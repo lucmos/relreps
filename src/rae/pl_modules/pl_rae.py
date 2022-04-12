@@ -5,20 +5,18 @@ import hydra
 import omegaconf
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
-import torchmetrics
 from torch.optim import Optimizer
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
-from rae.modules.module import CNN
+from rae.losses.vae_loss import vae_loss
 
 pylogger = logging.getLogger(__name__)
 
 
-class MyLightningModule(pl.LightningModule):
+class RAE(pl.LightningModule):
     logger: NNLogger
 
     def __init__(self, metadata: Optional[MetaData] = None, *args, **kwargs) -> None:
@@ -31,13 +29,7 @@ class MyLightningModule(pl.LightningModule):
 
         self.metadata = metadata
 
-        # example
-        metric = torchmetrics.Accuracy()
-        self.train_accuracy = metric.clone()
-        self.val_accuracy = metric.clone()
-        self.test_accuracy = metric.clone()
-
-        self.model = CNN(num_classes=len(metadata.class_vocab))
+        self.vae = hydra.utils.instantiate(kwargs["autoencoder"], metadata=metadata)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
@@ -49,18 +41,29 @@ class MyLightningModule(pl.LightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
         # example
-        return self.model(x)
+        return self.vae(x)
 
-    def step(self, x, y) -> Mapping[str, Any]:
-        # example
-        logits = self(x)
-        loss = F.cross_entropy(logits, y)
-        return {"logits": logits.detach(), "loss": loss}
+    def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
+        image_batch, _ = batch
+        image_batch_recon, latent_mu, latent_logvar = self.vae(image_batch)
+
+        loss = vae_loss(
+            image_batch_recon,
+            image_batch,
+            latent_mu,
+            latent_logvar,
+            variational_beta=self.hparams.loss.variational_beta,
+        )
+
+        return {
+            "loss": loss,
+            "image_batch_recon": image_batch_recon,
+            "latent_mu": latent_mu,
+            "latent_logvar": latent_logvar,
+        }
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        # example
-        x, y = batch
-        step_out = self.step(x, y)
+        step_out = self.step(batch, batch_idx, stage="train")
 
         self.log_dict(
             {"loss/train": step_out["loss"].cpu().detach()},
@@ -68,21 +71,10 @@ class MyLightningModule(pl.LightningModule):
             on_epoch=True,
             prog_bar=True,
         )
-
-        self.train_accuracy(torch.softmax(step_out["logits"], dim=-1), y)
-        self.log_dict(
-            {
-                "acc/train": self.train_accuracy,
-            },
-            on_epoch=True,
-        )
-
         return step_out
 
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        # example
-        x, y = batch
-        step_out = self.step(x, y)
+        step_out = self.step(batch, batch_idx, stage="validation")
 
         self.log_dict(
             {"loss/val": step_out["loss"].cpu().detach()},
@@ -90,34 +82,6 @@ class MyLightningModule(pl.LightningModule):
             on_epoch=True,
             prog_bar=True,
         )
-
-        self.val_accuracy(torch.softmax(step_out["logits"], dim=-1), y)
-        self.log_dict(
-            {
-                "acc/val": self.val_accuracy,
-            },
-            on_epoch=True,
-        )
-
-        return step_out
-
-    def test_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        # example
-        x, y = batch
-        step_out = self.step(x, y)
-
-        self.log_dict(
-            {"loss/test": step_out["loss"].cpu().detach()},
-        )
-
-        self.test_accuracy(torch.softmax(step_out["logits"], dim=-1), y)
-        self.log_dict(
-            {
-                "acc/test": self.test_accuracy,
-            },
-            on_epoch=True,
-        )
-
         return step_out
 
     def configure_optimizers(
@@ -151,9 +115,11 @@ def main(cfg: omegaconf.DictConfig) -> None:
     Args:
         cfg: the hydra configuration
     """
+    datamodule: pl.LightningDataModule = hydra.utils.instantiate(cfg.nn.data, _recursive_=False)
+
     _: pl.LightningModule = hydra.utils.instantiate(
-        cfg.model,
-        optim=cfg.optim,
+        cfg.nn.module,
+        metadata=datamodule.metadata,
         _recursive_=False,
     )
 
