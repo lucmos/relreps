@@ -1,13 +1,14 @@
 import logging
 from functools import cached_property, partial
 from pathlib import Path
-from typing import List, Mapping, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import hydra
 import omegaconf
 import pytorch_lightning as pl
+import torch
 from omegaconf import DictConfig
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
 
@@ -18,7 +19,13 @@ pylogger = logging.getLogger(__name__)
 
 
 class MetaData:
-    def __init__(self, class_vocab: Mapping[str, int]):
+    def __init__(
+        self,
+        anchors_idxs: List[int],
+        anchors: torch.Tensor,
+        anchors_targets: torch.Tensor,
+        class_to_idx: Dict[str, int],
+    ):
         """The data information the Lightning Module will be provided with.
 
         This is a "bridge" between the Lightning DataModule and the Lightning Module.
@@ -36,12 +43,14 @@ class MetaData:
         MetaData exposes `save` and `load`. Those are two user-defined methods that specify
         how to serialize and de-serialize the information contained in its attributes.
         This is needed for the checkpointing restore to work properly.
-
-        Args:
-            class_vocab: association between class names and their indices
         """
-        # example
-        self.class_vocab: Mapping[str, int] = class_vocab
+        self.class_to_idx: Dict[str, int] = class_to_idx
+        self.anchors_idxs: List[int] = anchors_idxs
+        self.anchors: torch.Tensor = anchors
+        self.anchors_targets: torch.Tensor = anchors_targets
+
+    def __repr__(self):
+        return f"MetaData(anchors_idxs={self.anchors_idxs}, ...)"
 
     def save(self, dst_path: Path) -> None:
         """Serialize the MetaData attributes into the zipped checkpoint in dst_path.
@@ -51,10 +60,10 @@ class MetaData:
         """
         pylogger.debug(f"Saving MetaData to '{dst_path}'")
 
-        # example
-        (dst_path / "class_vocab.tsv").write_text(
-            "\n".join(f"{key}\t{value}" for key, value in self.class_vocab.items())
-        )
+        torch.save(self.class_to_idx, f=dst_path / "class_to_idx.pt")
+        torch.save(self.anchors_idxs, f=dst_path / "anchors_idxs.pt")
+        torch.save(self.anchors, f=dst_path / "anchors.pt")
+        torch.save(self.anchors_targets, f=dst_path / "anchors_targets.pt")
 
     @staticmethod
     def load(src_path: Path) -> "MetaData":
@@ -68,16 +77,13 @@ class MetaData:
         """
         pylogger.debug(f"Loading MetaData from '{src_path}'")
 
-        # example
-        lines = (src_path / "class_vocab.tsv").read_text(encoding="utf-8").splitlines()
-
-        class_vocab = {}
-        for line in lines:
-            key, value = line.strip().split("\t")
-            class_vocab[key] = value
+        class_to_idx = torch.load(f=src_path / "class_to_idx.pt")
+        anchors_idxs = torch.load(f=src_path / "anchors_idxs.pt")
+        anchors = torch.load(f=src_path / "anchors.pt")
+        anchors_targets = torch.load(f=src_path / "anchors_targets.pt")
 
         return MetaData(
-            class_vocab=class_vocab,
+            anchors_idxs=anchors_idxs, anchors=anchors, anchors_targets=anchors_targets, class_to_idx=class_to_idx
         )
 
 
@@ -103,7 +109,7 @@ class MyDataModule(pl.LightningDataModule):
         batch_size: DictConfig,
         gpus: Optional[Union[List[int], str, int]],
         # example
-        val_percentage: float,
+        anchors_idxs: List[int],
     ):
         super().__init__()
         self.datasets = datasets
@@ -117,7 +123,7 @@ class MyDataModule(pl.LightningDataModule):
         self.test_datasets: Optional[Sequence[Dataset]] = None
 
         # example
-        self.val_percentage: float = val_percentage
+        self.anchors_idxs: List[int] = anchors_idxs
 
     @cached_property
     def metadata(self) -> MetaData:
@@ -132,40 +138,51 @@ class MyDataModule(pl.LightningDataModule):
         if self.train_dataset is None:
             self.setup(stage="fit")
 
-        return MetaData(class_vocab=self.train_dataset.dataset.class_vocab)
+        anchors_images = []
+        anchors_targets = []
+        for anchor_index in self.anchors_idxs:
+            image, target = self.train_dataset[anchor_index]
+            anchors_images.append(image)
+            anchors_targets.append(target)
+
+        anchors_images = torch.stack(anchors_images, dim=0)
+        anchors_targets = torch.as_tensor(anchors_targets)
+        class_to_idx = self.train_dataset.mnist.class_to_idx
+        return MetaData(
+            anchors_idxs=self.anchors_idxs,
+            anchors=anchors_images,
+            anchors_targets=anchors_targets,
+            class_to_idx=class_to_idx,
+        )
 
     def prepare_data(self) -> None:
         # download only
         pass
 
     def setup(self, stage: Optional[str] = None):
-        transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+        transform = transforms.Compose([transforms.ToTensor()])  # , transforms.Normalize((0.1307,), (0.3081,))])
 
         # Here you should instantiate your datasets, you may also split the train into train and validation if needed.
         if (stage is None or stage == "fit") and (self.train_dataset is None and self.val_datasets is None):
             # example
-            mnist_train = hydra.utils.instantiate(
+            self.train_dataset = hydra.utils.instantiate(
                 self.datasets.train,
                 split="train",
                 transform=transform,
                 path=PROJECT_ROOT / "data",
             )
-            train_length = int(len(mnist_train) * (1 - self.val_percentage))
-            val_length = len(mnist_train) - train_length
-            self.train_dataset, val_dataset = random_split(mnist_train, [train_length, val_length])
 
-            self.val_datasets = [val_dataset]
+            self.val_datasets = [
+                hydra.utils.instantiate(
+                    self.datasets.train,
+                    split="test",
+                    transform=transform,
+                    path=PROJECT_ROOT / "data",
+                )
+            ]
 
         if stage is None or stage == "test":
-            self.test_datasets = [
-                hydra.utils.instantiate(
-                    dataset_cfg,
-                    split="test",
-                    path=PROJECT_ROOT / "data",
-                    transform=transform,
-                )
-                for dataset_cfg in self.datasets.test
-            ]
+            raise NotImplementedError()
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
@@ -190,19 +207,6 @@ class MyDataModule(pl.LightningDataModule):
             for dataset in self.val_datasets
         ]
 
-    def test_dataloader(self) -> Sequence[DataLoader]:
-        return [
-            DataLoader(
-                dataset,
-                shuffle=False,
-                batch_size=self.batch_size.test,
-                num_workers=self.num_workers.test,
-                pin_memory=self.pin_memory,
-                collate_fn=partial(collate_fn, split="test", metadata=self.metadata),
-            )
-            for dataset in self.test_datasets
-        ]
-
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(" f"{self.datasets=}, " f"{self.num_workers=}, " f"{self.batch_size=})"
 
@@ -214,7 +218,7 @@ def main(cfg: omegaconf.DictConfig) -> None:
     Args:
         cfg: the hydra configuration
     """
-    _: pl.LightningDataModule = hydra.utils.instantiate(cfg.data.datamodule, _recursive_=False)
+    _: pl.LightningDataModule = hydra.utils.instantiate(cfg.nn.data, _recursive_=False)
 
 
 if __name__ == "__main__":
