@@ -1,9 +1,0 @@
-# Variational RAE
-
-python src/rae/run.py -m \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=True,False \
-    nn.data.anchors_mode=fixed,random_images,random_latents \
-    core.tags=rae \
-    train.trainer.fast_dev_run=True
