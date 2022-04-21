@@ -69,8 +69,8 @@ class RAE(nn.Module):
     def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool):
         super().__init__()
         self.metadata = metadata
-        self.anchors_images = metadata.anchors_images
-        self.anchors_latents = metadata.anchors_latents
+        self.register_buffer("anchors_images", metadata.anchors_images)
+        self.register_buffer("anchors_latents", metadata.anchors_latents)
 
         if self.anchors_images is None and self.anchors_latents is None:
             raise ValueError("The RAE model needs anchors!")

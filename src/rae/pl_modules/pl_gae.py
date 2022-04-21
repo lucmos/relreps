@@ -57,6 +57,10 @@ class LightningGAE(pl.LightningModule):
             "l1": F.l1_loss,
         }
 
+        self.register_buffer("anchor_images", self.metadata.anchors_images)
+        self.register_buffer("anchor_latents", self.metadata.anchors_latents)
+        self.register_buffer("fixed_images", self.metadata.fixed_images)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
 
@@ -89,11 +93,11 @@ class LightningGAE(pl.LightningModule):
                     self.validation_stats_df,
                     pd.DataFrame(
                         {
-                            "image_index": output["batch"]["index"],
+                            "image_index": output["batch"]["index"].cpu(),
                             "class": output["batch"]["class"],
-                            "target": output["batch"]["target"],
-                            "latent_0": output["default_latent"][:, 0],
-                            "latent_1": output["default_latent"][:, 1],
+                            "target": output["batch"]["target"].cpu(),
+                            "latent_0": output["default_latent"][:, 0].cpu(),
+                            "latent_1": output["default_latent"][:, 1].cpu(),
                             # "std_0": output["latent_logvar"][:, 0],
                             # "std_1": output["latent_logvar"][:, 1],
                             "epoch": [self.current_epoch] * len(output["batch"]["index"]),
@@ -104,26 +108,26 @@ class LightningGAE(pl.LightningModule):
                 ignore_index=False,
             )
 
-        if self.metadata.anchors_images is not None:
-            anchors_out = self(self.metadata.anchors_images)
-            anchors_num = self.metadata.anchors_images.shape[0]
+        if self.anchor_images is not None:
+            anchors_out = self(self.anchor_images)
+            anchors_num = self.anchor_images.shape[0]
             non_elements = ["none"] * anchors_num
             self.validation_stats_df = pd.concat(
                 [
                     self.validation_stats_df,
                     pd.DataFrame(
                         {
-                            "image_index": self.metadata.anchors_idxs
+                            "image_index": self.metadata.anchors_idxs.cpu()
                             if self.metadata.anchors_idxs is not None
                             else list(range(anchors_num)),
                             "class": self.metadata.anchors_classes
                             if self.metadata.anchors_classes is not None
                             else non_elements,
-                            "target": self.metadata.anchors_targets
+                            "target": self.metadata.anchors_targets.cpu()
                             if self.metadata.anchors_targets is not None
                             else non_elements,
-                            "latent_0": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 0],
-                            "latent_1": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 1],
+                            "latent_0": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 0].cpu(),
+                            "latent_1": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 1].cpu(),
                             # "std_0": anchors_latent_std[:, 0],
                             # "std_1": anchors_latent_std[:, 1],
                             "epoch": [self.current_epoch] * anchors_num,
@@ -135,14 +139,15 @@ class LightningGAE(pl.LightningModule):
             )
             anchors_reconstructed = anchors_out[Output.OUT]
         else:
-            anchors_latents = self.metadata.anchors_latents
-            assert anchors_latents is not None
+            assert self.anchors_latents is not None
             if isinstance(self.autoencoder.decoder, RaeDecoder):
-                anchors_reconstructed, _ = self.autoencoder.decoder(anchors_latents, anchors_latents=anchors_latents)
+                anchors_reconstructed, _ = self.autoencoder.decoder(
+                    self.anchors_latents, anchors_latents=self.anchors_latents
+                )
             else:
-                anchors_reconstructed = self.autoencoder.decoder(anchors_latents)
+                anchors_reconstructed = self.autoencoder.decoder(self.anchors_latents)
 
-            anchors_num = self.metadata.anchors_latents.shape[0]
+            anchors_num = self.anchors_latents.shape[0]
             non_elements = ["none"] * anchors_num
 
             self.validation_stats_df = pd.concat(
@@ -155,8 +160,8 @@ class LightningGAE(pl.LightningModule):
                             else list(range(anchors_num)),
                             "class": non_elements,
                             "target": non_elements,
-                            "latent_0": anchors_latents[:, 0],
-                            "latent_1": anchors_latents[:, 1],
+                            "latent_0": self.anchors_latents[:, 0].cpu(),
+                            "latent_1": self.anchors_latents[:, 1].cpu(),
                             # "std_0": anchors_latent_std[:, 0],
                             # "std_1": anchors_latent_std[:, 1],
                             "epoch": [self.current_epoch] * anchors_num,
@@ -167,7 +172,7 @@ class LightningGAE(pl.LightningModule):
                 ignore_index=False,
             )
 
-        fixed_images_out = self(self.metadata.fixed_images)[Output.OUT]
+        fixed_images_out = self(self.fixed_images)[Output.OUT]
 
         self.logger.experiment.log(
             {
@@ -180,15 +185,15 @@ class LightningGAE(pl.LightningModule):
         )
 
     def on_fit_start(self) -> None:
-        fixed_images_fig = self.plot_images(self.metadata.fixed_images, "Source images")
+        fixed_images_fig = self.plot_images(self.fixed_images.cpu(), "Source images")
         self.logger.experiment.log(
             {"images/source": fixed_images_fig},
             step=self.global_step,
         )
 
-        if self.metadata.anchors_images is not None:
+        if self.anchor_images is not None:
             self.logger.experiment.log(
-                {"anchors/source": self.plot_images(self.metadata.anchors_images, "Anchors images", figsize=(17, 4))},
+                {"anchors/source": self.plot_images(self.anchor_images.cpu(), "Anchors images", figsize=(17, 4))},
                 step=self.global_step,
             )
 
