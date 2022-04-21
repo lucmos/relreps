@@ -3,13 +3,16 @@ import logging
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import hydra
+import matplotlib.pyplot as plt
 import omegaconf
 import pandas as pd
 import plotly
 import plotly.express as px
 import pytorch_lightning as pl
 import torch
+import torchvision
 import wandb
+from matplotlib.figure import Figure
 from torch.optim import Optimizer
 
 from nn_core.common import PROJECT_ROOT
@@ -107,6 +110,30 @@ class LightningGAE(pl.LightningModule):
             ],
             ignore_index=False,
         )
+
+        fixed_images_out = self(self.metadata.fixed_images)[Output.OUT]
+        reconstructed_fixed_images_fig = self.plot_images(fixed_images_out, "Reconstructed images")
+
+        self.logger.experiment.log(
+            {"images/reconstructed": reconstructed_fixed_images_fig},
+            step=self.global_step,
+        )
+
+    def on_fit_start(self) -> None:
+        fixed_images_fig = self.plot_images(self.metadata.fixed_images, "Source images")
+        self.logger.experiment.log(
+            {"images/source": fixed_images_fig},
+            step=self.global_step,
+        )
+
+    @staticmethod
+    def plot_images(images: torch.Tensor, title: str) -> Figure:
+        fig, ax = plt.subplots(1, 1, figsize=(17, 9))
+        ax.imshow(torchvision.utils.make_grid(images, 10, 5).permute(1, 2, 0))
+        ax.set_title(title)
+        ax.axis("off")
+        fig.set_tight_layout(tight=True)
+        return fig
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         step_out = self.step(batch, batch_idx, stage="train")
