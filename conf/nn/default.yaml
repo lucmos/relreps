@@ -41,7 +41,7 @@ data:
 
 
 module:
-  _target_: rae.pl_modules.pl_variational.LightningVariational
+  _target_: rae.pl_modules.pl_deterministic.LightningDeterministic
 
   plot_n_val_samples: 1000
 
@@ -49,10 +49,10 @@ module:
     variational_beta: 1
 
   autoencoder:
-    _target_: rae.modules.rae.RAE
+    _target_: rae.modules.ae.AE
     latent_dim: 2
     hidden_channels: 64
-    normalize_latents: False
+#    normalize_latents: False
 
   optimizer:
     #  Adam-oriented deep learning

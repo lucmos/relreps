@@ -117,7 +117,7 @@ class LightningGAE(pl.LightningModule):
                     self.validation_stats_df,
                     pd.DataFrame(
                         {
-                            "image_index": self.metadata.anchors_idxs.cpu()
+                            "image_index": self.metadata.anchors_idxs
                             if self.metadata.anchors_idxs is not None
                             else list(range(anchors_num)),
                             "class": self.metadata.anchors_classes
@@ -185,7 +185,7 @@ class LightningGAE(pl.LightningModule):
         )
 
     def on_fit_start(self) -> None:
-        fixed_images_fig = self.plot_images(self.fixed_images.cpu(), "Source images")
+        fixed_images_fig = self.plot_images(self.fixed_images, "Source images")
         self.logger.experiment.log(
             {"images/source": fixed_images_fig},
             step=self.global_step,
@@ -193,14 +193,14 @@ class LightningGAE(pl.LightningModule):
 
         if self.anchor_images is not None:
             self.logger.experiment.log(
-                {"anchors/source": self.plot_images(self.anchor_images.cpu(), "Anchors images", figsize=(17, 4))},
+                {"anchors/source": self.plot_images(self.anchor_images, "Anchors images", figsize=(17, 4))},
                 step=self.global_step,
             )
 
     @staticmethod
     def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, int]] = None) -> Figure:
         fig, ax = plt.subplots(1, 1, figsize=(17, 9) if figsize is None else figsize)
-        ax.imshow(torchvision.utils.make_grid(images, 10, 5).permute(1, 2, 0))
+        ax.imshow(torchvision.utils.make_grid(images.cpu(), 10, 5).permute(1, 2, 0))
         ax.set_title(title)
         ax.axis("off")
         fig.set_tight_layout(tight=True)
