@@ -1,3 +1,4 @@
+import abc
 import logging
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -15,12 +16,12 @@ from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
-from rae.losses.vae_loss import vae_loss
+from rae.modules.output_keys import Output
 
 pylogger = logging.getLogger(__name__)
 
 
-class RAE(pl.LightningModule):
+class LightningGAE(pl.LightningModule):
     logger: NNLogger
 
     def __init__(self, metadata: Optional[MetaData] = None, *args, **kwargs) -> None:
@@ -33,9 +34,19 @@ class RAE(pl.LightningModule):
 
         self.metadata = metadata
 
-        self.vae = hydra.utils.instantiate(kwargs["autoencoder"], metadata=metadata)
+        self.autoencoder = hydra.utils.instantiate(kwargs["autoencoder"], metadata=metadata)
 
-        self.df_columns = ["image_index", "class", "target", "mu_0", "mu_1", "std_0", "std_1", "epoch", "is_anchor"]
+        self.df_columns = [
+            "image_index",
+            "class",
+            "target",
+            "latent_0",
+            "latent_1",
+            # "std_0",
+            # "std_1",
+            "epoch",
+            "is_anchor",
+        ]
 
         self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
 
@@ -49,27 +60,11 @@ class RAE(pl.LightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
         # example
-        return self.vae(x)
+        return self.autoencoder(x)
 
+    @abc.abstractmethod
     def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
-        image_batch = batch["image"]
-        image_batch_recon, latent_mu, latent_logvar = self.vae(image_batch)
-
-        loss = vae_loss(
-            image_batch_recon,
-            image_batch,
-            latent_mu,
-            latent_logvar,
-            variational_beta=self.hparams.loss.variational_beta,
-        )
-
-        return {
-            "loss": loss,
-            "batch": batch,
-            "image_batch_recon": image_batch_recon.detach(),
-            "latent_mu": latent_mu.detach(),
-            "latent_logvar": latent_logvar.detach(),
-        }
+        raise NotImplementedError()
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
         for output in outputs:
@@ -81,10 +76,10 @@ class RAE(pl.LightningModule):
                             "image_index": output["batch"]["index"],
                             "class": output["batch"]["class"],
                             "target": output["batch"]["target"],
-                            "mu_0": output["latent_mu"][:, 0],
-                            "mu_1": output["latent_mu"][:, 1],
-                            "std_0": output["latent_logvar"][:, 0],
-                            "std_1": output["latent_logvar"][:, 1],
+                            "latent_0": output["default_latent"][:, 0],
+                            "latent_1": output["default_latent"][:, 1],
+                            # "std_0": output["latent_logvar"][:, 0],
+                            # "std_1": output["latent_logvar"][:, 1],
                             "epoch": [self.current_epoch] * len(output["batch"]["index"]),
                             "is_anchor": [False] * len(output["batch"]["index"]),
                         }
@@ -92,7 +87,7 @@ class RAE(pl.LightningModule):
                 ],
                 ignore_index=False,
             )
-        anchors_recon, anchors_latent_mu, anchors_latent_std = self(self.metadata.anchors)
+        anchors_out = self(self.metadata.anchors)
         self.validation_stats_df = pd.concat(
             [
                 self.validation_stats_df,
@@ -101,10 +96,10 @@ class RAE(pl.LightningModule):
                         "image_index": self.metadata.anchors_idxs,
                         "class": self.metadata.anchors_classes,
                         "target": self.metadata.anchors_targets,
-                        "mu_0": anchors_latent_mu[:, 0],
-                        "mu_1": anchors_latent_mu[:, 1],
-                        "std_0": anchors_latent_std[:, 0],
-                        "std_1": anchors_latent_std[:, 1],
+                        "latent_0": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 0],
+                        "latent_1": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 1],
+                        # "std_0": anchors_latent_std[:, 0],
+                        # "std_1": anchors_latent_std[:, 1],
                         "epoch": [self.current_epoch] * len(self.metadata.anchors_idxs),
                         "is_anchor": [True] * len(self.metadata.anchors_idxs),
                     }
@@ -146,12 +141,12 @@ class RAE(pl.LightningModule):
 
         latent_val_fig = px.scatter(
             self.validation_stats_df.loc[self.validation_stats_df["image_index"] < n_samples],
-            x="mu_0",
-            y="mu_1",
+            x="latent_0",
+            y="latent_1",
             animation_frame="epoch",
             animation_group="image_index",
             category_orders={"class": self.metadata.class_to_idx.keys()},
-            # size='std_0',  # TODO: fixme, plotly crashes with any column name to set the anchor size
+            #             # size='std_0',  # TODO: fixme, plotly crashes with any column name to set the anchor size
             color="class",
             hover_name="image_index",
             facet_col="is_anchor",
