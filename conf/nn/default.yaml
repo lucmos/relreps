@@ -29,6 +29,8 @@ data:
 module:
   _target_: rae.pl_modules.pl_rae.RAE
 
+  plot_n_val_samples: 1000
+
   loss:
     variational_beta: 1
 

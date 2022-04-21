@@ -24,7 +24,9 @@ class MetaData:
         anchors_idxs: List[int],
         anchors: torch.Tensor,
         anchors_targets: torch.Tensor,
+        anchors_classes: torch.Tensor,
         class_to_idx: Dict[str, int],
+        idx_to_class: Dict[int, str],
     ):
         """The data information the Lightning Module will be provided with.
 
@@ -45,9 +47,11 @@ class MetaData:
         This is needed for the checkpointing restore to work properly.
         """
         self.class_to_idx: Dict[str, int] = class_to_idx
+        self.idx_to_class: Dict[int, str] = idx_to_class
         self.anchors_idxs: List[int] = anchors_idxs
         self.anchors: torch.Tensor = anchors
         self.anchors_targets: torch.Tensor = anchors_targets
+        self.anchors_classes: torch.Tensor = anchors_classes
 
     def __repr__(self):
         return f"MetaData(anchors_idxs={self.anchors_idxs}, ...)"
@@ -61,9 +65,11 @@ class MetaData:
         pylogger.debug(f"Saving MetaData to '{dst_path}'")
 
         torch.save(self.class_to_idx, f=dst_path / "class_to_idx.pt")
+        torch.save(self.idx_to_class, f=dst_path / "idx_to_class.pt")
         torch.save(self.anchors_idxs, f=dst_path / "anchors_idxs.pt")
         torch.save(self.anchors, f=dst_path / "anchors.pt")
         torch.save(self.anchors_targets, f=dst_path / "anchors_targets.pt")
+        torch.save(self.anchors_classes, f=dst_path / "anchors_classes.pt")
 
     @staticmethod
     def load(src_path: Path) -> "MetaData":
@@ -78,12 +84,19 @@ class MetaData:
         pylogger.debug(f"Loading MetaData from '{src_path}'")
 
         class_to_idx = torch.load(f=src_path / "class_to_idx.pt")
+        idx_to_class = torch.load(f=src_path / "idx_to_class.pt")
         anchors_idxs = torch.load(f=src_path / "anchors_idxs.pt")
         anchors = torch.load(f=src_path / "anchors.pt")
         anchors_targets = torch.load(f=src_path / "anchors_targets.pt")
+        anchors_classes = torch.load(f=src_path / "anchors_classes.pt")
 
         return MetaData(
-            anchors_idxs=anchors_idxs, anchors=anchors, anchors_targets=anchors_targets, class_to_idx=class_to_idx
+            anchors_idxs=anchors_idxs,
+            anchors=anchors,
+            anchors_targets=anchors_targets,
+            anchors_classes=anchors_classes,
+            class_to_idx=class_to_idx,
+            idx_to_class=idx_to_class,
         )
 
 
@@ -140,19 +153,24 @@ class MyDataModule(pl.LightningDataModule):
 
         anchors_images = []
         anchors_targets = []
+        anchors_classes = []
         for anchor_index in self.anchors_idxs:
-            image, target = self.train_dataset[anchor_index]
-            anchors_images.append(image)
-            anchors_targets.append(target)
+            sample = self.train_dataset[anchor_index]
+            anchors_images.append(sample["image"])
+            anchors_targets.append(sample["target"])
+            anchors_classes.append(sample["class"])
 
         anchors_images = torch.stack(anchors_images, dim=0)
         anchors_targets = torch.as_tensor(anchors_targets)
         class_to_idx = self.train_dataset.mnist.class_to_idx
+        idx_to_class = {x: y for y, x in class_to_idx.items()}
         return MetaData(
             anchors_idxs=self.anchors_idxs,
             anchors=anchors_images,
             anchors_targets=anchors_targets,
+            anchors_classes=anchors_classes,
             class_to_idx=class_to_idx,
+            idx_to_class=idx_to_class,
         )
 
     def prepare_data(self) -> None:

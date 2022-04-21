@@ -30,7 +30,8 @@ class MNISTDataset(Dataset):
 
     def __getitem__(self, index: int):
         # example
-        return self.mnist[index]
+        image, target = self.mnist[index]
+        return {"index": index, "image": image, "target": target, "class": self.mnist.classes[target]}
 
     def __repr__(self) -> str:
         return f"MNIST({self.split=}, n_instances={len(self)})"
@@ -45,13 +46,14 @@ def main(cfg: omegaconf.DictConfig) -> None:
     """
     from torchvision.transforms import transforms
 
-    _: Dataset = hydra.utils.instantiate(
+    dataset: Dataset = hydra.utils.instantiate(
         cfg.nn.data.datasets.train,
         split="train",
         path=PROJECT_ROOT / "data",
         transform=transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]),
         _recursive_=False,
     )
+    _ = dataset[0]
 
 
 if __name__ == "__main__":

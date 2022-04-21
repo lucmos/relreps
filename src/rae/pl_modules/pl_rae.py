@@ -1,10 +1,14 @@
 import logging
-from typing import Any, Mapping, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
 import hydra
 import omegaconf
+import pandas as pd
+import plotly
+import plotly.express as px
 import pytorch_lightning as pl
 import torch
+import wandb
 from torch.optim import Optimizer
 
 from nn_core.common import PROJECT_ROOT
@@ -31,6 +35,10 @@ class RAE(pl.LightningModule):
 
         self.vae = hydra.utils.instantiate(kwargs["autoencoder"], metadata=metadata)
 
+        self.df_columns = ["image_index", "class", "target", "mu_0", "mu_1", "std_0", "std_1", "epoch", "is_anchor"]
+
+        self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
 
@@ -44,7 +52,7 @@ class RAE(pl.LightningModule):
         return self.vae(x)
 
     def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
-        image_batch, _ = batch
+        image_batch = batch["image"]
         image_batch_recon, latent_mu, latent_logvar = self.vae(image_batch)
 
         loss = vae_loss(
@@ -57,10 +65,53 @@ class RAE(pl.LightningModule):
 
         return {
             "loss": loss,
-            "image_batch_recon": image_batch_recon,
-            "latent_mu": latent_mu,
-            "latent_logvar": latent_logvar,
+            "batch": batch,
+            "image_batch_recon": image_batch_recon.detach(),
+            "latent_mu": latent_mu.detach(),
+            "latent_logvar": latent_logvar.detach(),
         }
+
+    def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
+        for output in outputs:
+            self.validation_stats_df = pd.concat(
+                [
+                    self.validation_stats_df,
+                    pd.DataFrame(
+                        {
+                            "image_index": output["batch"]["index"],
+                            "class": output["batch"]["class"],
+                            "target": output["batch"]["target"],
+                            "mu_0": output["latent_mu"][:, 0],
+                            "mu_1": output["latent_mu"][:, 1],
+                            "std_0": output["latent_logvar"][:, 0],
+                            "std_1": output["latent_logvar"][:, 1],
+                            "epoch": [self.current_epoch] * len(output["batch"]["index"]),
+                            "is_anchor": [False] * len(output["batch"]["index"]),
+                        }
+                    ),
+                ],
+                ignore_index=False,
+            )
+        anchors_recon, anchors_latent_mu, anchors_latent_std = self(self.metadata.anchors)
+        self.validation_stats_df = pd.concat(
+            [
+                self.validation_stats_df,
+                pd.DataFrame(
+                    {
+                        "image_index": self.metadata.anchors_idxs,
+                        "class": self.metadata.anchors_classes,
+                        "target": self.metadata.anchors_targets,
+                        "mu_0": anchors_latent_mu[:, 0],
+                        "mu_1": anchors_latent_mu[:, 1],
+                        "std_0": anchors_latent_std[:, 0],
+                        "std_1": anchors_latent_std[:, 1],
+                        "epoch": [self.current_epoch] * len(self.metadata.anchors_idxs),
+                        "is_anchor": [True] * len(self.metadata.anchors_idxs),
+                    }
+                ),
+            ],
+            ignore_index=False,
+        )
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         step_out = self.step(batch, batch_idx, stage="train")
@@ -83,6 +134,40 @@ class RAE(pl.LightningModule):
             prog_bar=True,
         )
         return step_out
+
+    def on_fit_end(self) -> None:
+        n_samples = self.hparams.plot_n_val_samples
+        color_discrete_map = {
+            class_name: color
+            for class_name, color in zip(
+                self.metadata.class_to_idx, px.colors.qualitative.Plotly[: len(self.metadata.class_to_idx)]
+            )
+        }
+
+        latent_val_fig = px.scatter(
+            self.validation_stats_df.loc[self.validation_stats_df["image_index"] < n_samples],
+            x="mu_0",
+            y="mu_1",
+            animation_frame="epoch",
+            animation_group="image_index",
+            category_orders={"class": self.metadata.class_to_idx.keys()},
+            # size='std_0',  # TODO: fixme, plotly crashes with any column name to set the anchor size
+            color="class",
+            hover_name="image_index",
+            facet_col="is_anchor",
+            color_discrete_map=color_discrete_map,
+            symbol="is_anchor",
+            symbol_map={False: "circle", True: "star"},
+            size_max=40,
+            range_x=[-5, 5],
+            color_continuous_scale=None,
+            range_y=[-5, 5],
+        )
+
+        # Convert to HTML as a workaround to https://github.com/wandb/client/issues/2191
+        self.logger.experiment.log(
+            {"latent/val": wandb.Html(plotly.io.to_html(latent_val_fig), inject=False)}, step=self.global_step
+        )
 
     def configure_optimizers(
         self,

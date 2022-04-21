@@ -12,7 +12,7 @@ trainer:
   accumulate_grad_batches: 1
   num_sanity_val_steps: 2
   gradient_clip_val: 10.0
-  val_check_interval: 1.0
+  check_val_every_n_epoch: 1
   deterministic: ${train.deterministic}
 
 restore:
