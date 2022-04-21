@@ -10,8 +10,9 @@ pylogger = logging.getLogger(__name__)
 
 class LightningVariational(LightningGAE):
     def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
+        out = super().step(batch, batch_index, stage)
         image_batch = batch["image"]
-        out = self(image_batch)
+
         image_batch_recon, latent_mu, latent_logvar = out[Output.OUT], out[Output.LATENT_MU], out[Output.LATENT_LOGVAR]
         default_latent = out[out[Output.DEFAULT_LATENT]]
 

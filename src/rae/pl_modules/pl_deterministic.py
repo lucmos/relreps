@@ -11,8 +11,9 @@ pylogger = logging.getLogger(__name__)
 
 class LightningDeterministic(LightningGAE):
     def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
+        out = super().step(batch, batch_index, stage)
         image_batch = batch["image"]
-        out = self(image_batch)
+
         image_batch_recon = out[Output.OUT]
         default_latent = out[out[Output.DEFAULT_LATENT]]
 

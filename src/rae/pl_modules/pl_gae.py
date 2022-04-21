@@ -1,4 +1,3 @@
-import abc
 import logging
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, Union
 
@@ -10,6 +9,7 @@ import plotly
 import plotly.express as px
 import pytorch_lightning as pl
 import torch
+import torch.nn.functional as F
 import torchvision
 import wandb
 from matplotlib.figure import Figure
@@ -45,13 +45,16 @@ class LightningGAE(pl.LightningModule):
             "target",
             "latent_0",
             "latent_1",
-            # "std_0",
-            # "std_1",
             "epoch",
             "is_anchor",
         ]
 
         self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
+
+        self.reconstruction_quality_metrics = {
+            "mse": F.mse_loss,
+            "l1": F.l1_loss,
+        }
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
@@ -65,9 +68,15 @@ class LightningGAE(pl.LightningModule):
         # example
         return self.autoencoder(x)
 
-    @abc.abstractmethod
     def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
-        raise NotImplementedError()
+        image_batch = batch["image"]
+        out = self(image_batch)
+
+        for metric_name, metric in self.reconstruction_quality_metrics.items():
+            metric_value = metric(image_batch, out[Output.OUT])
+            self.log(f"{stage}/{metric_name}", metric_value)
+
+        return out
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
         for output in outputs:
@@ -188,7 +197,9 @@ class LightningGAE(pl.LightningModule):
 
         # Convert to HTML as a workaround to https://github.com/wandb/client/issues/2191
         self.logger.experiment.log(
-            {"latent/val": wandb.Html(plotly.io.to_html(latent_val_fig), inject=False)}, step=self.global_step
+            {
+                "latent": wandb.Html(plotly.io.to_html(latent_val_fig), inject=True),
+            }
         )
 
     def configure_optimizers(
