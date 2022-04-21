@@ -7,8 +7,8 @@ trainer:
   fast_dev_run: False # Enable this for debug purposes
   gpus: 1
   precision: 32
-  max_epochs: 3
-  max_steps: 10000
+  max_epochs: 100
+  max_steps: 100000
   accumulate_grad_batches: 1
   num_sanity_val_steps: 2
   gradient_clip_val: 10.0
