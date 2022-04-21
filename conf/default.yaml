@@ -3,7 +3,8 @@ core:
   project_name: rae
   storage_dir: ${oc.env:PROJECT_ROOT}/storage
   version: 0.0.1
-  tags: null
+  tags:
+    - develop
 
 defaults:
   - hydra: default

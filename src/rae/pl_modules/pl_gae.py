@@ -20,6 +20,7 @@ from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
 from rae.modules.output_keys import Output
+from rae.modules.rae import RaeDecoder
 
 pylogger = logging.getLogger(__name__)
 
@@ -102,32 +103,79 @@ class LightningGAE(pl.LightningModule):
                 ],
                 ignore_index=False,
             )
-        anchors_out = self(self.metadata.anchors)
-        self.validation_stats_df = pd.concat(
-            [
-                self.validation_stats_df,
-                pd.DataFrame(
-                    {
-                        "image_index": self.metadata.anchors_idxs,
-                        "class": self.metadata.anchors_classes,
-                        "target": self.metadata.anchors_targets,
-                        "latent_0": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 0],
-                        "latent_1": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 1],
-                        # "std_0": anchors_latent_std[:, 0],
-                        # "std_1": anchors_latent_std[:, 1],
-                        "epoch": [self.current_epoch] * len(self.metadata.anchors_idxs),
-                        "is_anchor": [True] * len(self.metadata.anchors_idxs),
-                    }
-                ),
-            ],
-            ignore_index=False,
-        )
+
+        if self.metadata.anchors_images is not None:
+            anchors_out = self(self.metadata.anchors_images)
+            anchors_num = self.metadata.anchors_images.shape[0]
+            non_elements = ["none"] * anchors_num
+            self.validation_stats_df = pd.concat(
+                [
+                    self.validation_stats_df,
+                    pd.DataFrame(
+                        {
+                            "image_index": self.metadata.anchors_idxs
+                            if self.metadata.anchors_idxs is not None
+                            else list(range(anchors_num)),
+                            "class": self.metadata.anchors_classes
+                            if self.metadata.anchors_classes is not None
+                            else non_elements,
+                            "target": self.metadata.anchors_targets
+                            if self.metadata.anchors_targets is not None
+                            else non_elements,
+                            "latent_0": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 0],
+                            "latent_1": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 1],
+                            # "std_0": anchors_latent_std[:, 0],
+                            # "std_1": anchors_latent_std[:, 1],
+                            "epoch": [self.current_epoch] * anchors_num,
+                            "is_anchor": [True] * anchors_num,
+                        }
+                    ),
+                ],
+                ignore_index=False,
+            )
+            anchors_reconstructed = anchors_out[Output.OUT]
+        else:
+            anchors_latents = self.metadata.anchors_latents
+            assert anchors_latents is not None
+            if isinstance(self.autoencoder.decoder, RaeDecoder):
+                anchors_reconstructed, _ = self.autoencoder.decoder(anchors_latents, anchors_latents=anchors_latents)
+            else:
+                anchors_reconstructed = self.autoencoder.decoder(anchors_latents)
+
+            anchors_num = self.metadata.anchors_latents.shape[0]
+            non_elements = ["none"] * anchors_num
+
+            self.validation_stats_df = pd.concat(
+                [
+                    self.validation_stats_df,
+                    pd.DataFrame(
+                        {
+                            "image_index": self.metadata.anchors_idxs
+                            if self.metadata.anchors_idxs is not None
+                            else list(range(anchors_num)),
+                            "class": non_elements,
+                            "target": non_elements,
+                            "latent_0": anchors_latents[:, 0],
+                            "latent_1": anchors_latents[:, 1],
+                            # "std_0": anchors_latent_std[:, 0],
+                            # "std_1": anchors_latent_std[:, 1],
+                            "epoch": [self.current_epoch] * anchors_num,
+                            "is_anchor": [True] * anchors_num,
+                        }
+                    ),
+                ],
+                ignore_index=False,
+            )
 
         fixed_images_out = self(self.metadata.fixed_images)[Output.OUT]
-        reconstructed_fixed_images_fig = self.plot_images(fixed_images_out, "Reconstructed images")
 
         self.logger.experiment.log(
-            {"images/reconstructed": reconstructed_fixed_images_fig},
+            {
+                "images/reconstructed": self.plot_images(fixed_images_out, "Reconstructed images"),
+                "anchors/reconstructed": self.plot_images(
+                    anchors_reconstructed, "Anchors reconstructed", figsize=(17, 4)
+                ),
+            },
             step=self.global_step,
         )
 
@@ -138,9 +186,15 @@ class LightningGAE(pl.LightningModule):
             step=self.global_step,
         )
 
+        if self.metadata.anchors_images is not None:
+            self.logger.experiment.log(
+                {"anchors/source": self.plot_images(self.metadata.anchors_images, "Anchors images", figsize=(17, 4))},
+                step=self.global_step,
+            )
+
     @staticmethod
-    def plot_images(images: torch.Tensor, title: str) -> Figure:
-        fig, ax = plt.subplots(1, 1, figsize=(17, 9))
+    def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, int]] = None) -> Figure:
+        fig, ax = plt.subplots(1, 1, figsize=(17, 9) if figsize is None else figsize)
         ax.imshow(torchvision.utils.make_grid(images, 10, 5).permute(1, 2, 0))
         ax.set_title(title)
         ax.axis("off")

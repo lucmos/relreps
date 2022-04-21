@@ -1,4 +1,5 @@
 import logging
+from enum import auto
 from functools import cached_property, partial
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union
@@ -15,16 +16,29 @@ from torchvision import transforms
 from nn_core.common import PROJECT_ROOT
 from nn_core.nn_types import Split
 
+try:
+    # be ready for 3.10 when it drops
+    from enum import StrEnum
+except ImportError:
+    from backports.strenum import StrEnum
+
 pylogger = logging.getLogger(__name__)
+
+
+class AnchorsMode(StrEnum):
+    FIXED = auto()
+    RANDOM_IMAGES = auto()
+    RANDOM_LATENTS = auto()
 
 
 class MetaData:
     def __init__(
         self,
-        anchors_idxs: List[int],
-        anchors: torch.Tensor,
-        anchors_targets: torch.Tensor,
-        anchors_classes: torch.Tensor,
+        anchors_idxs: Optional[List[int]],
+        anchors_images: Optional[torch.Tensor],
+        anchors_targets: Optional[torch.Tensor],
+        anchors_classes: Optional[torch.Tensor],
+        anchors_latents: Optional[torch.Tensor],
         fixed_images_idxs: List[int],
         fixed_images: torch.Tensor,
         fixed_images_targets: torch.Tensor,
@@ -53,9 +67,10 @@ class MetaData:
         self.class_to_idx: Dict[str, int] = class_to_idx
         self.idx_to_class: Dict[int, str] = idx_to_class
         self.anchors_idxs: List[int] = anchors_idxs
-        self.anchors: torch.Tensor = anchors
+        self.anchors_images: torch.Tensor = anchors_images
         self.anchors_targets: torch.Tensor = anchors_targets
         self.anchors_classes: torch.Tensor = anchors_classes
+        self.anchors_latents: torch.Tensor = anchors_latents
 
         self.fixed_images_idxs: torch.Tensor = fixed_images_idxs
         self.fixed_images: torch.Tensor = fixed_images
@@ -77,9 +92,10 @@ class MetaData:
         torch.save(self.idx_to_class, f=dst_path / "idx_to_class.pt")
 
         torch.save(self.anchors_idxs, f=dst_path / "anchors_idxs.pt")
-        torch.save(self.anchors, f=dst_path / "anchors.pt")
+        torch.save(self.anchors_images, f=dst_path / "anchors_images.pt")
         torch.save(self.anchors_targets, f=dst_path / "anchors_targets.pt")
         torch.save(self.anchors_classes, f=dst_path / "anchors_classes.pt")
+        torch.save(self.anchors_latents, f=dst_path / "anchors_latents.pt")
 
         torch.save(self.fixed_images_idxs, f=dst_path / "fixed_images_idxs.pt")
         torch.save(self.fixed_images, f=dst_path / "fixed_images.pt")
@@ -102,9 +118,10 @@ class MetaData:
         idx_to_class = torch.load(f=src_path / "idx_to_class.pt")
 
         anchors_idxs = torch.load(f=src_path / "anchors_idxs.pt")
-        anchors = torch.load(f=src_path / "anchors.pt")
+        anchors_images = torch.load(f=src_path / "anchors_images.pt")
         anchors_targets = torch.load(f=src_path / "anchors_targets.pt")
         anchors_classes = torch.load(f=src_path / "anchors_classes.pt")
+        anchors_latents = torch.load(f=src_path / "anchors_latents.pt")
 
         fixed_images_idxs = torch.load(f=src_path / "fixed_images_idxs.pt")
         fixed_images = torch.load(f=src_path / "fixed_images.pt")
@@ -113,9 +130,10 @@ class MetaData:
 
         return MetaData(
             anchors_idxs=anchors_idxs,
-            anchors=anchors,
+            anchors_images=anchors_images,
             anchors_targets=anchors_targets,
             anchors_classes=anchors_classes,
+            anchors_latents=anchors_latents,
             fixed_images_idxs=fixed_images_idxs,
             fixed_images=fixed_images,
             fixed_images_targets=fixed_images_targets,
@@ -146,8 +164,11 @@ class MyDataModule(pl.LightningDataModule):
         num_workers: DictConfig,
         batch_size: DictConfig,
         gpus: Optional[Union[List[int], str, int]],
-        anchors_idxs: List[int],
         val_images_fixed_idxs: List[int],
+        anchors_mode: str,
+        anchors_num: int,
+        anchors_idxs: List[int],
+        latent_dim: int,
     ):
         super().__init__()
         self.datasets = datasets
@@ -160,7 +181,17 @@ class MyDataModule(pl.LightningDataModule):
         self.val_datasets: Optional[Sequence[Dataset]] = None
         self.test_datasets: Optional[Sequence[Dataset]] = None
 
+        self.anchors_mode = anchors_mode
+        self.anchors_num = anchors_num
         self.anchors_idxs: List[int] = anchors_idxs
+        if anchors_mode not in set(AnchorsMode):
+            raise ValueError(f"Invalid anchors selection mode: '{anchors_mode}'")
+        if anchors_mode != AnchorsMode.FIXED and self.anchors_idxs is not None:
+            pylogger.warning("The anchors indexes are ignored if the anchors mode is not 'fixed'!")
+        if anchors_mode == AnchorsMode.FIXED and self.anchors_num is not None:
+            pylogger.warning("The anchor number is ignored if the anchors mode is 'fixed'!")
+        self.latent_dim = latent_dim
+
         self.val_images_fixed_idxs: List[int] = val_images_fixed_idxs
 
     def extract_batch(self, dataset: Dataset, indices: Sequence[int]) -> Dict[str, Any]:
@@ -182,6 +213,37 @@ class MyDataModule(pl.LightningDataModule):
             "classes": classes,
         }
 
+    def get_anchors(self) -> Dict[str, torch.Tensor]:
+        if self.anchors_mode == AnchorsMode.FIXED:
+            anchors = self.extract_batch(self.train_dataset, self.anchors_idxs)
+            return {
+                "anchors_idxs": self.anchors_idxs,
+                "anchors_images": anchors["images"],
+                "anchors_targets": anchors["targets"],
+                "anchors_classes": anchors["classes"],
+                "anchors_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.RANDOM_IMAGES:
+            random_images = torch.rand_like(self.extract_batch(self.train_dataset, [0] * self.anchors_num)["images"])
+            return {
+                "anchors_idxs": None,
+                "anchors_images": random_images,
+                "anchors_targets": None,
+                "anchors_classes": None,
+                "anchors_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.RANDOM_LATENTS:
+            random_latents = torch.randn(self.anchors_num, self.latent_dim)
+            return {
+                "anchors_idxs": None,
+                "anchors_images": None,
+                "anchors_targets": None,
+                "anchors_classes": None,
+                "anchors_latents": random_latents,
+            }
+        else:
+            raise RuntimeError()
+
     @cached_property
     def metadata(self) -> MetaData:
         """Data information to be fed to the Lightning Module as parameter.
@@ -198,20 +260,17 @@ class MyDataModule(pl.LightningDataModule):
         class_to_idx = self.train_dataset.mnist.class_to_idx
         idx_to_class = {x: y for y, x in class_to_idx.items()}
 
-        anchors = self.extract_batch(self.train_dataset, self.anchors_idxs)
+        anchors = self.get_anchors()
         fixed_images = self.extract_batch(self.val_datasets[0], self.val_images_fixed_idxs)
 
         return MetaData(
-            anchors_idxs=self.anchors_idxs,
-            anchors=anchors["images"],
-            anchors_targets=anchors["targets"],
-            anchors_classes=anchors["classes"],
             fixed_images_idxs=self.val_images_fixed_idxs,
             fixed_images=fixed_images["images"],
             fixed_images_targets=fixed_images["targets"],
             fixed_images_classes=fixed_images["classes"],
             class_to_idx=class_to_idx,
             idx_to_class=idx_to_class,
+            **anchors,
         )
 
     def prepare_data(self) -> None:
@@ -277,7 +336,8 @@ def main(cfg: omegaconf.DictConfig) -> None:
     Args:
         cfg: the hydra configuration
     """
-    _: pl.LightningDataModule = hydra.utils.instantiate(cfg.nn.data, _recursive_=False)
+    m: pl.LightningDataModule = hydra.utils.instantiate(cfg.nn.data, _recursive_=False)
+    m.metadata
 
 
 if __name__ == "__main__":
