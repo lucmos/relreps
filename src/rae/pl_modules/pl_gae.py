@@ -74,11 +74,14 @@ class LightningGAE(pl.LightningModule):
 
         for metric_name, metric in self.reconstruction_quality_metrics.items():
             metric_value = metric(image_batch, out[Output.OUT])
-            self.log(f"{stage}/{metric_name}", metric_value)
+            self.log(f"{stage}/{metric_name}", metric_value, on_step=False, on_epoch=True)
 
         return out
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
+        if self.trainer.sanity_checking:
+            return
+
         for output in outputs:
             self.validation_stats_df = pd.concat(
                 [
@@ -187,8 +190,8 @@ class LightningGAE(pl.LightningModule):
             hover_name="image_index",
             facet_col="is_anchor",
             color_discrete_map=color_discrete_map,
-            symbol="is_anchor",
-            symbol_map={False: "circle", True: "star"},
+            # symbol="is_anchor",
+            # symbol_map={False: "circle", True: "star"},
             size_max=40,
             range_x=[-5, 5],
             color_continuous_scale=None,
