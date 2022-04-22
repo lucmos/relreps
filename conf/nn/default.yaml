@@ -5,7 +5,7 @@ data:
   anchors_num: 10
 
   # Different classes for anchors
-  anchors_idxs: [0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
+  anchors_idxs: [15, 29, 38, 42, 52, 71, 79, 84, 91, 96]
 #
 #   ALl anchors from class seven
 #  anchors_idx: [0, 17, 26, 34, 36, 41, 60, 64, 70, 75]
