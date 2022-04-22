@@ -57,8 +57,8 @@ class LightningGAE(pl.LightningModule):
             "l1": F.l1_loss,
         }
 
-        self.register_buffer("anchor_images", self.metadata.anchors_images)
-        self.register_buffer("anchor_latents", self.metadata.anchors_latents)
+        self.register_buffer("anchors_images", self.metadata.anchors_images)
+        self.register_buffer("anchors_latents", self.metadata.anchors_latents)
         self.register_buffer("fixed_images", self.metadata.fixed_images)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -108,9 +108,9 @@ class LightningGAE(pl.LightningModule):
                 ignore_index=False,
             )
 
-        if self.anchor_images is not None:
-            anchors_out = self(self.anchor_images)
-            anchors_num = self.anchor_images.shape[0]
+        if self.anchors_images is not None:
+            anchors_out = self(self.anchors_images)
+            anchors_num = self.anchors_images.shape[0]
             non_elements = ["none"] * anchors_num
             self.validation_stats_df = pd.concat(
                 [
@@ -191,19 +191,22 @@ class LightningGAE(pl.LightningModule):
             step=self.global_step,
         )
 
-        if self.anchor_images is not None:
+        if self.anchors_images is not None:
             self.logger.experiment.log(
-                {"anchors/source": self.plot_images(self.anchor_images, "Anchors images", figsize=(17, 4))},
+                {"anchors/source": self.plot_images(self.anchors_images, "Anchors images", figsize=(17, 4))},
                 step=self.global_step,
             )
 
     @staticmethod
     def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, int]] = None) -> Figure:
         fig, ax = plt.subplots(1, 1, figsize=(17, 9) if figsize is None else figsize)
-        ax.imshow(torchvision.utils.make_grid(images.cpu(), 10, 5).permute(1, 2, 0))
         ax.set_title(title)
         ax.axis("off")
         fig.set_tight_layout(tight=True)
+        ax.imshow(torchvision.utils.make_grid(images.cpu(), 10, 5).permute(1, 2, 0))
+
+        # Plotly version
+        # fig = px.imshow(torchvision.utils.make_grid(images.cpu(), 10, 5).permute(1, 2, 0), title=title)
         return fig
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
