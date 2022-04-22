@@ -1,7 +1,7 @@
 data:
   _target_: rae.data.datamodule.MyDataModule
 
-  anchors_mode: "fixed" # # "fixed", "random_images", "random_latents"
+  anchors_mode: "random_latents" # # "fixed", "random_images", "random_latents"
   anchors_num: 10
   anchors_idxs: [0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
   latent_dim: ${nn.module.autoencoder.latent_dim}
@@ -30,8 +30,8 @@ data:
   gpus: ${train.trainer.gpus}
 
   num_workers:
-    train: 8
-    val: 4
+    train: 2
+    val: 1
     test: 4
 
   batch_size:
