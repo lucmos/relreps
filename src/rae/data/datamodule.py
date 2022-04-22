@@ -308,7 +308,7 @@ class MyDataModule(pl.LightningDataModule):
             shuffle=True,
             batch_size=self.batch_size.train,
             num_workers=self.num_workers.train,
-            pin_memory=self.pin_memory,
+            persistent_workers=True,
             collate_fn=partial(collate_fn, split="train", metadata=self.metadata),
         )
 
@@ -319,7 +319,7 @@ class MyDataModule(pl.LightningDataModule):
                 shuffle=False,
                 batch_size=self.batch_size.val,
                 num_workers=self.num_workers.val,
-                pin_memory=self.pin_memory,
+                persistent_workers=True,
                 collate_fn=partial(collate_fn, split="val", metadata=self.metadata),
             )
             for dataset in self.val_datasets
