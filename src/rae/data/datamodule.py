@@ -187,9 +187,10 @@ class MyDataModule(pl.LightningDataModule):
         if anchors_mode not in set(AnchorsMode):
             raise ValueError(f"Invalid anchors selection mode: '{anchors_mode}'")
         if anchors_mode != AnchorsMode.FIXED and self.anchors_idxs is not None:
-            pylogger.warning("The anchors indexes are ignored if the anchors mode is not 'fixed'!")
+            raise ValueError(f"The anchors indexes '{anchors_idxs}' are ignored if the anchors mode is not 'fixed'!")
         if anchors_mode == AnchorsMode.FIXED and self.anchors_num is not None:
-            pylogger.warning("The anchor number is ignored if the anchors mode is 'fixed'!")
+            raise ValueError(f"The anchor number '{anchors_num}' is ignored if the anchors mode is 'fixed'!")
+
         self.latent_dim = latent_dim
 
         self.val_images_fixed_idxs: List[int] = val_images_fixed_idxs
