@@ -18,7 +18,7 @@ from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, SupportedViz
 from rae.modules.rae import RaeDecoder
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
-from rae.utils.plotting import plot_images, plot_latent_evolution
+from rae.utils.plotting import plot_images, plot_latent_evolution, plot_matrix
 
 pylogger = logging.getLogger(__name__)
 
@@ -74,6 +74,8 @@ class LightningGAE(pl.LightningModule):
         supported_viz.add(SupportedViz.LATENT_EVOLUTION)
         supported_viz.add(SupportedViz.ANCHORS_RECONSTRUCTED)
         supported_viz.add(SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED)
+        supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
+        supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
         return supported_viz
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -132,6 +134,8 @@ class LightningGAE(pl.LightningModule):
             current_epoch=self.current_epoch,
         )
 
+        fixed_images_out = self(self.fixed_images)
+
         to_log = {}
         if SupportedViz.ANCHORS_RECONSTRUCTED in self.supported_viz:
             to_log["anchors/reconstructed"] = plot_images(
@@ -139,8 +143,24 @@ class LightningGAE(pl.LightningModule):
             )
 
         if SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED in self.supported_viz:
-            fixed_images_out = self(self.fixed_images)[Output.OUT]
-            to_log["images/reconstructed"] = plot_images(fixed_images_out, "Reconstructed images")
+            to_log["images/reconstructed"] = plot_images(fixed_images_out[Output.OUT], "Reconstructed images")
+
+        if SupportedViz.ANCHORS_SELF_INNER_PRODUCT in self.supported_viz:
+            anchors_self_inner_product = anchors_latents @ anchors_latents.T
+            to_log["inner/anchors-vs-anchors"] = plot_matrix(
+                anchors_self_inner_product,
+                title="Anchors vs Anchors inner products",
+                labels={"x": "anchors", "y": "anchors"},
+            )
+
+        if SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT in self.supported_viz:
+            batch_latent = fixed_images_out[Output.BATCH_LATENT]
+            anchors_batch_latents_inner_product = anchors_latents @ batch_latent.T
+            to_log["inner/anchors-vs-samples"] = plot_matrix(
+                anchors_batch_latents_inner_product,
+                title="Anchors vs Samples images inner products",
+                labels={"x": "samples", "y": "anchors"},
+            )
 
         if to_log:
             self.logger.experiment.log(to_log, step=self.global_step)

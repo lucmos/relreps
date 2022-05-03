@@ -45,3 +45,15 @@ def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, i
     # Plotly version
     # fig = px.imshow(torchvision.utils.make_grid(images.cpu(), 10, 5).permute(1, 2, 0), title=title)
     return fig
+
+
+def plot_matrix(matrix, **kwargs):
+    fig = px.imshow(
+        matrix,
+        color_continuous_midpoint=0,
+        # range_color=[-5, 5],
+        color_continuous_scale="RdBu",
+        aspect="equal",
+        **kwargs
+    )
+    return fig
