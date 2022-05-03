@@ -3,7 +3,7 @@ from typing import Any, Mapping
 
 import torch.nn.functional as F
 
-from rae.modules.output_keys import Output
+from rae.modules.enumerations import Output
 from rae.pl_modules.pl_gae import LightningGAE
 
 pylogger = logging.getLogger(__name__)

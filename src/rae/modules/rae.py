@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from rae.data.datamodule import MetaData
-from rae.modules.output_keys import Output
+from rae.modules.enumerations import Output
 
 
 class Encoder(nn.Module):
@@ -98,9 +98,11 @@ class RAE(nn.Module):
         return {
             Output.OUT: x_recon,
             Output.DEFAULT_LATENT: Output.LATENT_MU,
-            Output.LATENT: batch_latent,
+            Output.ANCHORS_LATENT: anchors_latent,
+            Output.BATCH_LATENT: batch_latent,
             Output.LATENT_MU: batch_latent_mu,
             Output.LATENT_LOGVAR: batch_latent_logvar,
+            Output.INV_LATENTS: latent,
         }
 
     def embed(self, x):

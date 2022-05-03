@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from rae.data.datamodule import MetaData
-from rae.modules.output_keys import Output
+from rae.modules.enumerations import Output
 
 
 class Encoder(nn.Module):
@@ -71,7 +71,7 @@ class VAE(nn.Module):
         return {
             Output.OUT: x_recon,
             Output.DEFAULT_LATENT: Output.LATENT_MU,
-            Output.LATENT: latent,
+            Output.BATCH_LATENT: latent,
             Output.LATENT_MU: latent_mu,
             Output.LATENT_LOGVAR: latent_logvar,
         }
