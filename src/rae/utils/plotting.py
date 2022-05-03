@@ -23,6 +23,7 @@ def plot_latent_evolution(metadata, validation_stats_df, n_samples):
         #             # size='std_0',  # TODO: fixme, plotly crashes with any column name to set the anchor size
         color="class",
         hover_name="image_index",
+        hover_data=["image_index", "anchor"],
         facet_col="is_anchor",
         color_discrete_map=color_discrete_map,
         # symbol="is_anchor",

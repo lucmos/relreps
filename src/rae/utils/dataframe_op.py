@@ -18,6 +18,7 @@ def cat_output_to_dataframe(validation_stats_df, output, current_epoch):
                     # "std_1": output["latent_logvar"][:, 1],
                     "epoch": [current_epoch] * len(output["batch"]["index"]),
                     "is_anchor": [False] * len(output["batch"]["index"]),
+                    "anchor": [None] * len(output["batch"]["index"]),
                 }
             ),
         ],
@@ -56,6 +57,7 @@ def cat_anchors_stats_to_dataframe(
                         # "std_1": anchors_latent_std[:, 1],
                         "epoch": [current_epoch] * anchors_num,
                         "is_anchor": [True] * anchors_num,
+                        "anchor": list(range(anchors_num)),
                     }
                 ),
             ],
@@ -81,6 +83,7 @@ def cat_anchors_stats_to_dataframe(
                         # "std_1": anchors_latent_std[:, 1],
                         "epoch": [current_epoch] * anchors_num,
                         "is_anchor": [True] * anchors_num,
+                        "anchor": list(range(anchors_num)),
                     }
                 ),
             ],

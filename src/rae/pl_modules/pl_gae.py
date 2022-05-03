@@ -46,6 +46,7 @@ class LightningGAE(pl.LightningModule):
             "latent_1",
             "epoch",
             "is_anchor",
+            "anchor",
         ]
 
         self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
