@@ -193,6 +193,7 @@ class MyDataModule(pl.LightningDataModule):
         self.latent_dim = latent_dim
 
         self.val_images_fixed_idxs: List[int] = val_images_fixed_idxs
+        self.anchors: Dict[str, Any] = None
 
     def extract_batch(self, dataset: Dataset, indices: Sequence[int]) -> Dict[str, Any]:
         images = []
@@ -260,7 +261,9 @@ class MyDataModule(pl.LightningDataModule):
         class_to_idx = self.train_dataset.mnist.class_to_idx
         idx_to_class = {x: y for y, x in class_to_idx.items()}
 
-        anchors = self.get_anchors()
+        if self.anchors is None:
+            self.anchors = self.get_anchors()
+
         fixed_images = self.extract_batch(self.val_datasets[0], self.val_images_fixed_idxs)
 
         return MetaData(
@@ -270,7 +273,7 @@ class MyDataModule(pl.LightningDataModule):
             fixed_images_classes=fixed_images["classes"],
             class_to_idx=class_to_idx,
             idx_to_class=idx_to_class,
-            **anchors,
+            **self.anchors,
         )
 
     def prepare_data(self) -> None:
