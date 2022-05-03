@@ -14,17 +14,13 @@ class LightningDeterministic(LightningGAE):
         out = super().step(batch, batch_index, stage)
         image_batch = batch["image"]
 
-        image_batch_recon = out[Output.OUT]
-        default_latent = out[out[Output.DEFAULT_LATENT]]
-
         loss = F.mse_loss(
-            image_batch_recon,
+            out[Output.RECONSTRUCTION],
             image_batch,
         )
 
         return {
-            "loss": loss,
-            "batch": batch,
-            "image_batch_recon": image_batch_recon.detach(),
-            "default_latent": default_latent.detach(),
+            Output.LOSS: loss,
+            Output.BATCH: batch,
+            **{key: self.normalize_output(value) for key, value in out.items()},
         }

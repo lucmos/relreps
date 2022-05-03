@@ -16,9 +16,9 @@ from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, SupportedViz
-from rae.modules.rae import RaeDecoder
+from rae.modules.rae import RAE, RaeDecoder
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
-from rae.utils.plotting import plot_images, plot_latent_evolution, plot_matrix
+from rae.utils.plotting import plot_images, plot_latent_evolution, plot_matrix, plot_violin
 
 pylogger = logging.getLogger(__name__)
 
@@ -71,6 +71,9 @@ class LightningGAE(pl.LightningModule):
         if self.anchors_images is not None:
             supported_viz.add(SupportedViz.ANCHORS_SOURCE)
 
+        if isinstance(self.autoencoder, RAE):
+            supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
+
         supported_viz.add(SupportedViz.LATENT_EVOLUTION)
         supported_viz.add(SupportedViz.ANCHORS_RECONSTRUCTED)
         supported_viz.add(SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED)
@@ -95,7 +98,7 @@ class LightningGAE(pl.LightningModule):
         out = self(image_batch)
 
         for metric_name, metric in self.reconstruction_quality_metrics.items():
-            metric_value = metric(image_batch, out[Output.OUT])
+            metric_value = metric(image_batch, out[Output.RECONSTRUCTION])
             self.log(f"{stage}/{metric_name}", metric_value, on_step=False, on_epoch=True)
 
         return out
@@ -113,7 +116,7 @@ class LightningGAE(pl.LightningModule):
         if self.anchors_images is not None:
             anchors_out = self(self.anchors_images)
             anchors_latents = anchors_out[Output.ANCHORS_LATENT]
-            anchors_reconstructed = anchors_out[Output.OUT]
+            anchors_reconstructed = anchors_out[Output.RECONSTRUCTION]
 
         else:
             assert self.anchors_latents is not None
@@ -143,11 +146,13 @@ class LightningGAE(pl.LightningModule):
             )
 
         if SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED in self.supported_viz:
-            to_log["images/reconstructed"] = plot_images(fixed_images_out[Output.OUT], "Reconstructed images")
+            to_log["images/reconstructed"] = plot_images(
+                fixed_images_out[Output.RECONSTRUCTION], "Reconstructed images"
+            )
 
         if SupportedViz.ANCHORS_SELF_INNER_PRODUCT in self.supported_viz:
             anchors_self_inner_product = anchors_latents @ anchors_latents.T
-            to_log["inner/anchors-vs-anchors"] = plot_matrix(
+            to_log["inners/anchors-vs-anchors"] = plot_matrix(
                 anchors_self_inner_product,
                 title="Anchors vs Anchors inner products",
                 labels={"x": "anchors", "y": "anchors"},
@@ -156,10 +161,17 @@ class LightningGAE(pl.LightningModule):
         if SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT in self.supported_viz:
             batch_latent = fixed_images_out[Output.BATCH_LATENT]
             anchors_batch_latents_inner_product = anchors_latents @ batch_latent.T
-            to_log["inner/anchors-vs-samples"] = plot_matrix(
+            to_log["inners/anchors-vs-samples"] = plot_matrix(
                 anchors_batch_latents_inner_product,
                 title="Anchors vs Samples images inner products",
                 labels={"x": "samples", "y": "anchors"},
+            )
+
+        if SupportedViz.INVARIANT_LATENT_DISTRIBUTION in self.supported_viz:
+            to_log["distributions/invariant-latent-space"] = plot_violin(
+                torch.cat([output[Output.INV_LATENTS] for output in outputs], dim=0),
+                title="Relative Latent Space distribution",
+                labels={"value": "validation distribution", "variable": "anchors"},
             )
 
         if to_log:
@@ -221,6 +233,12 @@ class LightningGAE(pl.LightningModule):
             return [opt]
         scheduler = hydra.utils.instantiate(self.hparams.lr_scheduler, optimizer=opt)
         return [opt], [scheduler]
+
+    def normalize_output(self, x: Any) -> Any:
+        if isinstance(x, torch.Tensor):
+            return x.detach().cpu()
+        else:
+            return x
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")

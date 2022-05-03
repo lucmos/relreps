@@ -8,13 +8,15 @@ except ImportError:
 
 
 class Output(StrEnum):
-    OUT = auto()
+    RECONSTRUCTION = auto()
     DEFAULT_LATENT = auto()
     BATCH_LATENT = auto()
     LATENT_MU = auto()
     LATENT_LOGVAR = auto()
     ANCHORS_LATENT = auto()
     INV_LATENTS = auto()
+    LOSS = auto()
+    BATCH = auto()
 
 
 class SupportedViz(StrEnum):
@@ -25,5 +27,4 @@ class SupportedViz(StrEnum):
     VALIDATION_IMAGES_RECONSTRUCTED = auto()
     ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT = auto()
     ANCHORS_SELF_INNER_PRODUCT = auto()
-    INVARIANT_LATENT_STD = auto()
-    INVARIANT_LATENT_MEAN = auto()
+    INVARIANT_LATENT_DISTRIBUTION = auto()

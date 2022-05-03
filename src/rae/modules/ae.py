@@ -66,7 +66,7 @@ class AE(nn.Module):
         latent = self.encoder(x)
         x_recon = self.decoder(latent)
         return {
-            Output.OUT: x_recon,
+            Output.RECONSTRUCTION: x_recon,
             Output.DEFAULT_LATENT: Output.BATCH_LATENT,
             Output.BATCH_LATENT: latent,
         }

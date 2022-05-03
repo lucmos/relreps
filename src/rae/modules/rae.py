@@ -96,7 +96,7 @@ class RAE(nn.Module):
         x_recon, latent = self.decoder(batch_latent, anchors_latent)
 
         return {
-            Output.OUT: x_recon,
+            Output.RECONSTRUCTION: x_recon,
             Output.DEFAULT_LATENT: Output.LATENT_MU,
             Output.ANCHORS_LATENT: anchors_latent,
             Output.BATCH_LATENT: batch_latent,

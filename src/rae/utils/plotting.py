@@ -57,3 +57,8 @@ def plot_matrix(matrix, **kwargs):
         **kwargs
     )
     return fig
+
+
+def plot_violin(batched_tensors, **kwargs):
+    fig = px.violin(batched_tensors, points="outliers", box=True, **kwargs)
+    return fig
