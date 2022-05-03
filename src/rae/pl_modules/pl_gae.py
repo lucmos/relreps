@@ -110,7 +110,7 @@ class LightningGAE(pl.LightningModule):
         anchors_out = None
         if self.anchors_images is not None:
             anchors_out = self(self.anchors_images)
-            anchors_latents = Output.ANCHORS_LATENT
+            anchors_latents = anchors_out[Output.ANCHORS_LATENT]
             anchors_reconstructed = anchors_out[Output.OUT]
 
         else:

@@ -33,10 +33,10 @@ def cat_anchors_stats_to_dataframe(
     metadata,
     current_epoch,
 ):
-    anchors_num = anchors_images.shape[0]
-    non_elements = ["none"] * anchors_num
 
     if anchors_images is not None:
+        anchors_num = anchors_images.shape[0]
+        non_elements = ["none"] * anchors_num
 
         validation_stats_df = pd.concat(
             [
@@ -63,6 +63,8 @@ def cat_anchors_stats_to_dataframe(
         )
     else:
         assert anchors_latents is not None
+        anchors_num = anchors_latents.shape[0]
+        non_elements = ["none"] * anchors_num
         validation_stats_df = pd.concat(
             [
                 validation_stats_df,
