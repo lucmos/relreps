@@ -21,6 +21,10 @@ class MNISTDataset(Dataset):
         )
 
     @property
+    def targets(self):
+        return self.mnist.targets
+
+    @property
     def class_vocab(self):
         return self.mnist.class_to_idx
 

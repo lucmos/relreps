@@ -9,6 +9,7 @@ import omegaconf
 import pytorch_lightning as pl
 import torch
 from omegaconf import DictConfig
+from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
@@ -26,6 +27,7 @@ pylogger = logging.getLogger(__name__)
 
 
 class AnchorsMode(StrEnum):
+    STRATIFIED = auto()
     FIXED = auto()
     RANDOM_IMAGES = auto()
     RANDOM_LATENTS = auto()
@@ -216,7 +218,22 @@ class MyDataModule(pl.LightningDataModule):
         }
 
     def get_anchors(self) -> Dict[str, torch.Tensor]:
-        if self.anchors_mode == AnchorsMode.FIXED:
+        if self.anchors_mode == AnchorsMode.STRATIFIED:
+            _, anchor_indices = train_test_split(
+                list(range(len(self.train_dataset))),
+                test_size=self.anchors_num,
+                stratify=self.train_dataset.targets,
+                random_state=0,
+            )
+            anchors = self.extract_batch(self.train_dataset, anchor_indices)
+            return {
+                "anchors_idxs": anchor_indices,
+                "anchors_images": anchors["images"],
+                "anchors_targets": anchors["targets"],
+                "anchors_classes": anchors["classes"],
+                "anchors_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.FIXED:
             anchors = self.extract_batch(self.train_dataset, self.anchors_idxs)
             return {
                 "anchors_idxs": self.anchors_idxs,
