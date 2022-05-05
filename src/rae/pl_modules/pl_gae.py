@@ -117,7 +117,9 @@ class LightningGAE(pl.LightningModule):
 
         for metric_name, metric in self.reconstruction_quality_metrics.items():
             metric_value = metric(image_batch, out[Output.RECONSTRUCTION])
-            self.log(f"{stage}/{metric_name}", metric_value, on_step=False, on_epoch=True)
+            self.log(
+                f"{stage}/{metric_name}", metric_value, on_step=False, on_epoch=True, batch_size=image_batch.shape[0]
+            )
 
         return out
 
@@ -280,13 +282,25 @@ class LightningGAE(pl.LightningModule):
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         step_out = self.step(batch, batch_idx, stage="train")
 
-        self.log_dict({"loss/train": step_out["loss"].cpu().detach()}, on_step=True, on_epoch=True, prog_bar=True)
+        self.log_dict(
+            {"loss/train": step_out["loss"].cpu().detach()},
+            on_step=True,
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=batch["image"].shape[0],
+        )
         return step_out
 
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         step_out = self.step(batch, batch_idx, stage="validation")
 
-        self.log_dict({"loss/val": step_out["loss"].cpu().detach()}, on_step=False, on_epoch=True, prog_bar=True)
+        self.log_dict(
+            {"loss/val": step_out["loss"].cpu().detach()},
+            on_step=False,
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=batch["image"].shape[0],
+        )
         return step_out
 
     def on_fit_end(self) -> None:
