@@ -35,9 +35,8 @@ class Encoder(nn.Module):
 
 
 class RaeDecoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int, normalize_latents: bool) -> None:
+    def __init__(self, hidden_channels: int, latent_dim: int) -> None:
         super().__init__()
-        self.normalize_latents = normalize_latents
         self.hidden_channels = hidden_channels
 
         self.fc = nn.Linear(in_features=latent_dim, out_features=hidden_channels * 2 * 7 * 7)
@@ -50,10 +49,6 @@ class RaeDecoder(nn.Module):
         self.activation = nn.ReLU()
 
     def forward(self, batch_latent: torch.Tensor, anchors_latents: torch.Tensor) -> torch.Tensor:
-        if self.normalize_latents:
-            batch_latent = F.normalize(batch_latent, p=2, dim=-1)
-            anchors_latents = F.normalize(anchors_latents, p=2, dim=-1)
-
         latent = torch.einsum("bi, ji -> bj", (batch_latent, anchors_latents))
 
         x = self.fc(latent)
@@ -81,7 +76,6 @@ class RAE(nn.Module):
         self.decoder = RaeDecoder(
             hidden_channels=hidden_channels,
             latent_dim=(self.anchors_images if self.anchors_images is not None else self.anchors_latents).shape[0],
-            normalize_latents=normalize_latents,
         )
 
     def forward(self, x):
@@ -92,6 +86,10 @@ class RAE(nn.Module):
             anchors_latent = self.anchors_latents
 
         batch_latent, batch_latent_mu, batch_latent_logvar = self.embed(x)
+
+        if self.normalize_latents:
+            batch_latent = F.normalize(batch_latent, p=2, dim=-1)
+            anchors_latent = F.normalize(anchors_latent, p=2, dim=-1)
 
         x_recon, latent = self.decoder(batch_latent, anchors_latent)
 
