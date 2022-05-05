@@ -2,7 +2,7 @@ data:
   _target_: rae.data.datamodule.MyDataModule
 
   anchors_mode: "fixed" # # "fixed", "random_images", "random_latents"
-  anchors_num: 10
+  anchors_num: null #10
 
   # Different classes for anchors
   anchors_idxs: [0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
