@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from rae.data.datamodule import MetaData
@@ -56,14 +57,19 @@ class Decoder(nn.Module):
 
 
 class AE(nn.Module):
-    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int):
+    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool):
         super().__init__()
         self.metadata = metadata
         self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
         self.decoder = Decoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
+        self.normalize_latents = normalize_latents
 
     def forward(self, x):
         latent = self.encoder(x)
+
+        if self.normalize_latents:
+            latent = F.normalize(latent, p=2, dim=-1)
+
         x_recon = self.decoder(latent)
         return {
             Output.RECONSTRUCTION: x_recon,
