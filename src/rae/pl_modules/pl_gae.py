@@ -10,6 +10,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 import wandb
+from sklearn.decomposition import PCA
 from torch.optim import Optimizer
 
 from nn_core.common import PROJECT_ROOT
@@ -66,6 +67,8 @@ class LightningGAE(pl.LightningModule):
         self.supported_viz = self._determine_supported_viz()
         pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
 
+        self.validation_pca: Optional[PCA] = None
+
     def _determine_supported_viz(self) -> Set[SupportedViz]:
         supported_viz = set()
 
@@ -87,7 +90,14 @@ class LightningGAE(pl.LightningModule):
         supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
         supported_viz.add(SupportedViz.LATENT_SPACE)
         supported_viz.add(SupportedViz.LATENT_SPACE_NORMALIZED)
+        supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
         return supported_viz
+
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        checkpoint["validation_pca"] = self.validation_pca
+
+    def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        self.validation_pca = checkpoint["validation_pca"]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
@@ -115,9 +125,17 @@ class LightningGAE(pl.LightningModule):
         if self.trainer.sanity_checking:
             return
 
+        if self.validation_pca is None or self.hparams.fit_pca_each_epoch:
+            all_default_latents = torch.cat([x[Output.DEFAULT_LATENT] for x in outputs], dim=0)
+            self.validation_pca = PCA(n_components=2)
+            self.validation_pca.fit(all_default_latents)
+
         for output in outputs:
             self.validation_stats_df = cat_output_to_dataframe(
-                validation_stats_df=self.validation_stats_df, output=output, current_epoch=self.current_epoch
+                validation_stats_df=self.validation_stats_df,
+                output=output,
+                current_epoch=self.current_epoch,
+                pca=self.validation_pca,
             )
 
         anchors_out = None
@@ -143,6 +161,7 @@ class LightningGAE(pl.LightningModule):
             anchors_latents=anchors_latents,
             metadata=self.metadata,
             current_epoch=self.current_epoch,
+            pca=self.validation_pca,
         )
 
         fixed_images_out = self(self.fixed_images)
@@ -222,6 +241,16 @@ class LightningGAE(pl.LightningModule):
                 epoch=self.current_epoch,
                 x_data="latent_0_normalized",
                 y_data="latent_1_normalized",
+                n_samples=self.hparams.plot_n_val_samples,
+            )
+
+        if SupportedViz.LATENT_SPACE_PCA in self.supported_viz:
+            to_log["latent/space-pca"] = plot_latent_space(
+                metadata=self.metadata,
+                validation_stats_df=self.validation_stats_df,
+                epoch=self.current_epoch,
+                x_data="latent_0_pca",
+                y_data="latent_1_pca",
                 n_samples=self.hparams.plot_n_val_samples,
             )
 
