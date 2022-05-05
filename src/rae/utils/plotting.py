@@ -37,6 +37,7 @@ def plot_latent_evolution(metadata, validation_stats_df, n_samples):
 
 
 def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, int]] = None) -> Figure:
+    images = images.cpu().detach()
     fig, ax = plt.subplots(1, 1, figsize=(17, 9) if figsize is None else figsize)
     ax.set_title(title)
     ax.axis("off")
@@ -49,6 +50,7 @@ def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, i
 
 
 def plot_matrix(matrix, **kwargs):
+    matrix = matrix.cpu().detach()
     fig = px.imshow(
         matrix,
         color_continuous_midpoint=0,
@@ -61,5 +63,6 @@ def plot_matrix(matrix, **kwargs):
 
 
 def plot_violin(batched_tensors, **kwargs):
+    batched_tensors = batched_tensors.cpu().detach()
     fig = px.violin(batched_tensors, points="outliers", box=True, **kwargs)
     return fig
