@@ -76,7 +76,7 @@ class VAE(nn.Module):
         x_recon = self.decoder(latent)
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: Output.LATENT_MU,
+            Output.DEFAULT_LATENT: latent_mu,
             Output.BATCH_LATENT: latent,
             Output.LATENT_MU: latent_mu,
             Output.LATENT_LOGVAR: latent_logvar,

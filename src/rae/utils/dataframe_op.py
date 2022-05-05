@@ -1,9 +1,12 @@
 import pandas as pd
+import torch.nn.functional as F
 
 from rae.modules.enumerations import Output
 
 
 def cat_output_to_dataframe(validation_stats_df, output, current_epoch):
+    latents = output[Output.DEFAULT_LATENT].cpu()
+    latents_normalized = F.normalize(latents, p=2, dim=-1)
     return pd.concat(
         [
             validation_stats_df,
@@ -12,8 +15,10 @@ def cat_output_to_dataframe(validation_stats_df, output, current_epoch):
                     "image_index": output["batch"]["index"].cpu(),
                     "class": output["batch"]["class"],
                     "target": output["batch"]["target"].cpu(),
-                    "latent_0": output[output[Output.DEFAULT_LATENT]][:, 0].cpu(),
-                    "latent_1": output[output[Output.DEFAULT_LATENT]][:, 1].cpu(),
+                    "latent_0": latents[:, 0],
+                    "latent_1": latents[:, 1],
+                    "latent_0_normalized": latents_normalized[:, 0],
+                    "latent_1_normalized": latents_normalized[:, 1],
                     # "std_0": output["latent_logvar"][:, 0],
                     # "std_1": output["latent_logvar"][:, 1],
                     "epoch": [current_epoch] * len(output["batch"]["index"]),
@@ -39,6 +44,9 @@ def cat_anchors_stats_to_dataframe(
         anchors_num = anchors_images.shape[0]
         non_elements = ["none"] * anchors_num
 
+        latents = anchors_out[Output.DEFAULT_LATENT].cpu()
+        latents_normalized = F.normalize(latents, p=2, dim=-1)
+
         validation_stats_df = pd.concat(
             [
                 validation_stats_df,
@@ -51,8 +59,10 @@ def cat_anchors_stats_to_dataframe(
                         "target": metadata.anchors_targets.cpu()
                         if metadata.anchors_targets is not None
                         else non_elements,
-                        "latent_0": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 0].cpu(),
-                        "latent_1": anchors_out[anchors_out[Output.DEFAULT_LATENT]][:, 1].cpu(),
+                        "latent_0": latents[:, 0],
+                        "latent_1": latents[:, 1],
+                        "latent_0_normalized": latents_normalized[:, 0],
+                        "latent_1_normalized": latents_normalized[:, 1],
                         # "std_0": anchors_latent_std[:, 0],
                         # "std_1": anchors_latent_std[:, 1],
                         "epoch": [current_epoch] * anchors_num,
@@ -67,6 +77,10 @@ def cat_anchors_stats_to_dataframe(
         assert anchors_latents is not None
         anchors_num = anchors_latents.shape[0]
         non_elements = ["none"] * anchors_num
+
+        latents = anchors_latents.cpu()
+        latents_normalized = F.normalize(latents, p=2, dim=-1)
+
         validation_stats_df = pd.concat(
             [
                 validation_stats_df,
@@ -77,8 +91,10 @@ def cat_anchors_stats_to_dataframe(
                         else list(range(anchors_num)),
                         "class": non_elements,
                         "target": non_elements,
-                        "latent_0": anchors_latents[:, 0].cpu(),
-                        "latent_1": anchors_latents[:, 1].cpu(),
+                        "latent_0": latents[:, 0],
+                        "latent_1": latents[:, 1],
+                        "latent_0_normalized": latents_normalized[:, 0],
+                        "latent_1_normalized": latents_normalized[:, 1],
                         # "std_0": anchors_latent_std[:, 0],
                         # "std_1": anchors_latent_std[:, 1],
                         "epoch": [current_epoch] * anchors_num,

@@ -19,7 +19,7 @@ from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, SupportedViz
 from rae.modules.rae import RAE, RaeDecoder
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
-from rae.utils.plotting import plot_images, plot_latent_evolution, plot_matrix, plot_violin
+from rae.utils.plotting import plot_images, plot_latent_evolution, plot_latent_space, plot_matrix, plot_violin
 
 pylogger = logging.getLogger(__name__)
 
@@ -45,6 +45,8 @@ class LightningGAE(pl.LightningModule):
             "target",
             "latent_0",
             "latent_1",
+            "latent_0_normalized",
+            "latent_1_normalized",
             "epoch",
             "is_anchor",
             "anchor",
@@ -76,13 +78,15 @@ class LightningGAE(pl.LightningModule):
         if isinstance(self.autoencoder, RAE):
             supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
 
-        supported_viz.add(SupportedViz.LATENT_EVOLUTION)
+        supported_viz.add(SupportedViz.LATENT_EVOLUTION_PLOTLY_ANIMATION)
         supported_viz.add(SupportedViz.ANCHORS_RECONSTRUCTED)
         supported_viz.add(SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED)
         supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
         supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
         supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
         supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
+        supported_viz.add(SupportedViz.LATENT_SPACE)
+        supported_viz.add(SupportedViz.LATENT_SPACE_NORMALIZED)
         return supported_viz
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -201,6 +205,26 @@ class LightningGAE(pl.LightningModule):
                 labels={"value": "validation distribution", "variable": "anchors"},
             )
 
+        if SupportedViz.LATENT_SPACE in self.supported_viz:
+            to_log["latent/space"] = plot_latent_space(
+                metadata=self.metadata,
+                validation_stats_df=self.validation_stats_df,
+                epoch=self.current_epoch,
+                x_data="latent_0",
+                y_data="latent_1",
+                n_samples=self.hparams.plot_n_val_samples,
+            )
+
+        if SupportedViz.LATENT_SPACE_NORMALIZED in self.supported_viz:
+            to_log["latent/space-normalized"] = plot_latent_space(
+                metadata=self.metadata,
+                validation_stats_df=self.validation_stats_df,
+                epoch=self.current_epoch,
+                x_data="latent_0_normalized",
+                y_data="latent_1_normalized",
+                n_samples=self.hparams.plot_n_val_samples,
+            )
+
         if to_log:
             self.logger.experiment.log(to_log, step=self.global_step)
 
@@ -209,14 +233,20 @@ class LightningGAE(pl.LightningModule):
 
     def on_fit_start(self) -> None:
         to_log = {}
+        to_close = set()
         if SupportedViz.VALIDATION_IMAGES_SOURCE in self.supported_viz:
             to_log["images/source"] = plot_images(self.fixed_images, "Source images")
+            to_close.add(to_log["images/source"])
 
         if SupportedViz.ANCHORS_SOURCE in self.supported_viz:
             to_log["anchors/source"] = plot_images(self.anchors_images, "Anchors images", figsize=(17, 4))
+            to_close.add(to_log["anchors/source"])
 
         if to_log:
             self.logger.experiment.log(to_log, step=self.global_step)
+
+        for fig in to_close:
+            plt.close(fig)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         step_out = self.step(batch, batch_idx, stage="train")
@@ -232,7 +262,7 @@ class LightningGAE(pl.LightningModule):
 
     def on_fit_end(self) -> None:
 
-        if SupportedViz.LATENT_EVOLUTION in self.supported_viz:
+        if SupportedViz.LATENT_EVOLUTION_PLOTLY_ANIMATION in self.supported_viz:
             latent_plot = plot_latent_evolution(
                 metadata=self.metadata,
                 validation_stats_df=self.validation_stats_df,

@@ -36,6 +36,35 @@ def plot_latent_evolution(metadata, validation_stats_df, n_samples):
     return latent_val_fig
 
 
+def plot_latent_space(metadata, validation_stats_df, epoch: int, x_data: str, y_data: str, n_samples: int):
+    color_discrete_map = {
+        class_name: color
+        for class_name, color in zip(metadata.class_to_idx, px.colors.qualitative.Plotly[: len(metadata.class_to_idx)])
+    }
+
+    latent_val_fig = px.scatter(
+        validation_stats_df.loc[
+            (validation_stats_df["image_index"] < n_samples) & (validation_stats_df["epoch"] == epoch)
+        ],
+        x=x_data,
+        y=y_data,
+        category_orders={"class": metadata.class_to_idx.keys()},
+        #             # size='std_0',  # TODO: fixme, plotly crashes with any column name to set the anchor size
+        color="class",
+        hover_name="image_index",
+        hover_data=["image_index", "anchor"],
+        facet_col="is_anchor",
+        color_discrete_map=color_discrete_map,
+        # symbol="is_anchor",
+        # symbol_map={False: "circle", True: "star"},
+        size_max=40,
+        range_x=[-5, 5],
+        color_continuous_scale=None,
+        range_y=[-5, 5],
+    )
+    return latent_val_fig
+
+
 def plot_images(images: torch.Tensor, title: str, figsize: Optional[Tuple[int, int]] = None) -> Figure:
     images = images.cpu().detach()
     fig, ax = plt.subplots(1, 1, figsize=(17, 9) if figsize is None else figsize)

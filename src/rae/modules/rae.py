@@ -95,7 +95,7 @@ class RAE(nn.Module):
 
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: Output.LATENT_MU,
+            Output.DEFAULT_LATENT: batch_latent_mu,
             Output.ANCHORS_LATENT: anchors_latent,
             Output.BATCH_LATENT: batch_latent,
             Output.LATENT_MU: batch_latent_mu,
