@@ -222,7 +222,9 @@ class MyDataModule(pl.LightningDataModule):
             _, anchor_indices = train_test_split(
                 list(range(len(self.train_dataset))),
                 test_size=self.anchors_num,
-                stratify=self.train_dataset.targets,
+                stratify=self.train_dataset.targets
+                if self.anchors_num >= len(self.train_dataset.mnist.classes)
+                else None,
                 random_state=0,
             )
             anchors = self.extract_batch(self.train_dataset, anchor_indices)
