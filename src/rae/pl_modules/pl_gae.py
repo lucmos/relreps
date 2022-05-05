@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import hydra
+import matplotlib.pyplot as plt
 import omegaconf
 import pandas as pd
 import plotly
@@ -80,6 +81,8 @@ class LightningGAE(pl.LightningModule):
         supported_viz.add(SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED)
         supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
         supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
+        supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
+        supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
         return supported_viz
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -141,19 +144,22 @@ class LightningGAE(pl.LightningModule):
         fixed_images_out = self(self.fixed_images)
 
         to_log = {}
+        to_close = set()
         if SupportedViz.ANCHORS_RECONSTRUCTED in self.supported_viz:
             to_log["anchors/reconstructed"] = plot_images(
                 anchors_reconstructed, "Anchors reconstructed", figsize=(17, 4)
             )
+            to_close.add(to_log["anchors/reconstructed"])
 
         if SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED in self.supported_viz:
             to_log["images/reconstructed"] = plot_images(
                 fixed_images_out[Output.RECONSTRUCTION], "Reconstructed images"
             )
+            to_close.add(to_log["images/reconstructed"])
 
         if SupportedViz.ANCHORS_SELF_INNER_PRODUCT in self.supported_viz:
             anchors_self_inner_product = anchors_latents @ anchors_latents.T
-            to_log["inners/anchors-vs-anchors"] = plot_matrix(
+            to_log["anchors-vs-anchors/inner"] = plot_matrix(
                 anchors_self_inner_product,
                 title="Anchors vs Anchors inner products",
                 labels={"x": "anchors", "y": "anchors"},
@@ -162,8 +168,28 @@ class LightningGAE(pl.LightningModule):
         if SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT in self.supported_viz:
             batch_latent = fixed_images_out[Output.BATCH_LATENT]
             anchors_batch_latents_inner_product = anchors_latents @ batch_latent.T
-            to_log["inners/anchors-vs-samples"] = plot_matrix(
+            to_log["anchors-vs-samples/inner"] = plot_matrix(
                 anchors_batch_latents_inner_product,
+                title="Anchors vs Samples images inner products",
+                labels={"x": "samples", "y": "anchors"},
+            )
+
+        if SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED in self.supported_viz:
+            anchors_latents_normalized = F.normalize(anchors_latents, p=2, dim=-1)
+            anchors_self_inner_product_normalized = anchors_latents_normalized @ anchors_latents_normalized.T
+            to_log["anchors-vs-anchors/inner-normalized"] = plot_matrix(
+                anchors_self_inner_product_normalized,
+                title="Anchors vs Anchors inner products",
+                labels={"x": "anchors", "y": "anchors"},
+            )
+
+        if SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED in self.supported_viz:
+            batch_latent = fixed_images_out[Output.BATCH_LATENT]
+            anchors_latents_normalized = F.normalize(anchors_latents, p=2, dim=-1)
+            batch_latent_normalized = F.normalize(batch_latent, p=2, dim=-1)
+            anchors_batch_latents_inner_product_normalized = anchors_latents_normalized @ batch_latent_normalized.T
+            to_log["anchors-vs-samples/inner-normalized"] = plot_matrix(
+                anchors_batch_latents_inner_product_normalized,
                 title="Anchors vs Samples images inner products",
                 labels={"x": "samples", "y": "anchors"},
             )
@@ -177,6 +203,9 @@ class LightningGAE(pl.LightningModule):
 
         if to_log:
             self.logger.experiment.log(to_log, step=self.global_step)
+
+        for fig in to_close:
+            plt.close(fig)
 
     def on_fit_start(self) -> None:
         to_log = {}
