@@ -14,7 +14,9 @@ def plot_latent_evolution(metadata, validation_stats_df, n_samples):
     }
 
     latent_val_fig = px.scatter(
-        validation_stats_df.loc[validation_stats_df["image_index"] < n_samples],
+        validation_stats_df.loc[
+            ((validation_stats_df["image_index"] < n_samples) | (validation_stats_df["is_anchor"]))
+        ],
         x="latent_0",
         y="latent_1",
         animation_frame="epoch",
@@ -44,7 +46,8 @@ def plot_latent_space(metadata, validation_stats_df, epoch: int, x_data: str, y_
 
     latent_val_fig = px.scatter(
         validation_stats_df.loc[
-            (validation_stats_df["image_index"] < n_samples) & (validation_stats_df["epoch"] == epoch)
+            ((validation_stats_df["image_index"] < n_samples) | (validation_stats_df["is_anchor"]))
+            & (validation_stats_df["epoch"] == epoch)
         ],
         x=x_data,
         y=y_data,
