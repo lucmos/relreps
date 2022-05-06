@@ -25,6 +25,8 @@ except ImportError:
 
 pylogger = logging.getLogger(__name__)
 
+HARDCODED_ANCHORS: List[int] = [0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
+
 
 class AnchorsMode(StrEnum):
     STRATIFIED = auto()
@@ -219,14 +221,17 @@ class MyDataModule(pl.LightningDataModule):
 
     def get_anchors(self) -> Dict[str, torch.Tensor]:
         if self.anchors_mode == AnchorsMode.STRATIFIED:
-            _, anchor_indices = train_test_split(
-                list(range(len(self.train_dataset))),
-                test_size=self.anchors_num,
-                stratify=self.train_dataset.targets
-                if self.anchors_num >= len(self.train_dataset.mnist.classes)
-                else None,
-                random_state=0,
-            )
+            if self.anchors_num >= len(self.train_dataset.mnist.classes):
+                _, anchor_indices = train_test_split(
+                    list(range(len(self.train_dataset))),
+                    test_size=self.anchors_num,
+                    stratify=self.train_dataset.targets
+                    if self.anchors_num >= len(self.train_dataset.mnist.classes)
+                    else None,
+                    random_state=0,
+                )
+            else:
+                anchor_indices = HARDCODED_ANCHORS[: self.anchors_num]
             anchors = self.extract_batch(self.train_dataset, anchor_indices)
             return {
                 "anchors_idxs": anchor_indices,
