@@ -1,11 +1,18 @@
+from enum import auto
 from typing import Optional
 
 import torch
 import torch.nn.functional as F
+from backports.strenum import StrEnum
 from torch import nn
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output
+
+
+class RelativeEmbeddingMethod(StrEnum):
+    BASIS_CHANGE = auto()
+    INNER = auto()
 
 
 class Encoder(nn.Module):
@@ -37,7 +44,7 @@ class Encoder(nn.Module):
 
 
 class RaeDecoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int) -> None:
+    def __init__(self, hidden_channels: int, latent_dim: int, relative_embedding_method: str) -> None:
         super().__init__()
         self.hidden_channels = hidden_channels
 
@@ -49,6 +56,7 @@ class RaeDecoder(nn.Module):
         self.conv1 = nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=1, kernel_size=4, stride=2, padding=1)
 
         self.activation = nn.ReLU()
+        self.relative_embedding_method = relative_embedding_method
 
     def forward(
         self,
@@ -57,7 +65,11 @@ class RaeDecoder(nn.Module):
         relative_embedding: Optional[torch.Tensor] = None,
     ) -> (torch.Tensor, torch.Tensor):
         if relative_embedding is None:
-            relative_embedding = torch.einsum("bi, ji -> bj", (batch_latent, anchors_latents))
+            if self.relative_embedding_method == RelativeEmbeddingMethod.INNER:
+                relative_embedding = torch.einsum("bi, ji -> bj", (batch_latent, anchors_latents))
+
+            elif self.relative_embedding_method == RelativeEmbeddingMethod.BASIS_CHANGE:
+                relative_embedding = torch.linalg.lstsq(anchors_latents.T, batch_latent.T)[0].T
 
         x = self.fc(relative_embedding)
         x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
@@ -69,8 +81,19 @@ class RaeDecoder(nn.Module):
 
 
 class RAE(nn.Module):
-    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool):
+    def __init__(
+        self,
+        metadata: MetaData,
+        hidden_channels: int,
+        latent_dim: int,
+        normalize_latents: bool,
+        relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
+    ):
         super().__init__()
+
+        if relative_embedding_method not in set(RelativeEmbeddingMethod):
+            raise ValueError(f"Embedding method not valid: {relative_embedding_method}")
+
         self.metadata = metadata
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
@@ -84,6 +107,7 @@ class RAE(nn.Module):
         self.decoder = RaeDecoder(
             hidden_channels=hidden_channels,
             latent_dim=(self.anchors_images if self.anchors_images is not None else self.anchors_latents).shape[0],
+            relative_embedding_method=relative_embedding_method,
         )
 
     def forward(self, x):
