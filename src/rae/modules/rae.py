@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -48,16 +50,22 @@ class RaeDecoder(nn.Module):
 
         self.activation = nn.ReLU()
 
-    def forward(self, batch_latent: torch.Tensor, anchors_latents: torch.Tensor) -> torch.Tensor:
-        latent = torch.einsum("bi, ji -> bj", (batch_latent, anchors_latents))
+    def forward(
+        self,
+        batch_latent: Optional[torch.Tensor] = None,
+        anchors_latents: Optional[torch.Tensor] = None,
+        relative_embedding: Optional[torch.Tensor] = None,
+    ) -> (torch.Tensor, torch.Tensor):
+        if relative_embedding is None:
+            relative_embedding = torch.einsum("bi, ji -> bj", (batch_latent, anchors_latents))
 
-        x = self.fc(latent)
+        x = self.fc(relative_embedding)
         x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
         x = self.activation(self.conv2(x))
         x = torch.sigmoid(
             self.conv1(x)
         )  # last layer before output is sigmoid, since we are using BCE as reconstruction loss
-        return x, latent
+        return x, relative_embedding
 
 
 class RAE(nn.Module):
