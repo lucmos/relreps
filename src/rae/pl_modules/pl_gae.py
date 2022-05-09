@@ -220,14 +220,14 @@ class LightningGAE(pl.LightningModule):
             )
 
         if SupportedViz.INVARIANT_LATENT_DISTRIBUTION in self.supported_viz:
-            to_log["distributions/invariant-latent-space"] = wandb.Image(
-                plot_violin(
-                    torch.cat([output[Output.INV_LATENTS] for output in outputs], dim=0),
-                    title="Relative Latent Space distribution",
-                    y_label="validation distribution",
-                    x_label="anchors",
-                )
+            fig = plot_violin(
+                torch.cat([output[Output.INV_LATENTS] for output in outputs], dim=0),
+                title="Relative Latent Space distribution",
+                y_label="validation distribution",
+                x_label="anchors",
             )
+            to_log["distributions/invariant-latent-space"] = wandb.Image(fig)
+            to_close.add(fig)
 
         if SupportedViz.LATENT_SPACE in self.supported_viz:
             to_log["latent/space"] = plot_latent_space(
