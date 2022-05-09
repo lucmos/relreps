@@ -1,6 +1,7 @@
 from typing import Optional, Tuple
 
 import plotly.express as px
+import seaborn as sns
 import torch
 import torchvision
 from matplotlib import pyplot as plt
@@ -94,7 +95,20 @@ def plot_matrix(matrix, **kwargs):
     return fig
 
 
-def plot_violin(batched_tensors, **kwargs):
+def plot_violin(batched_tensors, title, x_label, y_label, **kwargs):
     batched_tensors = batched_tensors.cpu().detach()
-    fig = px.violin(batched_tensors, points="outliers", box=True, **kwargs)
+    # plotly
+    # fig = px.violin(batched_tensors, points="outliers", box=True, **kwargs)
+
+    sns.set_theme()
+    fig, ax = plt.subplots(1, 1, figsize=(21, 7), dpi=120)
+    ax.set_title(title)
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    # for item in [ax.title, ax.xaxis.label, ax.yaxis.label] + ax.get_xticklabels() + ax.get_yticklabels():
+    #     item.set_fontsize(40)
+    fig.set_tight_layout(tight=True)
+    sns.violinplot(ax=ax, data=batched_tensors, linewidth=1)
+    sns.set_theme()
+    plt.show()
     return fig
