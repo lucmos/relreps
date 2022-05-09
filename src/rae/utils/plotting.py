@@ -110,5 +110,4 @@ def plot_violin(batched_tensors, title, x_label, y_label, **kwargs):
     fig.set_tight_layout(tight=True)
     sns.violinplot(ax=ax, data=batched_tensors, linewidth=1)
     sns.set_theme()
-    plt.show()
     return fig
