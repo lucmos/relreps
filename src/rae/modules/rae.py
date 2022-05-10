@@ -15,6 +15,11 @@ class RelativeEmbeddingMethod(StrEnum):
     INNER = auto()
 
 
+class RelativeEmbeddingNormalization(StrEnum):
+    L2 = auto()
+    OFF = auto()
+
+
 class Encoder(nn.Module):
     def __init__(self, hidden_channels: int, latent_dim: int) -> None:
         super().__init__()
@@ -44,7 +49,13 @@ class Encoder(nn.Module):
 
 
 class RaeDecoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int, relative_embedding_method: str) -> None:
+    def __init__(
+        self,
+        hidden_channels: int,
+        latent_dim: int,
+        relative_embedding_method: str,
+        normalize_relative_embedding: str,
+    ) -> None:
         super().__init__()
         self.hidden_channels = hidden_channels
 
@@ -57,6 +68,7 @@ class RaeDecoder(nn.Module):
 
         self.activation = nn.ReLU()
         self.relative_embedding_method = relative_embedding_method
+        self.normalize_relative_embedding = normalize_relative_embedding
 
     def forward(
         self,
@@ -70,6 +82,9 @@ class RaeDecoder(nn.Module):
 
             elif self.relative_embedding_method == RelativeEmbeddingMethod.BASIS_CHANGE:
                 relative_embedding = torch.linalg.lstsq(anchors_latents.T, batch_latent.T)[0].T
+
+        if self.normalize_relative_embedding == RelativeEmbeddingNormalization.L2:
+            relative_embedding = F.normalize(relative_embedding, p=2, dim=-1)
 
         x = self.fc(relative_embedding)
         x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
@@ -88,11 +103,15 @@ class RAE(nn.Module):
         latent_dim: int,
         normalize_latents: bool,
         relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
+        normalize_relative_embedding: str = RelativeEmbeddingNormalization.OFF,
     ):
         super().__init__()
 
         if relative_embedding_method not in set(RelativeEmbeddingMethod):
-            raise ValueError(f"Embedding method not valid: {relative_embedding_method}")
+            raise ValueError(f"Relative embedding method not valid: {relative_embedding_method}")
+
+        if normalize_relative_embedding not in set(RelativeEmbeddingNormalization):
+            raise ValueError(f"Relative Embedding normalization not valid: {normalize_relative_embedding}")
 
         self.metadata = metadata
         self.register_buffer("anchors_images", metadata.anchors_images)
@@ -108,6 +127,7 @@ class RAE(nn.Module):
             hidden_channels=hidden_channels,
             latent_dim=(self.anchors_images if self.anchors_images is not None else self.anchors_latents).shape[0],
             relative_embedding_method=relative_embedding_method,
+            normalize_relative_embedding=normalize_relative_embedding,
         )
 
     def forward(self, x):

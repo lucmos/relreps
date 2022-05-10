@@ -62,6 +62,7 @@ module:
     hidden_channels: 64
     normalize_latents: False
     relative_embedding_method: basis_change # inner, basis_change
+    normalize_relative_embedding: l2
 
   optimizer:
     #  Adam-oriented deep learning
