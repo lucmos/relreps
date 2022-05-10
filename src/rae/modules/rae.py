@@ -18,6 +18,7 @@ class RelativeEmbeddingMethod(StrEnum):
 class RelativeEmbeddingNormalization(StrEnum):
     L2 = auto()
     OFF = auto()
+    BATCHNORM = auto()
 
 
 class Encoder(nn.Module):
@@ -70,6 +71,9 @@ class RaeDecoder(nn.Module):
         self.relative_embedding_method = relative_embedding_method
         self.normalize_relative_embedding = normalize_relative_embedding
 
+        if self.normalize_relative_embedding == RelativeEmbeddingNormalization.BATCHNORM:
+            self.batch_norm = nn.BatchNorm1d(num_features=latent_dim)
+
     def forward(
         self,
         batch_latent: Optional[torch.Tensor] = None,
@@ -85,6 +89,8 @@ class RaeDecoder(nn.Module):
 
         if self.normalize_relative_embedding == RelativeEmbeddingNormalization.L2:
             relative_embedding = F.normalize(relative_embedding, p=2, dim=-1)
+        elif self.normalize_relative_embedding == RelativeEmbeddingNormalization.BATCHNORM:
+            relative_embedding = self.batch_norm(relative_embedding)
 
         x = self.fc(relative_embedding)
         x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
