@@ -5,299 +5,227 @@
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
     train.seed_index=0 \
+    nn.data.anchors_mode=fixed \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=2 \
+    nn.module.autoencoder.latent_dim=2
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
     train.seed_index=0 \
+    nn.data.anchors_mode=fixed \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=3 \
+    nn.module.autoencoder.latent_dim=10
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
     train.seed_index=0 \
+    nn.data.anchors_mode=fixed \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=4 \
+    nn.module.autoencoder.latent_dim=20
+
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=1 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=5 \
+    nn.module.autoencoder.latent_dim=2
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=1 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=6 \
+    nn.module.autoencoder.latent_dim=10
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=1 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=7 \
+    nn.module.autoencoder.latent_dim=20
+
+
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=2 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=8 \
+    nn.module.autoencoder.latent_dim=2
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=2 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=9 \
+    nn.module.autoencoder.latent_dim=10
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=basis_change \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=2 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=10 \
+    nn.module.autoencoder.latent_dim=20
+
+
+
+
+
+
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
     train.seed_index=0 \
+    nn.data.anchors_mode=fixed \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=15 \
+    nn.module.autoencoder.latent_dim=2
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
     train.seed_index=0 \
+    nn.data.anchors_mode=fixed \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=20 \
+    nn.module.autoencoder.latent_dim=10
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
     train.seed_index=0 \
+    nn.data.anchors_mode=fixed \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=30 \
+    nn.module.autoencoder.latent_dim=20
+
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=1 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=35 \
+    nn.module.autoencoder.latent_dim=2
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=1 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=40 \
+    nn.module.autoencoder.latent_dim=10
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=1 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=50 \
+    nn.module.autoencoder.latent_dim=20
+
+
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=2 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=60 \
+    nn.module.autoencoder.latent_dim=2
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=2 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=75 \
+    nn.module.autoencoder.latent_dim=10
 
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_latents=True \
+    nn.module.autoencoder.normalize_relative_embedding=l2 \
+    nn.module.autoencoder.relative_embedding_method=inner \
+    core.tags='[rae, basis-change-comparison, no-lr-scheduler]' \
+    train.seed_index=2 \
     nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
     nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=90 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=110 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=130 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=150 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=200 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=250 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=300 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=350 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=400 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=450 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=500 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=750 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=True \
-    nn.data.anchors_mode=fixed \
-    core.tags='[rae, latent-dim-sweep, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=1000 \
+    nn.module.autoencoder.latent_dim=20
