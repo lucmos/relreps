@@ -60,8 +60,15 @@ module:
     _target_: rae.modules.rae.RAE
     latent_dim: 2
     hidden_channels: 64
-    normalize_latents: instancenorm
+
+    reparametrize_anchors: False
+
+    normalize_latents: 'off'
     normalize_only_anchors_latents: True
+
+    normalize_means: l2
+    normalize_only_anchors_means: False
+
     relative_embedding_method: basis_change # inner, basis_change
     normalize_relative_embedding: 'off'
 

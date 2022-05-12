@@ -1,6 +1,6 @@
 import functools
 from enum import auto
-from typing import Optional
+from typing import Callable, Optional, Union
 
 import torch
 import torch.nn.functional as F
@@ -112,7 +112,10 @@ class RAE(nn.Module):
         metadata: MetaData,
         hidden_channels: int,
         latent_dim: int,
+        normalize_means: str,
+        normalize_only_anchors_means: bool,
         normalize_latents: str,
+        reparametrize_anchors: bool = True,
         normalize_only_anchors_latents: bool = False,
         relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
         normalize_relative_embedding: str = NormalizationMode.OFF,
@@ -132,8 +135,13 @@ class RAE(nn.Module):
         if self.anchors_images is None and self.anchors_latents is None:
             raise ValueError("The RAE model needs anchors!")
 
+        self.reparametrize_anchors = reparametrize_anchors
+
         self.normalize_latents = normalize_latents
         self.normalize_only_anchors_latents = normalize_only_anchors_latents
+
+        self.normalize_means = normalize_means
+        self.normalize_only_anchors_means = normalize_only_anchors_means
 
         self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
         self.decoder = RaeDecoder(
@@ -143,56 +151,74 @@ class RAE(nn.Module):
             normalize_relative_embedding=normalize_relative_embedding,
         )
 
-        if self.normalize_latents == NormalizationMode.BATCHNORM:
-            self.latent_normalization = nn.BatchNorm1d(num_features=latent_dim, track_running_stats=True)
-        elif self.normalize_latents == NormalizationMode.INSTANCENORM:
-            self.latent_normalization = nn.InstanceNorm1d(
-                num_features=latent_dim, affine=True, track_running_stats=True
-            )
-        elif self.normalize_latents == NormalizationMode.LAYERNORM:
-            self.latent_normalization = nn.LayerNorm(latent_dim, elementwise_affine=True)
-        elif self.normalize_latents == NormalizationMode.INSTANCENORM_NOAFFINE:
-            self.latent_normalization = nn.InstanceNorm1d(
-                num_features=latent_dim, affine=False, track_running_stats=True
-            )
-        elif self.normalize_latents == NormalizationMode.LAYERNORM_NOAFFINE:
-            self.latent_normalization = nn.LayerNorm(latent_dim, elementwise_affine=False)
-        elif (
-            isinstance(self.normalize_latents, bool) and self.normalize_latents
-        ) or self.normalize_latents == NormalizationMode.L2:
-            self.latent_normalization = functools.partial(F.normalize, p=2, dim=-1)
-        elif isinstance(self.normalize_latents, bool) and not self.normalize_latents:
-            self.latent_normalization = None
-        else:
-            raise ValueError(f"Invalid latent normalization {self.latent_normalization}")
+        self.mean_normalization = self._instantiate_normalization(
+            normalization_mode=self.normalize_means, latent_dim=latent_dim
+        )
+        self.latent_normalization = self._instantiate_normalization(
+            normalization_mode=self.normalize_latents, latent_dim=latent_dim
+        )
 
-    def apply_latent_normalization(self, x: torch.Tensor) -> torch.Tensor:
-        if self.latent_normalization is None:
+    @staticmethod
+    def _instantiate_normalization(normalization_mode: Union[str, NormalizationMode], latent_dim: int):
+        if normalization_mode == NormalizationMode.BATCHNORM:
+            return nn.BatchNorm1d(num_features=latent_dim, track_running_stats=True)
+        elif normalization_mode == NormalizationMode.INSTANCENORM:
+            return nn.InstanceNorm1d(num_features=latent_dim, affine=True, track_running_stats=True)
+        elif normalization_mode == NormalizationMode.LAYERNORM:
+            return nn.LayerNorm(latent_dim, elementwise_affine=True)
+        elif normalization_mode == NormalizationMode.INSTANCENORM_NOAFFINE:
+            return nn.InstanceNorm1d(num_features=latent_dim, affine=False, track_running_stats=True)
+        elif normalization_mode == NormalizationMode.LAYERNORM_NOAFFINE:
+            return nn.LayerNorm(latent_dim, elementwise_affine=False)
+        elif (
+            isinstance(normalization_mode, bool) and normalization_mode
+        ) or normalization_mode == NormalizationMode.L2:
+            return functools.partial(F.normalize, p=2, dim=-1)
+        elif (
+            isinstance(normalization_mode, bool) and not normalization_mode
+        ) or normalization_mode == NormalizationMode.OFF:
+            return None
+        else:
+            raise ValueError(f"Invalid latent normalization {normalization_mode}")
+
+    @staticmethod
+    def _apply_normalization(
+        normalization_mode: Union[str, NormalizationMode],
+        normalization_fn: Callable[[torch.Tensor], torch.Tensor],
+        x: torch.Tensor,
+    ) -> torch.Tensor:
+        if normalization_fn is None or normalization_mode == NormalizationMode.OFF or not normalization_mode:
             return x
-        if (
-            self.normalize_latents == NormalizationMode.INSTANCENORM
-            or self.normalize_latents == NormalizationMode.INSTANCENORM_NOAFFINE
-        ):
+        if isinstance(normalization_fn, nn.InstanceNorm1d):
             x = torch.transpose(x, 1, 0)
-            x = self.latent_normalization(x)
+            x = normalization_fn(x)
             x = torch.transpose(x, 1, 0)
             return x
         else:
-            return self.latent_normalization(x)
+            return normalization_fn(x)
 
     def forward(self, x):
         if self.anchors_images is not None:
             with torch.no_grad():
-                anchors_latent, _, _ = self.embed(self.anchors_images)
+                anchors_latent, _, _ = self.embed(
+                    self.anchors_images, normalize_mean=self.normalize_means, reparametrize=self.reparametrize_anchors
+                )
         else:
             anchors_latent = self.anchors_latents
 
-        batch_latent, batch_latent_mu, batch_latent_logvar = self.embed(x)
+        batch_latent, batch_latent_mu, batch_latent_logvar = self.embed(
+            x,
+            normalize_mean=self.normalize_means if not self.normalize_only_anchors_means else NormalizationMode.OFF,
+            reparametrize=True,
+        )
 
-        if self.normalize_latents:
-            if not self.normalize_only_anchors_latents:
-                batch_latent = self.apply_latent_normalization(batch_latent)
-            anchors_latent = self.apply_latent_normalization(anchors_latent)
+        if not self.normalize_only_anchors_latents:
+            batch_latent = self._apply_normalization(
+                normalization_mode=self.normalize_latents, normalization_fn=self.latent_normalization, x=batch_latent
+            )
+        anchors_latent = self._apply_normalization(
+            normalization_mode=self.normalize_latents, normalization_fn=self.latent_normalization, x=anchors_latent
+        )
 
         x_recon, latent = self.decoder(batch_latent, anchors_latent)
 
@@ -206,12 +232,21 @@ class RAE(nn.Module):
             Output.INV_LATENTS: latent,
         }
 
-    def embed(self, x):
+    def embed(self, x, reparametrize: bool, normalize_mean: Union[NormalizationMode, str]):
         latent_mu, latent_logvar = self.encoder(x)
-        latent = self.latent_sample(
-            latent_mu,
-            latent_logvar,
+
+        latent_mu = self._apply_normalization(
+            normalization_mode=normalize_mean, normalization_fn=self.mean_normalization, x=latent_mu
         )
+
+        if reparametrize:
+            latent = self.latent_sample(
+                latent_mu,
+                latent_logvar,
+            )
+        else:
+            latent = latent_mu
+
         return latent, latent_mu, latent_logvar
 
     def latent_sample(self, mu, logvar):
