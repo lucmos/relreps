@@ -44,6 +44,8 @@ fixed_image_idx = st.sidebar.slider("Select sample image:", 0, max_value=images.
 image = images[fixed_image_idx]
 
 
+set_zero = st.sidebar.checkbox("Set to zero")
+
 # Compute the relative embeddings...
 relative_embedding = model(image[None, ...])[Output.INV_LATENTS]
 
@@ -66,6 +68,9 @@ with col2:
 # Visualize for each anchor: image, relative value, widget to modify the value
 for i_col, relative_value in enumerate(relative_embedding.squeeze()):
     value = relative_value.detach().item()
+
+    if set_zero:
+        value = 0.0
 
     col1, col2, col3 = st.columns([1.5, 7, 3])
     with col1:
