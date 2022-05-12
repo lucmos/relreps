@@ -4,7 +4,7 @@
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm \
+    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
     nn.module.autoencoder.normalize_only_anchors_latents=True \
     nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
@@ -17,7 +17,7 @@ python src/rae/run.py \
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm \
+    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
     nn.module.autoencoder.normalize_only_anchors_latents=True \
     nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
@@ -30,7 +30,7 @@ python src/rae/run.py \
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm \
+    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
     nn.module.autoencoder.normalize_only_anchors_latents=True \
     nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
@@ -45,7 +45,7 @@ python src/rae/run.py \
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm \
+    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
     nn.module.autoencoder.normalize_only_anchors_latents=False \
     nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
@@ -58,7 +58,7 @@ python src/rae/run.py \
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm \
+    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
     nn.module.autoencoder.normalize_only_anchors_latents=False \
     nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
@@ -71,7 +71,7 @@ python src/rae/run.py \
 python src/rae/run.py \
     nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
     nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm \
+    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
     nn.module.autoencoder.normalize_only_anchors_latents=False \
     nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
