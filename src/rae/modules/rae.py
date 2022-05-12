@@ -21,6 +21,7 @@ class NormalizationMode(StrEnum):
     OFF = auto()
     BATCHNORM = auto()
     INSTANCENORM = auto()
+    LAYERNORM = auto()
 
 
 class Encoder(nn.Module):
@@ -144,6 +145,8 @@ class RAE(nn.Module):
             self.latent_normalization = nn.BatchNorm1d(num_features=latent_dim)
         elif self.normalize_latents == NormalizationMode.INSTANCENORM:
             self.latent_normalization = nn.InstanceNorm1d(num_features=latent_dim, affine=True)
+        elif self.normalize_latents == NormalizationMode.LAYERNORM:
+            self.latent_normalization = nn.LayerNorm(latent_dim, elementwise_affine=True)
         elif (
             isinstance(self.normalize_latents, bool) and self.normalize_latents
         ) or self.normalize_latents == NormalizationMode.L2:
@@ -152,15 +155,12 @@ class RAE(nn.Module):
             raise ValueError(f"Invalid latent normalization {self.latent_normalization}")
 
     def apply_latent_normalization(self, x: torch.Tensor) -> torch.Tensor:
-        if self.normalize_latents == NormalizationMode.BATCHNORM:
-            return self.latent_normalization(x)
-        elif self.normalize_latents == NormalizationMode.INSTANCENORM:
+        if self.normalize_latents == NormalizationMode.INSTANCENORM:
             x = torch.transpose(x, 1, 0)
             x = self.latent_normalization(x)
             x = torch.transpose(x, 1, 0)
-
             return x
-        elif self.normalize_latents or self.normalize_latents == NormalizationMode.L2:
+        else:
             return self.latent_normalization(x)
 
     def forward(self, x):
