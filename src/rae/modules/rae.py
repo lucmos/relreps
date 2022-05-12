@@ -144,13 +144,17 @@ class RAE(nn.Module):
         )
 
         if self.normalize_latents == NormalizationMode.BATCHNORM:
-            self.latent_normalization = nn.BatchNorm1d(num_features=latent_dim)
+            self.latent_normalization = nn.BatchNorm1d(num_features=latent_dim, track_running_stats=True)
         elif self.normalize_latents == NormalizationMode.INSTANCENORM:
-            self.latent_normalization = nn.InstanceNorm1d(num_features=latent_dim, affine=True)
+            self.latent_normalization = nn.InstanceNorm1d(
+                num_features=latent_dim, affine=True, track_running_stats=True
+            )
         elif self.normalize_latents == NormalizationMode.LAYERNORM:
             self.latent_normalization = nn.LayerNorm(latent_dim, elementwise_affine=True)
         elif self.normalize_latents == NormalizationMode.INSTANCENORM_NOAFFINE:
-            self.latent_normalization = nn.InstanceNorm1d(num_features=latent_dim, affine=False)
+            self.latent_normalization = nn.InstanceNorm1d(
+                num_features=latent_dim, affine=False, track_running_stats=True
+            )
         elif self.normalize_latents == NormalizationMode.LAYERNORM_NOAFFINE:
             self.latent_normalization = nn.LayerNorm(latent_dim, elementwise_affine=False)
         elif (
