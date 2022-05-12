@@ -157,10 +157,14 @@ class RAE(nn.Module):
             isinstance(self.normalize_latents, bool) and self.normalize_latents
         ) or self.normalize_latents == NormalizationMode.L2:
             self.latent_normalization = functools.partial(F.normalize, p=2, dim=-1)
+        elif isinstance(self.normalize_latents, bool) and not self.normalize_latents:
+            self.latent_normalization = None
         else:
             raise ValueError(f"Invalid latent normalization {self.latent_normalization}")
 
     def apply_latent_normalization(self, x: torch.Tensor) -> torch.Tensor:
+        if self.latent_normalization is None:
+            return x
         if (
             self.normalize_latents == NormalizationMode.INSTANCENORM
             or self.normalize_latents == NormalizationMode.INSTANCENORM_NOAFFINE
