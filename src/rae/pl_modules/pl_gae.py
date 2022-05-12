@@ -140,14 +140,16 @@ class LightningGAE(pl.LightningModule):
                 pca=self.validation_pca,
             )
 
-        anchors_out = None
         if self.anchors_images is not None:
+            anchors_num = self.anchors_images.shape[0]
             anchors_out = self(self.anchors_images)
             anchors_latents = anchors_out[Output.ANCHORS_LATENT]
             anchors_reconstructed = anchors_out[Output.RECONSTRUCTION]
 
         else:
             assert self.anchors_latents is not None
+            anchors_num = self.anchors_latents.shape[0]
+            # TODO: these latents should be normalized if the normalization is enabled..
             anchors_latents = self.anchors_latents
             if isinstance(self.autoencoder.decoder, RaeDecoder):
                 anchors_reconstructed, _ = self.autoencoder.decoder(
@@ -158,8 +160,7 @@ class LightningGAE(pl.LightningModule):
 
         self.validation_stats_df = cat_anchors_stats_to_dataframe(
             validation_stats_df=self.validation_stats_df,
-            anchors_images=self.anchors_images,
-            anchors_out=anchors_out,
+            anchors_num=anchors_num,
             anchors_latents=anchors_latents,
             metadata=self.metadata,
             current_epoch=self.current_epoch,
