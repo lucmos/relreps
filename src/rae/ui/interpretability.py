@@ -34,9 +34,8 @@ if wandb.api.api_key is None:
 
 st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
 
-checkpoint_path = select_checkpoint(default_run_path="gladia/rae/3la7i1zj")
+checkpoint_path = select_checkpoint(default_run_path="gladia/rae/oobq35zf")
 model: LightningGAE = get_model(checkpoint_path=checkpoint_path)
-
 
 st.sidebar.markdown("---")
 images = model.metadata.fixed_images.cpu().detach()
