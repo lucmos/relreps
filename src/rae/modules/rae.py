@@ -108,6 +108,7 @@ class RAE(nn.Module):
         hidden_channels: int,
         latent_dim: int,
         normalize_latents: bool,
+        normalize_only_anchors_latents: bool = False,
         relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
         normalize_relative_embedding: str = RelativeEmbeddingNormalization.OFF,
     ):
@@ -127,6 +128,7 @@ class RAE(nn.Module):
             raise ValueError("The RAE model needs anchors!")
 
         self.normalize_latents = normalize_latents
+        self.normalize_only_anchors_latents = normalize_only_anchors_latents
 
         self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
         self.decoder = RaeDecoder(
@@ -146,7 +148,8 @@ class RAE(nn.Module):
         batch_latent, batch_latent_mu, batch_latent_logvar = self.embed(x)
 
         if self.normalize_latents:
-            batch_latent = F.normalize(batch_latent, p=2, dim=-1)
+            if not self.normalize_only_anchors_latents:
+                batch_latent = F.normalize(batch_latent, p=2, dim=-1)
             anchors_latent = F.normalize(anchors_latent, p=2, dim=-1)
 
         x_recon, latent = self.decoder(batch_latent, anchors_latent)

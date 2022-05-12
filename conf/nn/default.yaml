@@ -60,9 +60,10 @@ module:
     _target_: rae.modules.rae.RAE
     latent_dim: 2
     hidden_channels: 64
-    normalize_latents: False
+    normalize_latents: True
+    normalize_only_anchors_latents: True
     relative_embedding_method: basis_change # inner, basis_change
-    normalize_relative_embedding: batchnorm
+    normalize_relative_embedding: 'off'
 
   optimizer:
     #  Adam-oriented deep learning
