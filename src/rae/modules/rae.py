@@ -1,3 +1,4 @@
+import functools
 from enum import auto
 from typing import Optional
 
@@ -15,10 +16,11 @@ class RelativeEmbeddingMethod(StrEnum):
     INNER = auto()
 
 
-class RelativeEmbeddingNormalization(StrEnum):
+class NormalizationMode(StrEnum):
     L2 = auto()
     OFF = auto()
     BATCHNORM = auto()
+    INSTANCENORM = auto()
 
 
 class Encoder(nn.Module):
@@ -71,7 +73,7 @@ class RaeDecoder(nn.Module):
         self.relative_embedding_method = relative_embedding_method
         self.normalize_relative_embedding = normalize_relative_embedding
 
-        if self.normalize_relative_embedding == RelativeEmbeddingNormalization.BATCHNORM:
+        if self.normalize_relative_embedding == NormalizationMode.BATCHNORM:
             self.batch_norm = nn.BatchNorm1d(num_features=latent_dim)
 
     def forward(
@@ -87,9 +89,9 @@ class RaeDecoder(nn.Module):
             elif self.relative_embedding_method == RelativeEmbeddingMethod.BASIS_CHANGE:
                 relative_embedding = torch.linalg.lstsq(anchors_latents.T, batch_latent.T)[0].T
 
-        if self.normalize_relative_embedding == RelativeEmbeddingNormalization.L2:
+        if self.normalize_relative_embedding == NormalizationMode.L2:
             relative_embedding = F.normalize(relative_embedding, p=2, dim=-1)
-        elif self.normalize_relative_embedding == RelativeEmbeddingNormalization.BATCHNORM:
+        elif self.normalize_relative_embedding == NormalizationMode.BATCHNORM:
             relative_embedding = self.batch_norm(relative_embedding)
 
         x = self.fc(relative_embedding)
@@ -107,17 +109,17 @@ class RAE(nn.Module):
         metadata: MetaData,
         hidden_channels: int,
         latent_dim: int,
-        normalize_latents: bool,
+        normalize_latents: str,
         normalize_only_anchors_latents: bool = False,
         relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
-        normalize_relative_embedding: str = RelativeEmbeddingNormalization.OFF,
+        normalize_relative_embedding: str = NormalizationMode.OFF,
     ):
         super().__init__()
 
         if relative_embedding_method not in set(RelativeEmbeddingMethod):
             raise ValueError(f"Relative embedding method not valid: {relative_embedding_method}")
 
-        if normalize_relative_embedding not in set(RelativeEmbeddingNormalization):
+        if normalize_relative_embedding not in set(NormalizationMode):
             raise ValueError(f"Relative Embedding normalization not valid: {normalize_relative_embedding}")
 
         self.metadata = metadata
@@ -138,6 +140,29 @@ class RAE(nn.Module):
             normalize_relative_embedding=normalize_relative_embedding,
         )
 
+        if self.normalize_latents == NormalizationMode.BATCHNORM:
+            self.latent_normalization = nn.BatchNorm1d(num_features=latent_dim)
+        elif self.normalize_latents == NormalizationMode.INSTANCENORM:
+            self.latent_normalization = nn.InstanceNorm1d(num_features=latent_dim, affine=True)
+        elif (
+            isinstance(self.normalize_latents, bool) and self.normalize_latents
+        ) or self.normalize_latents == NormalizationMode.L2:
+            self.latent_normalization = functools.partial(F.normalize, p=2, dim=-1)
+        else:
+            raise ValueError(f"Invalid latent normalization {self.latent_normalization}")
+
+    def apply_latent_normalization(self, x: torch.Tensor) -> torch.Tensor:
+        if self.normalize_latents == NormalizationMode.BATCHNORM:
+            return self.latent_normalization(x)
+        elif self.normalize_latents == NormalizationMode.INSTANCENORM:
+            x = torch.transpose(x, 1, 0)
+            x = self.latent_normalization(x)
+            x = torch.transpose(x, 1, 0)
+
+            return x
+        elif self.normalize_latents or self.normalize_latents == NormalizationMode.L2:
+            return self.latent_normalization(x)
+
     def forward(self, x):
         if self.anchors_images is not None:
             with torch.no_grad():
@@ -149,8 +174,8 @@ class RAE(nn.Module):
 
         if self.normalize_latents:
             if not self.normalize_only_anchors_latents:
-                batch_latent = F.normalize(batch_latent, p=2, dim=-1)
-            anchors_latent = F.normalize(anchors_latent, p=2, dim=-1)
+                batch_latent = self.apply_latent_normalization(batch_latent)
+            anchors_latent = self.apply_latent_normalization(anchors_latent)
 
         x_recon, latent = self.decoder(batch_latent, anchors_latent)
 
