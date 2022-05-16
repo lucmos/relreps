@@ -36,7 +36,7 @@ if wandb.api.api_key is None:
 
 # Load model
 st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
-checkpoint_path = select_checkpoint(default_run_path="gladia/rae/oobq35zf")
+checkpoint_path = select_checkpoint(default_run_path="gladia/rae/356rslt5")
 model: LightningGAE = get_model(checkpoint_path=checkpoint_path)
 
 # Select a sample
