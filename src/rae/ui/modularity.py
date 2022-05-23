@@ -19,6 +19,7 @@ st.set_page_config(layout="wide")
 
 slider_placeholder = st.sidebar.empty()
 visualize_latent_space = st.sidebar.checkbox("Visualize latent space")
+visualize_decoder_weights_diff = st.sidebar.checkbox("Visualize decoder weights diff")
 
 check_wandb_login()
 st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
@@ -61,6 +62,13 @@ def display_latent(st_container, metadata, model, pca: Optional[PCA] = None):
     return pca
 
 
+def compute_weights_difference(m1, m2):
+    wdif = sum((x - y).abs().sum().detach().item() for x, y in zip(m1.parameters(), m2.parameters())) / sum(
+        p.numel() for p in rae_encoder.autoencoder.decoder.parameters()
+    )
+    st.metric("D1 - D2 weights", f"{wdif:.4f}")
+
+
 with torch.no_grad():
     st.sidebar.header("RAE checkpoints")
     rae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/356rslt5")
@@ -86,12 +94,12 @@ with torch.no_grad():
 
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown("Source")
+        st.markdown("Source (E1)")
         source_plot = plot_image(image)
         st.pyplot(source_plot)
 
     with col2:
-        st.markdown("First Decoder")
+        st.markdown("Decoder (D1)")
         reconstruction, _ = rae_encoder.autoencoder.decoder(batch_latent, anchors_latent)
         st.pyplot(plot_image(reconstruction))
 
@@ -99,7 +107,7 @@ with torch.no_grad():
             pca = display_latent(st_container=col2, metadata=metadata, model=rae_encoder, pca=None)
 
     with col3:
-        st.markdown("Second Decoder")
+        st.markdown("Decoder (D2)")
         reconstruction, _ = rae_decoder.autoencoder.decoder(batch_latent, anchors_latent)
         st.pyplot(plot_image(reconstruction))
 
@@ -113,6 +121,9 @@ with torch.no_grad():
     vae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/24d608t3")
     vae_decoder: LightningGAE = get_model(checkpoint_path=vae_decoder_ckpt)
     st.sidebar.markdown("---")
+
+    if visualize_decoder_weights_diff:
+        compute_weights_difference(rae_encoder.autoencoder.decoder, rae_decoder.autoencoder.decoder)
 
     st.subheader("VAE")
     model_out = vae_encoder(image[None])
@@ -134,6 +145,9 @@ with torch.no_grad():
 
         if visualize_latent_space:
             pca = display_latent(st_container=col3, metadata=metadata, model=vae_decoder, pca=None)
+
+    if visualize_decoder_weights_diff:
+        compute_weights_difference(vae_encoder.autoencoder.decoder, vae_decoder.autoencoder.decoder)
 
     st.sidebar.subheader("AE checkpoints")
     ae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3a9iwpmo")
@@ -163,3 +177,6 @@ with torch.no_grad():
 
         if visualize_latent_space:
             pca = display_latent(st_container=col3, metadata=metadata, model=rae_decoder, pca=None)
+
+    if visualize_decoder_weights_diff:
+        compute_weights_difference(ae_encoder.autoencoder.decoder, ae_decoder.autoencoder.decoder)
