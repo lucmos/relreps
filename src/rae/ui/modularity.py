@@ -84,7 +84,7 @@ with torch.no_grad():
         for class_name, color in zip(metadata.class_to_idx, px.colors.qualitative.Plotly[: len(metadata.class_to_idx)])
     }
     images = metadata.fixed_images.cpu().detach()
-    fixed_image_idx = slider_placeholder.slider("Select sample image:", 0, max_value=images.shape[0], value=2)
+    fixed_image_idx = slider_placeholder.number_input("Select sample image:", 0, max_value=images.shape[0], value=2)
     image = images[fixed_image_idx]
 
     st.subheader("RAE")
