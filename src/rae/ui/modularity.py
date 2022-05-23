@@ -1,6 +1,12 @@
+from typing import Optional
+
+import pandas as pd
+import plotly.express as px
 import streamlit as st
+import torch
 import wandb
 from matplotlib import pyplot as plt
+from sklearn.decomposition import PCA
 
 from nn_core.ui import select_checkpoint
 
@@ -9,88 +15,151 @@ from rae.pl_modules.pl_gae import LightningGAE
 from rae.ui.ui_utils import check_wandb_login, get_model, plot_image
 
 plt.style.use("ggplot")
-st.set_page_config(layout="centered")
+st.set_page_config(layout="wide")
 
 slider_placeholder = st.sidebar.empty()
+visualize_latent_space = st.sidebar.checkbox("Visualize latent space")
+
 check_wandb_login()
 st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
 
-st.sidebar.header("RAE checkpoints")
-rae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/356rslt5")
-rae_encoder: LightningGAE = get_model(checkpoint_path=rae_encoder_ckpt)
-st.sidebar.markdown("---")
-rae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/1f1u0s7r")
-rae_decoder: LightningGAE = get_model(checkpoint_path=rae_decoder_ckpt)
-st.sidebar.markdown("---")
 
-images = rae_encoder.metadata.fixed_images.cpu().detach()
-fixed_image_idx = slider_placeholder.slider("Select sample image:", 0, max_value=images.shape[0], value=2)
-image = images[fixed_image_idx]
+def display_latent(st_container, metadata, model, pca: Optional[PCA] = None):
+    model_out = model(images)
+    if pca is None:
+        pca = PCA(n_components=2)
+        pca.fit(model_out[Output.DEFAULT_LATENT])
 
-st.subheader("RAE")
-model_out = rae_encoder(image[None])
-batch_latent = model_out[Output.BATCH_LATENT]
-anchors_latent = model_out[Output.ANCHORS_LATENT]
+    latents = pca.transform(model_out[Output.DEFAULT_LATENT])
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.markdown("Source")
-    source_plot = plot_image(image)
-    st.pyplot(source_plot)
-
-with col2:
-    st.markdown("First Decoder")
-    reconstruction, _ = rae_encoder.autoencoder.decoder(batch_latent, anchors_latent)
-    st.pyplot(plot_image(reconstruction))
-
-with col3:
-    st.markdown("Second Decoder")
-    reconstruction, _ = rae_decoder.autoencoder.decoder(batch_latent, anchors_latent)
-    st.pyplot(plot_image(reconstruction))
-
-st.sidebar.subheader("VAE checkpoints")
-vae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3ufahj5a")
-vae_encoder: LightningGAE = get_model(checkpoint_path=vae_encoder_ckpt)
-st.sidebar.markdown("---")
-vae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/9ciiajda")
-vae_decoder: LightningGAE = get_model(checkpoint_path=vae_decoder_ckpt)
-st.sidebar.markdown("---")
+    fig = px.scatter(
+        pd.DataFrame(
+            {
+                "image_index": metadata.fixed_images_idxs,
+                "class": metadata.fixed_images_classes,
+                "target": metadata.fixed_images_targets,
+                "latent_0": latents[:, 0],
+                "latent_1": latents[:, 1],
+            }
+        ),
+        x="latent_0",
+        y="latent_1",
+        category_orders={"class": metadata.class_to_idx.keys()},
+        color="class",
+        hover_name="image_index",
+        hover_data=["image_index"],
+        color_discrete_map=color_discrete_map,
+        size_max=40,
+        color_continuous_scale=None,
+        labels={"latent_1": "", "latent_0": ""},
+    )
+    fig.layout.showlegend = False
+    st_container.plotly_chart(
+        fig,
+        use_container_width=True,
+    )
+    return pca
 
 
-st.subheader("VAE")
-model_out = vae_encoder(image[None])
-batch_latent_mu = model_out[Output.LATENT_MU]
+with torch.no_grad():
+    st.sidebar.header("RAE checkpoints")
+    rae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/356rslt5")
+    rae_encoder: LightningGAE = get_model(checkpoint_path=rae_encoder_ckpt)
+    st.sidebar.markdown("---")
+    rae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/1f1u0s7r")
+    rae_decoder: LightningGAE = get_model(checkpoint_path=rae_decoder_ckpt)
+    st.sidebar.markdown("---")
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.pyplot(source_plot)
-with col2:
-    reconstruction = vae_encoder.autoencoder.decoder(batch_latent_mu)
-    st.pyplot(plot_image(reconstruction))
-with col3:
-    reconstruction = vae_decoder.autoencoder.decoder(batch_latent_mu)
-    st.pyplot(plot_image(reconstruction))
+    metadata = rae_encoder.metadata
+    color_discrete_map = {
+        class_name: color
+        for class_name, color in zip(metadata.class_to_idx, px.colors.qualitative.Plotly[: len(metadata.class_to_idx)])
+    }
+    images = metadata.fixed_images.cpu().detach()
+    fixed_image_idx = slider_placeholder.slider("Select sample image:", 0, max_value=images.shape[0], value=2)
+    image = images[fixed_image_idx]
 
+    st.subheader("RAE")
+    model_out = rae_encoder(image[None])
+    batch_latent = model_out[Output.BATCH_LATENT]
+    anchors_latent = model_out[Output.ANCHORS_LATENT]
 
-st.sidebar.subheader("AE checkpoints")
-ae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3a9iwpmo")
-ae_encoder: LightningGAE = get_model(checkpoint_path=ae_encoder_ckpt)
-st.sidebar.markdown("---")
-ae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/16tamf2p")
-ae_decoder: LightningGAE = get_model(checkpoint_path=ae_decoder_ckpt)
-st.sidebar.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("Source")
+        source_plot = plot_image(image)
+        st.pyplot(source_plot)
 
+    with col2:
+        st.markdown("First Decoder")
+        reconstruction, _ = rae_encoder.autoencoder.decoder(batch_latent, anchors_latent)
+        st.pyplot(plot_image(reconstruction))
 
-st.subheader("AE")
-model_out = ae_encoder(image[None])
-batch_latent = model_out[Output.BATCH_LATENT]
+        if visualize_latent_space:
+            pca = display_latent(st_container=col2, metadata=metadata, model=rae_encoder, pca=None)
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.pyplot(source_plot)
-with col2:
-    reconstruction = ae_encoder.autoencoder.decoder(batch_latent)
-    st.pyplot(plot_image(reconstruction))
-with col3:
-    reconstruction = ae_decoder.autoencoder.decoder(batch_latent)
-    st.pyplot(plot_image(reconstruction))
+    with col3:
+        st.markdown("Second Decoder")
+        reconstruction, _ = rae_decoder.autoencoder.decoder(batch_latent, anchors_latent)
+        st.pyplot(plot_image(reconstruction))
+
+        if visualize_latent_space:
+            pca = display_latent(st_container=col3, metadata=metadata, model=rae_decoder, pca=None)
+
+    st.sidebar.subheader("VAE checkpoints")
+    vae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3ufahj5a")
+    vae_encoder: LightningGAE = get_model(checkpoint_path=vae_encoder_ckpt)
+    st.sidebar.markdown("---")
+    vae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/24d608t3")
+    vae_decoder: LightningGAE = get_model(checkpoint_path=vae_decoder_ckpt)
+    st.sidebar.markdown("---")
+
+    st.subheader("VAE")
+    model_out = vae_encoder(image[None])
+    batch_latent_mu = model_out[Output.LATENT_MU]
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.pyplot(source_plot)
+    with col2:
+        reconstruction = vae_encoder.autoencoder.decoder(batch_latent_mu)
+        st.pyplot(plot_image(reconstruction))
+
+        if visualize_latent_space:
+            pca = display_latent(st_container=col2, metadata=metadata, model=vae_encoder, pca=None)
+
+    with col3:
+        reconstruction = vae_decoder.autoencoder.decoder(batch_latent_mu)
+        st.pyplot(plot_image(reconstruction))
+
+        if visualize_latent_space:
+            pca = display_latent(st_container=col3, metadata=metadata, model=vae_decoder, pca=None)
+
+    st.sidebar.subheader("AE checkpoints")
+    ae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3a9iwpmo")
+    ae_encoder: LightningGAE = get_model(checkpoint_path=ae_encoder_ckpt)
+    st.sidebar.markdown("---")
+    ae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/16tamf2p")
+    ae_decoder: LightningGAE = get_model(checkpoint_path=ae_decoder_ckpt)
+    st.sidebar.markdown("---")
+
+    st.subheader("AE")
+    model_out = ae_encoder(image[None])
+    batch_latent = model_out[Output.BATCH_LATENT]
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.pyplot(source_plot)
+    with col2:
+        reconstruction = ae_encoder.autoencoder.decoder(batch_latent)
+        st.pyplot(plot_image(reconstruction))
+
+        if visualize_latent_space:
+            pca = display_latent(st_container=col2, metadata=metadata, model=ae_encoder, pca=None)
+
+    with col3:
+        reconstruction = ae_decoder.autoencoder.decoder(batch_latent)
+        st.pyplot(plot_image(reconstruction))
+
+        if visualize_latent_space:
+            pca = display_latent(st_container=col3, metadata=metadata, model=rae_decoder, pca=None)
