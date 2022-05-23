@@ -57,7 +57,7 @@ class Decoder(nn.Module):
 
 
 class AE(nn.Module):
-    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool):
+    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool = False):
         super().__init__()
         self.metadata = metadata
         self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)

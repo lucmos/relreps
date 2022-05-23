@@ -97,7 +97,10 @@ class LightningGAE(pl.LightningModule):
         checkpoint["validation_pca"] = self.validation_pca
 
     def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        self.validation_pca = checkpoint["validation_pca"]
+        if "validation_pca" in checkpoint:
+            self.validation_pca = checkpoint["validation_pca"]
+        else:
+            self.validation_pca = PCA(n_components=2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
