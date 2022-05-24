@@ -71,10 +71,10 @@ def compute_weights_difference(m1, m2):
 
 with torch.no_grad():
     st.sidebar.header("RAE checkpoints")
-    rae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/356rslt5")
+    rae_encoder_ckpt = select_checkpoint(st_key="rae_encoder_ckpt", default_run_path="gladia/rae/2c3w6plr")
     rae_encoder: LightningGAE = get_model(checkpoint_path=rae_encoder_ckpt)
     st.sidebar.markdown("---")
-    rae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/1f1u0s7r")
+    rae_decoder_ckpt = select_checkpoint(st_key="rae_decoder_ckpt", default_run_path="gladia/rae/l1rnvm2u")
     rae_decoder: LightningGAE = get_model(checkpoint_path=rae_decoder_ckpt)
     st.sidebar.markdown("---")
 
@@ -115,10 +115,10 @@ with torch.no_grad():
             pca = display_latent(st_container=col3, metadata=metadata, model=rae_decoder, pca=None)
 
     st.sidebar.subheader("VAE checkpoints")
-    vae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3ufahj5a")
+    vae_encoder_ckpt = select_checkpoint(st_key="vae_encoder_ckpt", default_run_path="gladia/rae/3ufahj5a")
     vae_encoder: LightningGAE = get_model(checkpoint_path=vae_encoder_ckpt)
     st.sidebar.markdown("---")
-    vae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/24d608t3")
+    vae_decoder_ckpt = select_checkpoint(st_key="vae_decoder_ckpt", default_run_path="gladia/rae/24d608t3")
     vae_decoder: LightningGAE = get_model(checkpoint_path=vae_decoder_ckpt)
     st.sidebar.markdown("---")
 
@@ -150,10 +150,10 @@ with torch.no_grad():
         compute_weights_difference(vae_encoder.autoencoder.decoder, vae_decoder.autoencoder.decoder)
 
     st.sidebar.subheader("AE checkpoints")
-    ae_encoder_ckpt = select_checkpoint(default_run_path="gladia/rae/3a9iwpmo")
+    ae_encoder_ckpt = select_checkpoint(st_key="ae_encoder_ckpt", default_run_path="gladia/rae/3a9iwpmo")
     ae_encoder: LightningGAE = get_model(checkpoint_path=ae_encoder_ckpt)
     st.sidebar.markdown("---")
-    ae_decoder_ckpt = select_checkpoint(default_run_path="gladia/rae/16tamf2p")
+    ae_decoder_ckpt = select_checkpoint(st_key="ae_decoder_ckpt", default_run_path="gladia/rae/16tamf2p")
     ae_decoder: LightningGAE = get_model(checkpoint_path=ae_decoder_ckpt)
     st.sidebar.markdown("---")
 
