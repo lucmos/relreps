@@ -195,7 +195,7 @@ with torch.no_grad():
             model_out_d1 = vae_1(images)
 
             if visualize_latent_space:
-                pca = display_latent(st_container=col2, metadata=metadata, model=vae_1, pca=None)
+                pca = display_latent(st_container=col2, metadata=metadata, model_out=model_out_d1, pca=None)
 
         with col3:
             reconstruction = vae_2.autoencoder.decoder(batch_latent_mu)
@@ -204,7 +204,7 @@ with torch.no_grad():
             model_out_d2 = vae_2(images)
 
             if visualize_latent_space:
-                pca = display_latent(st_container=col3, metadata=metadata, model=vae_2, pca=None)
+                pca = display_latent(st_container=col3, metadata=metadata, model_out=model_out_d2, pca=None)
 
         if visualize_stats:
             with col4:
@@ -239,7 +239,7 @@ with torch.no_grad():
                     numerize(
                         mse_loss(
                             model_out_d2[Output.RECONSTRUCTION],
-                            vae_1.autoencoder.decoder(model_out_d2[Output.BATCH_LATENT])[0],
+                            vae_1.autoencoder.decoder(model_out_d2[Output.BATCH_LATENT]),
                         ).item(),
                         decimals=5,
                     ),
@@ -308,7 +308,7 @@ with torch.no_grad():
             model_out_d1 = ae_1(images)
 
             if visualize_latent_space:
-                pca = display_latent(st_container=col2, metadata=metadata, model=ae_1, pca=None)
+                pca = display_latent(st_container=col2, metadata=metadata, model_out=model_out_d1, pca=None)
 
         with col3:
             reconstruction = ae_2.autoencoder.decoder(batch_latent)
@@ -317,7 +317,7 @@ with torch.no_grad():
             model_out_d2 = ae_2(images)
 
             if visualize_latent_space:
-                pca = display_latent(st_container=col3, metadata=metadata, model=rae_2, pca=None)
+                pca = display_latent(st_container=col3, metadata=metadata, model_out=model_out_d2, pca=None)
 
         if visualize_stats:
             with col4:
@@ -352,7 +352,7 @@ with torch.no_grad():
                     numerize(
                         mse_loss(
                             model_out_d2[Output.RECONSTRUCTION],
-                            ae_1.autoencoder.decoder(model_out_d2[Output.BATCH_LATENT])[0],
+                            ae_1.autoencoder.decoder(model_out_d2[Output.BATCH_LATENT]),
                         ).item(),
                         decimals=5,
                     ),
