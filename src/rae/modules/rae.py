@@ -27,8 +27,9 @@ class NormalizationMode(StrEnum):
 
 
 class Encoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int) -> None:
+    def __init__(self, hidden_channels: int, latent_dim: int, force_positive_embeddings: bool) -> None:
         super().__init__()
+        self.force_positive_embeddings = force_positive_embeddings
         self.conv1 = nn.Conv2d(
             in_channels=1, out_channels=hidden_channels, kernel_size=4, stride=2, padding=1
         )  # out: hidden_channels x 14 x 14
@@ -41,6 +42,8 @@ class Encoder(nn.Module):
         self.fc_logvar = nn.Linear(in_features=hidden_channels * 2 * 7 * 7, out_features=latent_dim)
 
         self.activation = nn.ReLU()
+        if force_positive_embeddings:
+            self.last_activation = nn.SiLU()
 
     def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         x = self.activation(self.conv1(x))
@@ -50,6 +53,9 @@ class Encoder(nn.Module):
 
         x_mu = self.fc_mu(x)
         x_logvar = self.fc_logvar(x)
+
+        if self.force_positive_embeddings:
+            x_mu = self.last_activation(x_mu)
 
         return x_mu, x_logvar
 
@@ -119,6 +125,7 @@ class RAE(nn.Module):
         normalize_only_anchors_latents: bool = False,
         relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
         normalize_relative_embedding: str = NormalizationMode.OFF,
+        force_positive_embeddings: bool = False,
     ):
         super().__init__()
 
@@ -143,7 +150,9 @@ class RAE(nn.Module):
         self.normalize_means = normalize_means
         self.normalize_only_anchors_means = normalize_only_anchors_means
 
-        self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
+        self.encoder = Encoder(
+            hidden_channels=hidden_channels, latent_dim=latent_dim, force_positive_embeddings=force_positive_embeddings
+        )
         self.decoder = RaeDecoder(
             hidden_channels=hidden_channels,
             latent_dim=(self.anchors_images if self.anchors_images is not None else self.anchors_latents).shape[0],

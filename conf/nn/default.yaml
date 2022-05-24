@@ -72,6 +72,8 @@ module:
     relative_embedding_method: basis_change # inner, basis_change
     normalize_relative_embedding: 'off'
 
+    force_positive_embeddings: True
+
   optimizer:
     #  Adam-oriented deep learning
     _target_: torch.optim.Adam
