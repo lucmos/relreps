@@ -175,9 +175,7 @@ class LightningGAE(pl.LightningModule):
         to_log = {}
         to_close = set()
         if SupportedViz.ANCHORS_RECONSTRUCTED in self.supported_viz:
-            to_log["anchors/reconstructed"] = plot_images(
-                anchors_reconstructed, "Anchors reconstructed", figsize=(17, 4)
-            )
+            to_log["anchors/reconstructed"] = plot_images(anchors_reconstructed, "Anchors reconstructed")
             to_close.add(to_log["anchors/reconstructed"])
 
         if SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED in self.supported_viz:
@@ -277,7 +275,7 @@ class LightningGAE(pl.LightningModule):
             to_close.add(to_log["images/source"])
 
         if SupportedViz.ANCHORS_SOURCE in self.supported_viz:
-            to_log["anchors/source"] = plot_images(self.anchors_images, "Anchors images", figsize=(17, 4))
+            to_log["anchors/source"] = plot_images(self.anchors_images, "Anchors images")
             to_close.add(to_log["anchors/source"])
 
         if to_log:

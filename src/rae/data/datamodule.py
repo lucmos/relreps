@@ -5,11 +5,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Union
 
 import hydra
+import numpy as np
 import omegaconf
 import pytorch_lightning as pl
 import torch
 from omegaconf import DictConfig
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.dataloader import default_collate
 from torchvision import transforms
@@ -30,6 +32,7 @@ HARDCODED_ANCHORS: List[int] = [0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
 
 class AnchorsMode(StrEnum):
     STRATIFIED = auto()
+    STRATIFIED_SUBSET = auto()
     FIXED = auto()
     RANDOM_IMAGES = auto()
     RANDOM_LATENTS = auto()
@@ -220,7 +223,34 @@ class MyDataModule(pl.LightningDataModule):
         }
 
     def get_anchors(self) -> Dict[str, torch.Tensor]:
-        if self.anchors_mode == AnchorsMode.STRATIFIED:
+        if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
+            if self.anchors_num >= len(self.train_dataset.mnist.classes):
+                shuffled_idxs, shuffled_targets = shuffle(
+                    np.asarray(list(range(len(self.train_dataset)))),
+                    self.train_dataset.mnist.targets.numpy(),
+                    random_state=0,
+                )
+                all_targets = sorted(set(shuffled_targets))
+                class2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
+
+                anchor_indices = []
+                i = 0
+                while len(anchor_indices) < self.anchors_num:
+                    for target, target_idxs in class2idxs.items():
+                        anchor_indices.append(target_idxs[i])
+                        if len(anchor_indices) == self.anchors_num:
+                            break
+                    i += 1
+
+            anchors = self.extract_batch(self.train_dataset, anchor_indices)
+            return {
+                "anchors_idxs": anchor_indices,
+                "anchors_images": anchors["images"],
+                "anchors_targets": anchors["targets"],
+                "anchors_classes": anchors["classes"],
+                "anchors_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.STRATIFIED:
             if self.anchors_num >= len(self.train_dataset.mnist.classes):
                 _, anchor_indices = train_test_split(
                     list(range(len(self.train_dataset))),
