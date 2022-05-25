@@ -17,6 +17,7 @@ class RelativeEmbeddingMethod(StrEnum):
 
 
 class NormalizationMode(StrEnum):
+    ABS = auto()
     L2 = auto()
     OFF = auto()
     BATCHNORM = auto()
@@ -102,6 +103,8 @@ class RaeDecoder(nn.Module):
             relative_embedding = F.normalize(relative_embedding, p=2, dim=-1)
         elif self.normalize_relative_embedding == NormalizationMode.BATCHNORM:
             relative_embedding = self.batch_norm(relative_embedding)
+        elif self.normalize_relative_embedding == NormalizationMode.ABS:
+            relative_embedding = relative_embedding.abs()
 
         x = self.fc(relative_embedding)
         x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
