@@ -20,7 +20,7 @@ class LightningVariational(LightningGAE):
             out[Output.LATENT_LOGVAR],
             variational_beta=self.hparams.loss.variational_beta,
         )
-        loss = loss - out[Output.INV_LATENTS].clamp(max=0).sum() * 1000
+        loss = loss - out[Output.INV_LATENTS].clamp(max=0).sum() * 100
 
         return {
             Output.LOSS: loss,
