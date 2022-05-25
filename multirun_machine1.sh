@@ -9,10 +9,10 @@ python src/rae/run.py \
     nn.module.autoencoder.normalize_only_anchors_latents=False \
     nn.module.autoencoder.normalize_means=l2 \
     nn.module.autoencoder.normalize_only_anchors_means=False \
-    nn.module.autoencoder.normalize_relative_embedding='abs' \
+    nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
     nn.module.autoencoder.force_positive_embeddings=False \
-    core.tags='[rae]' \
+    core.tags='[rae, loss-positive-relative-embeds]' \
     train.seed_index=0 \
     nn.data.anchors_mode=stratified_subset \
     nn.data.anchors_num=50 \
@@ -27,10 +27,10 @@ python src/rae/run.py \
     nn.module.autoencoder.normalize_only_anchors_latents=False \
     nn.module.autoencoder.normalize_means=l2 \
     nn.module.autoencoder.normalize_only_anchors_means=False \
-    nn.module.autoencoder.normalize_relative_embedding='abs' \
+    nn.module.autoencoder.normalize_relative_embedding='off' \
     nn.module.autoencoder.relative_embedding_method=basis_change \
     nn.module.autoencoder.force_positive_embeddings=False \
-    core.tags='[rae]' \
+    core.tags='[rae, loss-positive-relative-embeds]' \
     train.seed_index=1 \
     nn.data.anchors_mode=stratified_subset \
     nn.data.anchors_num=50 \
