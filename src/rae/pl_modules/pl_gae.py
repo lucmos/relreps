@@ -18,7 +18,7 @@ from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, SupportedViz
-from rae.modules.rae import RAE, RaeDecoder
+from rae.modules.rae_model import RAE, RaeDecoder
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
 from rae.utils.plotting import plot_images, plot_latent_evolution, plot_latent_space, plot_matrix, plot_violin
 

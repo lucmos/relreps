@@ -7,6 +7,17 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
+class RelativeEmbeddingMethod(StrEnum):
+    BASIS_CHANGE = auto()
+    INNER = auto()
+
+
+class ValuesMethod(StrEnum):
+    SIMILARITIES = auto()
+    TRAINABLE = auto()
+    ANCHORS = auto()
+
+
 class Output(StrEnum):
     RECONSTRUCTION = auto()
     DEFAULT_LATENT = auto()

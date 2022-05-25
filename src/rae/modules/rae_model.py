@@ -8,12 +8,7 @@ from backports.strenum import StrEnum
 from torch import nn
 
 from rae.data.datamodule import MetaData
-from rae.modules.enumerations import Output
-
-
-class RelativeEmbeddingMethod(StrEnum):
-    BASIS_CHANGE = auto()
-    INNER = auto()
+from rae.modules.enumerations import Output, RelativeEmbeddingMethod
 
 
 class NormalizationMode(StrEnum):
