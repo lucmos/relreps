@@ -206,15 +206,13 @@ class LightningAutoencoder(AbstractLightningModule):
             pca=self.validation_pca,
         )
 
-        fixed_images_out = self(self.fixed_images)
-
         validation_epoch_end_viz(
             lightning_module=self,
             outputs=outputs,
             validation_stats_df=self.validation_stats_df,
             anchors_reconstructed=anchors_reconstructed,
             anchors_latents=anchors_latents,
-            fixed_images_out=fixed_images_out,
+            fixed_images_out=self(self.fixed_images),
         )
 
 

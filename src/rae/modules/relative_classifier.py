@@ -29,12 +29,12 @@ class RCNN(nn.Module):
         Args:
             metadata: the metadata object
             input_channels: number of color channels in the image
-            hidden_channels: size of the hidden dimensions to use
-            hidden_features:
+            hidden_channels: size of the hidden channels to use in the convolutions
+            hidden_features: size of the hidden features
             n_classes: expected size of the output
-            normalization_mode
-            similarity_mode
-            values_mode
+            normalization_mode: how the inputs and anchors should be normalized
+            similarity_mode: how to compute the anchors similarities
+            values_mode: how to compute the attention output
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")

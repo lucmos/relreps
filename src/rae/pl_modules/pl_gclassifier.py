@@ -14,7 +14,6 @@ from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
-from rae.modules.rae_model import RaeDecoder
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
@@ -162,19 +161,8 @@ class LightningClassifier(AbstractLightningModule):
                 anchors_latents = anchors_out[Output.ANCHORS_LATENT]
             else:
                 anchors_latents = anchors_out[Output.DEFAULT_LATENT]
-            anchors_reconstructed = anchors_out.get(Output.RECONSTRUCTION, None)
-
         else:
-            assert self.anchors_latents is not None
-            anchors_num = self.anchors_latents.shape[0]
-            # TODO: these latents should be normalized if the normalization is enabled..
-            anchors_latents = self.anchors_latents
-            if isinstance(self.autoencoder.decoder, RaeDecoder):
-                anchors_reconstructed, _ = self.autoencoder.decoder(
-                    self.anchors_latents, anchors_latents=self.anchors_latents
-                )
-            else:
-                anchors_reconstructed = self.autoencoder.decoder(self.anchors_latents)
+            raise NotImplementedError()
 
         self.validation_stats_df = cat_anchors_stats_to_dataframe(
             validation_stats_df=self.validation_stats_df,
@@ -185,15 +173,13 @@ class LightningClassifier(AbstractLightningModule):
             pca=self.validation_pca,
         )
 
-        fixed_images_out = self(self.fixed_images)
-
         validation_epoch_end_viz(
             lightning_module=self,
             outputs=outputs,
             validation_stats_df=self.validation_stats_df,
-            anchors_reconstructed=anchors_reconstructed,
+            anchors_reconstructed=None,
             anchors_latents=anchors_latents,
-            fixed_images_out=fixed_images_out,
+            fixed_images_out=self(self.fixed_images),
         )
 
 

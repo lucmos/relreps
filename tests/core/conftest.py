@@ -57,6 +57,9 @@ def cfg_simple_train(cfg: DictConfig) -> DictConfig:
     # Disable gpus
     cfg.train.trainer.gpus = 0
 
+    # Disable fast dev run
+    cfg.train.trainer.fast_dev_run = False
+
     # Disable logger
     cfg.train.logging.logger.mode = "disabled"
 

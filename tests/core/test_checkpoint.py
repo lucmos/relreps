@@ -55,7 +55,7 @@ class ModuleWithCustomCheckpoint(LightningAutoencoder):
 
 def test_on_save_checkpoint_hook(cfg_all_not_dry: DictConfig) -> None:
     cfg = OmegaConf.create(cfg_all_not_dry)
-    cfg.nn.module._target_ = "tests.test_checkpoint.ModuleWithCustomCheckpoint"
+    cfg.nn.module._target_ = "tests.core.test_checkpoint.ModuleWithCustomCheckpoint"
     output_path = Path(run(cfg))
 
     checkpoint = load_checkpoint(output_path)
