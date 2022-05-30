@@ -8,17 +8,21 @@ from nn_core.ui import select_checkpoint
 
 from rae.modules.enumerations import Output
 from rae.pl_modules.pl_gae import LightningGAE
-from rae.ui.ui_utils import check_wandb_login, get_model, plot_image
+from rae.ui.ui_utils import check_wandb_login, get_model, plot_image, show_code_version
 
 plt.style.use("ggplot")
 
 
 check_wandb_login()
 
+
+CODE_VERSION = "0.0.1"
+show_code_version(code_version=CODE_VERSION)
+
 # Load model
 st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
 checkpoint_path = select_checkpoint(default_run_path="gladia/rae/356rslt5")
-model: LightningGAE = get_model(checkpoint_path=checkpoint_path)
+model: LightningGAE = get_model(checkpoint_path=checkpoint_path, supported_code_version=CODE_VERSION)
 
 # Select a sample
 st.sidebar.markdown("---")
