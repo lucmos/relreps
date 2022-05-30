@@ -1,2 +1,2 @@
-_target_: rae.modules.classifier.CNN
+_target_: rae.modules.cnn.CNN
 hidden_channels: 64
