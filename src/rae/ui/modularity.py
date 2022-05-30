@@ -8,7 +8,7 @@ from torch.nn.functional import mse_loss
 from nn_core.ui import select_checkpoint
 
 from rae.modules.enumerations import Output
-from rae.pl_modules.pl_gae import LightningGAE
+from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
 from rae.ui.ui_utils import (
     check_wandb_login,
     compute_weights_difference,
@@ -39,10 +39,10 @@ st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
 with torch.no_grad():
     st.sidebar.header("RAE checkpoints")
     rae_1_ckpt = select_checkpoint(st_key="rae_1_ckpt", default_run_path="gladia/rae/2c3w6plr")
-    rae_1: LightningGAE = get_model(checkpoint_path=rae_1_ckpt, supported_code_version=CODE_VERSION)
+    rae_1: LightningAutoencoder = get_model(checkpoint_path=rae_1_ckpt, supported_code_version=CODE_VERSION)
     st.sidebar.markdown("---")
     rae_2_ckpt = select_checkpoint(st_key="rae_2_ckpt", default_run_path="gladia/rae/l1rnvm2u")
-    rae_2: LightningGAE = get_model(checkpoint_path=rae_2_ckpt, supported_code_version=CODE_VERSION)
+    rae_2: LightningAutoencoder = get_model(checkpoint_path=rae_2_ckpt, supported_code_version=CODE_VERSION)
     st.sidebar.markdown("---")
 
     metadata = rae_1.metadata
@@ -179,10 +179,10 @@ with torch.no_grad():
 
         st.sidebar.subheader("VAE checkpoints")
         vae_1_ckpt = select_checkpoint(st_key="vae_1_ckpt", default_run_path="gladia/rae/3ufahj5a")
-        vae_1: LightningGAE = get_model(checkpoint_path=vae_1_ckpt, supported_code_version=CODE_VERSION)
+        vae_1: LightningAutoencoder = get_model(checkpoint_path=vae_1_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
         vae_2_ckpt = select_checkpoint(st_key="vae_2_ckpt", default_run_path="gladia/rae/24d608t3")
-        vae_2: LightningGAE = get_model(checkpoint_path=vae_2_ckpt, supported_code_version=CODE_VERSION)
+        vae_2: LightningAutoencoder = get_model(checkpoint_path=vae_2_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
 
         st.subheader("VAE")
@@ -292,10 +292,10 @@ with torch.no_grad():
 
         st.sidebar.subheader("AE checkpoints")
         ae_1_ckpt = select_checkpoint(st_key="ae_1_ckpt", default_run_path="gladia/rae/3a9iwpmo")
-        ae_1: LightningGAE = get_model(checkpoint_path=ae_1_ckpt, supported_code_version=CODE_VERSION)
+        ae_1: LightningAutoencoder = get_model(checkpoint_path=ae_1_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
         ae_2_ckpt = select_checkpoint(st_key="ae_2_ckpt", default_run_path="gladia/rae/16tamf2p")
-        ae_2: LightningGAE = get_model(checkpoint_path=ae_2_ckpt, supported_code_version=CODE_VERSION)
+        ae_2: LightningAutoencoder = get_model(checkpoint_path=ae_2_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
 
         st.subheader("AE")

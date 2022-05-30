@@ -48,9 +48,9 @@ def run(cfg: DictConfig) -> str:
     Returns:
         the run directory inside the storage_dir used by the current experiment
     """
-    seed_index_everything(cfg.train)
-
     pylogger.info(f"Codebase version: '{cfg.core.version}'")
+
+    seed_index_everything(cfg.train)
 
     fast_dev_run: bool = cfg.train.trainer.fast_dev_run
     if fast_dev_run:

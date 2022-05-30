@@ -29,7 +29,7 @@ TRAIN_MAX_NSTEPS = 1
 def cfg(tmp_path_factory: TempPathFactory) -> DictConfig:
     test_cfg_tmpdir = tmp_path_factory.mktemp("test_train_tmpdir")
 
-    with initialize(config_path="../conf"):
+    with initialize(config_path="../../conf"):
         cfg = compose(config_name="default", return_hydra_config=True)
         HydraConfig().set_config(cfg)
 

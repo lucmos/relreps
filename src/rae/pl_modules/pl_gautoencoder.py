@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Set
 
 import hydra
 import matplotlib.pyplot as plt
@@ -11,7 +11,6 @@ import torch
 import torch.nn.functional as F
 import wandb
 from sklearn.decomposition import PCA
-from torch.optim import Optimizer
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
@@ -20,6 +19,7 @@ from rae.data.datamodule import MetaData
 from rae.modules.ae import AE
 from rae.modules.enumerations import Output, SupportedViz
 from rae.modules.rae_model import RAE, RaeDecoder
+from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
 from rae.utils.plotting import plot_images, plot_latent_evolution, plot_latent_space, plot_matrix, plot_violin
 from rae.utils.tensor_ops import detach_tensors
@@ -27,18 +27,11 @@ from rae.utils.tensor_ops import detach_tensors
 pylogger = logging.getLogger(__name__)
 
 
-class LightningAutoencoder(pl.LightningModule):
+class LightningAutoencoder(AbstractLightningModule):
     logger: NNLogger
 
     def __init__(self, metadata: Optional[MetaData] = None, *args, **kwargs) -> None:
-        super().__init__()
-
-        # Populate self.hparams with args and kwargs automagically!
-        # We want to skip metadata since it is saved separately by the NNCheckpointIO object.
-        # Be careful when modifying this instruction. If in doubt, don't do it :]
-        self.save_hyperparameters(logger=False, ignore=("metadata",))
-
-        self.metadata = metadata
+        super().__init__(metadata, *args, **kwargs)
 
         self.autoencoder = hydra.utils.instantiate(
             kwargs["model"] if "model" in kwargs else kwargs["autoencoder"], metadata=metadata
@@ -68,14 +61,14 @@ class LightningAutoencoder(pl.LightningModule):
         self.register_buffer("anchors_latents", self.metadata.anchors_latents)
         self.register_buffer("fixed_images", self.metadata.fixed_images)
 
-        self.supported_viz = self._determine_supported_viz()
-        pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
-
         self.validation_pca: Optional[PCA] = None
 
         self.loss = hydra.utils.instantiate(self.hparams.loss)
 
-    def _determine_supported_viz(self) -> Set[SupportedViz]:
+        self.supported_viz = self.supported_viz()
+        pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
+
+    def supported_viz(self) -> Set[SupportedViz]:
         supported_viz = set()
 
         if self.fixed_images is not None:
@@ -142,6 +135,14 @@ class LightningAutoencoder(pl.LightningModule):
                 out[Output.LATENT_MU],
                 out[Output.LATENT_LOGVAR],
             )
+
+        self.log_dict(
+            {f"loss/{stage}": loss.cpu().detach()},
+            on_step=stage == "train",
+            on_epoch=True,
+            prog_bar=True,
+            batch_size=batch["image"].shape[0],
+        )
 
         return {
             Output.LOSS: loss,
@@ -308,28 +309,10 @@ class LightningAutoencoder(pl.LightningModule):
             plt.close(fig)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        step_out = self.step(batch, batch_idx, stage="train")
-
-        self.log_dict(
-            {"loss/train": step_out["loss"].cpu().detach()},
-            on_step=True,
-            on_epoch=True,
-            prog_bar=True,
-            batch_size=batch["image"].shape[0],
-        )
-        return step_out
+        return self.step(batch, batch_idx, stage="train")
 
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        step_out = self.step(batch, batch_idx, stage="validation")
-
-        self.log_dict(
-            {"loss/val": step_out["loss"].cpu().detach()},
-            on_step=False,
-            on_epoch=True,
-            prog_bar=True,
-            batch_size=batch["image"].shape[0],
-        )
-        return step_out
+        return self.step(batch, batch_idx, stage="val")
 
     def on_fit_end(self) -> None:
 
@@ -341,29 +324,6 @@ class LightningAutoencoder(pl.LightningModule):
             )
             # Convert to HTML as a workaround to https://github.com/wandb/client/issues/2191
             self.logger.experiment.log({"latent": wandb.Html(plotly.io.to_html(latent_plot), inject=True)})
-
-    def configure_optimizers(
-        self,
-    ) -> Union[Optimizer, Tuple[Sequence[Optimizer], Sequence[Any]]]:
-        """Choose what optimizers and learning-rate schedulers to use in your optimization.
-
-        Normally you'd need one. But in the case of GANs or similar you might have multiple.
-
-        Return:
-            Any of these 6 options.
-            - Single optimizer.
-            - List or Tuple - List of optimizers.
-            - Two lists - The first list has multiple optimizers, the second a list of LR schedulers (or lr_dict).
-            - Dictionary, with an 'optimizer' key, and (optionally) a 'lr_scheduler'
-              key whose value is a single LR scheduler or lr_dict.
-            - Tuple of dictionaries as described, with an optional 'frequency' key.
-            - None - Fit will run without any optimizer.
-        """
-        opt = hydra.utils.instantiate(self.hparams.optimizer, params=self.parameters(), _convert_="partial")
-        if "lr_scheduler" not in self.hparams:
-            return [opt]
-        scheduler = hydra.utils.instantiate(self.hparams.lr_scheduler, optimizer=opt)
-        return [opt], [scheduler]
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")

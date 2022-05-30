@@ -1,0 +1,55 @@
+import abc
+import logging
+from typing import Any, Optional, Sequence, Set, Tuple, Union
+
+import hydra
+import pytorch_lightning as pl
+from torch.optim import Optimizer
+
+from nn_core.model_logging import NNLogger
+
+from rae.data.datamodule import MetaData
+from rae.modules.enumerations import SupportedViz
+
+pylogger = logging.getLogger(__name__)
+
+
+class AbstractLightningModule(pl.LightningModule):
+    logger: NNLogger
+
+    def __init__(self, metadata: Optional[MetaData] = None, *args, **kwargs) -> None:
+        super().__init__()
+
+        # Populate self.hparams with args and kwargs automagically!
+        # We want to skip metadata since it is saved separately by the NNCheckpointIO object.
+        # Be careful when modifying this instruction. If in doubt, don't do it :]
+        self.save_hyperparameters(logger=False, ignore=("metadata",))
+
+        self.metadata = metadata
+
+    @abc.abstractmethod
+    def supported_viz(self) -> Set[SupportedViz]:
+        raise NotImplementedError
+
+    def configure_optimizers(
+        self,
+    ) -> Union[Optimizer, Tuple[Sequence[Optimizer], Sequence[Any]]]:
+        """Choose what optimizers and learning-rate schedulers to use in your optimization.
+
+        Normally you'd need one. But in the case of GANs or similar you might have multiple.
+
+        Return:
+            Any of these 6 options.
+            - Single optimizer.
+            - List or Tuple - List of optimizers.
+            - Two lists - The first list has multiple optimizers, the second a list of LR schedulers (or lr_dict).
+            - Dictionary, with an 'optimizer' key, and (optionally) a 'lr_scheduler'
+              key whose value is a single LR scheduler or lr_dict.
+            - Tuple of dictionaries as described, with an optional 'frequency' key.
+            - None - Fit will run without any optimizer.
+        """
+        opt = hydra.utils.instantiate(self.hparams.optimizer, params=self.parameters(), _convert_="partial")
+        if "lr_scheduler" not in self.hparams:
+            return [opt]
+        scheduler = hydra.utils.instantiate(self.hparams.lr_scheduler, optimizer=opt)
+        return [opt], [scheduler]

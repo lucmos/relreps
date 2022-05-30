@@ -6,12 +6,12 @@ import wandb
 from nn_core.serialization import load_model
 from nn_core.ui import select_checkpoint
 
-from rae.pl_modules.pl_gae import LightningGAE
+from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
 
 
 @st.cache(allow_output_mutation=True)
 def get_model(checkpoint_path: Path):
-    return load_model(module_class=LightningGAE, checkpoint_path=checkpoint_path)
+    return load_model(module_class=LightningAutoencoder, checkpoint_path=checkpoint_path)
 
 
 if wandb.api.api_key is None:
@@ -21,5 +21,5 @@ if wandb.api.api_key is None:
 st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
 
 checkpoint_path = select_checkpoint()
-model: LightningGAE = get_model(checkpoint_path=checkpoint_path)
+model: LightningAutoencoder = get_model(checkpoint_path=checkpoint_path)
 model
