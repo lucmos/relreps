@@ -50,6 +50,8 @@ def run(cfg: DictConfig) -> str:
     """
     seed_index_everything(cfg.train)
 
+    pylogger.info(f"Codebase version: '{cfg.core.version}'")
+
     fast_dev_run: bool = cfg.train.trainer.fast_dev_run
     if fast_dev_run:
         pylogger.info(f"Debug mode <{cfg.train.trainer.fast_dev_run=}>. Forcing debugger friendly configuration!")

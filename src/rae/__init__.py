@@ -1,6 +1,10 @@
 import logging
 
+from omegaconf import OmegaConf
+
 from nn_core.console_logging import NNRichHandler
+
+from .utils.resolvers import codebase_version
 
 # Required workaround because PyTorch Lightning configures the logging on import,
 # thus the logging configuration defined in the __init__.py must be called before
@@ -27,6 +31,9 @@ logging.basicConfig(
         )
     ],
 )
+
+
+OmegaConf.register_new_resolver("version", codebase_version)
 
 try:
     from ._version import __version__ as __version__
