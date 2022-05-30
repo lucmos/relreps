@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from rae.modules.enumerations import RelativeEmbeddingMethod, ValuesMethod
+from rae.modules.enumerations import NormalizationMode, RelativeEmbeddingMethod, ValuesMethod
 
 
 class RelativeAttention(nn.Module):
@@ -13,6 +13,7 @@ class RelativeAttention(nn.Module):
         in_features: int,
         out_features: int,
         n_anchors: int,
+        normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
     ):
@@ -25,6 +26,7 @@ class RelativeAttention(nn.Module):
             in_features: hidden dimension of the input batch and anchors
             out_features: hidden dimension of the output (the queries, if trainable)
             n_anchors: number of anchors
+            normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
         """
@@ -32,6 +34,7 @@ class RelativeAttention(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.n_anchors = n_anchors
+        self.normalization_mode = normalization_mode
         self.similarity_mode = similarity_mode
         self.values_mode = values_mode
 
@@ -53,6 +56,14 @@ class RelativeAttention(nn.Module):
         """
         if x.shape[-1] != anchors.shape[-1]:
             raise ValueError(f"Inconsistent dimensions between batch and anchors: {x.shape}, {anchors.shape}")
+
+        if self.normalization_mode == NormalizationMode.OFF:
+            pass
+        elif self.normalization_mode == NormalizationMode.L2:
+            x = F.normalize(x, p=2, dim=-1)
+            anchors = F.normalize(anchors, p=2, dim=-1)
+        else:
+            raise ValueError(f"Normalization mode not supported: {self.normalization_mode}")
 
         # Compute queries-keys similarities
         if self.similarity_mode == RelativeEmbeddingMethod.INNER:
@@ -85,6 +96,7 @@ class RelativeTransformerBlock(nn.Module):
         in_features: int,
         out_features: int,
         n_anchors: int,
+        normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
     ):
@@ -94,6 +106,7 @@ class RelativeTransformerBlock(nn.Module):
             in_features: hidden dimension of the input batch and anchors
             out_features: hidden dimension of the output (the queries, if trainable)
             n_anchors: number of anchors
+            normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
         """
@@ -103,6 +116,7 @@ class RelativeTransformerBlock(nn.Module):
             n_anchors=n_anchors,
             in_features=in_features,
             out_features=out_features,
+            normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
         )
