@@ -11,7 +11,7 @@ data:
 #   ALl anchors from class seven
 #  anchors_idx: [0, 17, 26, 34, 36, 41, 60, 64, 70, 75]
 
-  latent_dim: ${nn.module.autoencoder.latent_dim}
+  latent_dim: ${oc.select:nn.module.autoencoder.latent_dim,null}
 
   val_images_fixed_idxs: [7371, 3963, 2861, 1701, 3172,
                           1749, 7023, 1606, 6481, 1377,
@@ -26,13 +26,19 @@ data:
 
   datasets:
     train:
-      _target_: rae.data.mnist.MNISTDataset
+      _target_: rae.data.cifar100.CIFAR100Dataset
 
     val:
-      - _target_: rae.data.mnist.MNISTDataset
+      - _target_: rae.data.cifar100.CIFAR100Dataset
 
 #    test:
-#      - _target_: rae.data.mnist.MNISTDataset
+#      - _target_: rae.data.cifar100.CIFAR100Dataset
+
+  transforms:
+    _target_: torchvision.transforms.Compose
+    transforms:
+#      - _target_: torchvision.transforms.Normalize
+      - _target_: torchvision.transforms.ToTensor
 
   gpus: ${train.trainer.gpus}
 
@@ -46,9 +52,8 @@ data:
     val: 128
     test: 16
 
-
 module:
-  _target_: rae.pl_modules.pl_variational.LightningVariational
+  _target_: rae.pl_modules.pl_gclassifier.LightningClassifier
 
   plot_n_val_samples: 1000
   fit_pca_each_epoch: True
@@ -56,21 +61,25 @@ module:
   loss:
     variational_beta: 1
 
-  autoencoder:
-    _target_: rae.modules.rae_model.RAE
-    latent_dim: 20
+  model:
+    _target_: rae.modules.relative_classifier.RCNN
     hidden_channels: 64
 
-    reparametrize_anchors: False
+    hidden_features: 64
+    normalization_mode: l2
+    similarity_mode: basis_change
+    values_mode: trainable
 
-    normalize_latents: 'off'
-    normalize_only_anchors_latents: True
-
-    normalize_means: l2
-    normalize_only_anchors_means: False
-
-    relative_embedding_method: basis_change # inner, basis_change
-    normalize_relative_embedding: 'off'
+#    reparametrize_anchors: False
+#
+#    normalize_latents: 'off'
+#    normalize_only_anchors_latents: True
+#
+#    normalize_means: l2
+#    normalize_only_anchors_means: False
+#
+#    relative_embedding_method: basis_change # inner, basis_change
+#    normalize_relative_embedding: 'off'
 
   optimizer:
     #  Adam-oriented deep learning

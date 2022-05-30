@@ -29,6 +29,7 @@ class ValuesMethod(StrEnum):
 
 
 class Output(StrEnum):
+    LOGITS = auto()
     RECONSTRUCTION = auto()
     DEFAULT_LATENT = auto()
     DEFAULT_LATENT_NORMALIZED = auto()
