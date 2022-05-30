@@ -26,13 +26,19 @@ data:
 
   datasets:
     train:
-      _target_: rae.data.mnist.MNISTDataset
+      _target_: rae.data.cifar100.CIFAR100Dataset
 
     val:
-      - _target_: rae.data.mnist.MNISTDataset
+      - _target_: rae.data.cifar100.CIFAR100Dataset
 
 #    test:
-#      - _target_: rae.data.mnist.MNISTDataset
+#      - _target_: rae.data.cifar100.CIFAR100Dataset
+
+  transforms:
+    _target_: torchvision.transforms.Compose
+    transforms:
+#      - _target_: torchvision.transforms.Normalize
+      - _target_: torchvision.transforms.ToTensor
 
   gpus: ${train.trainer.gpus}
 

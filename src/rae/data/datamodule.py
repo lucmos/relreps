@@ -14,7 +14,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data.dataloader import default_collate
-from torchvision import transforms
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.nn_types import Split
@@ -176,6 +175,7 @@ class MyDataModule(pl.LightningDataModule):
         anchors_num: int,
         anchors_idxs: List[int],
         latent_dim: int,
+        transforms: Sequence[Dict[str, str]],
     ):
         super().__init__()
         self.datasets = datasets
@@ -202,6 +202,7 @@ class MyDataModule(pl.LightningDataModule):
 
         self.val_images_fixed_idxs: List[int] = val_images_fixed_idxs
         self.anchors: Dict[str, Any] = None
+        self.transforms = transforms
 
     def extract_batch(self, dataset: Dataset, indices: Sequence[int]) -> Dict[str, Any]:
         images = []
@@ -224,23 +225,22 @@ class MyDataModule(pl.LightningDataModule):
 
     def get_anchors(self) -> Dict[str, torch.Tensor]:
         if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
-            if self.anchors_num >= len(self.train_dataset.mnist.classes):
-                shuffled_idxs, shuffled_targets = shuffle(
-                    np.asarray(list(range(len(self.train_dataset)))),
-                    self.train_dataset.mnist.targets.numpy(),
-                    random_state=0,
-                )
-                all_targets = sorted(set(shuffled_targets))
-                class2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
+            shuffled_idxs, shuffled_targets = shuffle(
+                np.asarray(list(range(len(self.train_dataset)))),
+                np.asarray(self.train_dataset.targets),
+                random_state=0,
+            )
+            all_targets = sorted(set(shuffled_targets))
+            class2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
 
-                anchor_indices = []
-                i = 0
-                while len(anchor_indices) < self.anchors_num:
-                    for target, target_idxs in class2idxs.items():
-                        anchor_indices.append(target_idxs[i])
-                        if len(anchor_indices) == self.anchors_num:
-                            break
-                    i += 1
+            anchor_indices = []
+            i = 0
+            while len(anchor_indices) < self.anchors_num:
+                for target, target_idxs in class2idxs.items():
+                    anchor_indices.append(target_idxs[i])
+                    if len(anchor_indices) == self.anchors_num:
+                        break
+                i += 1
 
             anchors = self.extract_batch(self.train_dataset, anchor_indices)
             return {
@@ -251,12 +251,12 @@ class MyDataModule(pl.LightningDataModule):
                 "anchors_latents": None,
             }
         elif self.anchors_mode == AnchorsMode.STRATIFIED:
-            if self.anchors_num >= len(self.train_dataset.mnist.classes):
+            if self.anchors_num >= len(self.train_dataset.classes):
                 _, anchor_indices = train_test_split(
                     list(range(len(self.train_dataset))),
                     test_size=self.anchors_num,
                     stratify=self.train_dataset.targets
-                    if self.anchors_num >= len(self.train_dataset.mnist.classes)
+                    if self.anchors_num >= len(self.train_dataset.classes)
                     else None,
                     random_state=0,
                 )
@@ -313,7 +313,7 @@ class MyDataModule(pl.LightningDataModule):
         if self.train_dataset is None:
             self.setup(stage="fit")
 
-        class_to_idx = self.train_dataset.mnist.class_to_idx
+        class_to_idx = self.train_dataset.class_vocab
         idx_to_class = {x: y for y, x in class_to_idx.items()}
 
         if self.anchors is None:
@@ -336,7 +336,8 @@ class MyDataModule(pl.LightningDataModule):
         pass
 
     def setup(self, stage: Optional[str] = None):
-        transform = transforms.Compose([transforms.ToTensor()])  # , transforms.Normalize((0.1307,), (0.3081,))])
+        # transform = transforms.Compose([transforms.ToTensor()])  # , transforms.Normalize((0.1307,), (0.3081,))])
+        transform = hydra.utils.instantiate(self.transforms)
 
         # Here you should instantiate your datasets, you may also split the train into train and validation if needed.
         if (stage is None or stage == "fit") and (self.train_dataset is None and self.val_datasets is None):
