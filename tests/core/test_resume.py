@@ -2,7 +2,7 @@ from omegaconf import DictConfig, OmegaConf
 from pytest import TempPathFactory
 
 from nn_core.serialization import NNCheckpointIO
-from tests.conftest import TRAIN_MAX_NSTEPS, get_checkpoint_path, load_checkpoint
+from tests.core.conftest import TRAIN_MAX_NSTEPS, get_checkpoint_path, load_checkpoint
 
 from rae.run import run
 

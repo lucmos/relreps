@@ -7,6 +7,27 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
+class NormalizationMode(StrEnum):
+    L2 = auto()
+    OFF = auto()
+    BATCHNORM = auto()
+    INSTANCENORM = auto()
+    LAYERNORM = auto()
+    INSTANCENORM_NOAFFINE = auto()
+    LAYERNORM_NOAFFINE = auto()
+
+
+class RelativeEmbeddingMethod(StrEnum):
+    BASIS_CHANGE = auto()
+    INNER = auto()
+
+
+class ValuesMethod(StrEnum):
+    SIMILARITIES = auto()
+    TRAINABLE = auto()
+    ANCHORS = auto()
+
+
 class Output(StrEnum):
     RECONSTRUCTION = auto()
     DEFAULT_LATENT = auto()

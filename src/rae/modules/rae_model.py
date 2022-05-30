@@ -1,29 +1,12 @@
 import functools
-from enum import auto
 from typing import Callable, Optional, Union
 
 import torch
 import torch.nn.functional as F
-from backports.strenum import StrEnum
 from torch import nn
 
 from rae.data.datamodule import MetaData
-from rae.modules.enumerations import Output
-
-
-class RelativeEmbeddingMethod(StrEnum):
-    BASIS_CHANGE = auto()
-    INNER = auto()
-
-
-class NormalizationMode(StrEnum):
-    L2 = auto()
-    OFF = auto()
-    BATCHNORM = auto()
-    INSTANCENORM = auto()
-    LAYERNORM = auto()
-    INSTANCENORM_NOAFFINE = auto()
-    LAYERNORM_NOAFFINE = auto()
+from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod
 
 
 class Encoder(nn.Module):

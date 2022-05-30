@@ -69,12 +69,12 @@ def cfg_simple_train(cfg: DictConfig) -> DictConfig:
     cfg.nn.data.num_workers.val = 0
     cfg.nn.data.num_workers.test = 0
 
-    # Minimize the amount of work in test training
-    cfg.train.trainer.max_steps = TRAIN_MAX_NSTEPS
-    cfg.train.trainer.val_check_interval = TRAIN_MAX_NSTEPS
-
-    # Ensure the resuming is disabled
     with open_dict(config=cfg):
+        # Minimize the amount of work in test training
+        cfg.train.trainer.max_steps = TRAIN_MAX_NSTEPS
+        cfg.train.trainer.val_check_interval = TRAIN_MAX_NSTEPS
+
+        # Ensure the resuming is disabled
         cfg.train.restore = {}
         cfg.train.restore.ckpt_or_run_path = None
         cfg.train.restore.mode = None
