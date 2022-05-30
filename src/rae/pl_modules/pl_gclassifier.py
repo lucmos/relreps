@@ -2,14 +2,11 @@ import logging
 from typing import Any, Dict, List, Mapping, Optional, Set
 
 import hydra
-import matplotlib.pyplot as plt
 import omegaconf
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
 import torchmetrics
-import wandb
 from sklearn.decomposition import PCA
 
 from nn_core.common import PROJECT_ROOT
@@ -19,8 +16,8 @@ from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.modules.rae_model import RaeDecoder
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
+from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
-from rae.utils.plotting import plot_images, plot_latent_space, plot_matrix, plot_violin
 from rae.utils.tensor_ops import detach_tensors
 
 pylogger = logging.getLogger(__name__)
@@ -130,21 +127,10 @@ class LightningClassifier(AbstractLightningModule):
         }
 
     def on_fit_start(self) -> None:
-        to_log = {}
-        to_close = set()
-        if SupportedViz.VALIDATION_IMAGES_SOURCE in self.supported_viz:
-            to_log["images/source"] = plot_images(self.fixed_images, "Source images")
-            to_close.add(to_log["images/source"])
+        on_fit_start_viz(lightning_module=self, fixed_images=self.fixed_images, anchors_images=self.anchors_images)
 
-        if SupportedViz.ANCHORS_SOURCE in self.supported_viz:
-            to_log["anchors/source"] = plot_images(self.anchors_images, "Anchors images")
-            to_close.add(to_log["anchors/source"])
-
-        if to_log:
-            self.logger.experiment.log(to_log, step=self.global_step)
-
-        for fig in to_close:
-            plt.close(fig)
+    def on_fit_end(self) -> None:
+        on_fit_end_viz(lightning_module=self, validation_stats_df=self.validation_stats_df)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         return self.step(batch, batch_idx, stage=Stage.TRAIN)
@@ -176,7 +162,7 @@ class LightningClassifier(AbstractLightningModule):
                 anchors_latents = anchors_out[Output.ANCHORS_LATENT]
             else:
                 anchors_latents = anchors_out[Output.DEFAULT_LATENT]
-            anchors_reconstructed = anchors_out[Output.RECONSTRUCTION]
+            anchors_reconstructed = anchors_out.get(Output.RECONSTRUCTION, None)
 
         else:
             assert self.anchors_latents is not None
@@ -201,100 +187,14 @@ class LightningClassifier(AbstractLightningModule):
 
         fixed_images_out = self(self.fixed_images)
 
-        to_log = {}
-        to_close = set()
-        if SupportedViz.ANCHORS_RECONSTRUCTED in self.supported_viz:
-            to_log["anchors/reconstructed"] = plot_images(anchors_reconstructed, "Anchors reconstructed")
-            to_close.add(to_log["anchors/reconstructed"])
-
-        if SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED in self.supported_viz:
-            to_log["images/reconstructed"] = plot_images(
-                fixed_images_out[Output.RECONSTRUCTION], "Reconstructed images"
-            )
-            to_close.add(to_log["images/reconstructed"])
-
-        if SupportedViz.ANCHORS_SELF_INNER_PRODUCT in self.supported_viz:
-            anchors_self_inner_product = anchors_latents @ anchors_latents.T
-            to_log["anchors-vs-anchors/inner"] = plot_matrix(
-                anchors_self_inner_product,
-                title="Anchors vs Anchors inner products",
-                labels={"x": "anchors", "y": "anchors"},
-            )
-
-        if SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT in self.supported_viz:
-            batch_latent = fixed_images_out[Output.BATCH_LATENT]
-            anchors_batch_latents_inner_product = anchors_latents @ batch_latent.T
-            to_log["anchors-vs-samples/inner"] = plot_matrix(
-                anchors_batch_latents_inner_product,
-                title="Anchors vs Samples images inner products",
-                labels={"x": "samples", "y": "anchors"},
-            )
-
-        if SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED in self.supported_viz:
-            anchors_latents_normalized = F.normalize(anchors_latents, p=2, dim=-1)
-            anchors_self_inner_product_normalized = anchors_latents_normalized @ anchors_latents_normalized.T
-            to_log["anchors-vs-anchors/inner-normalized"] = plot_matrix(
-                anchors_self_inner_product_normalized,
-                title="Anchors vs Anchors inner products",
-                labels={"x": "anchors", "y": "anchors"},
-            )
-
-        if SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED in self.supported_viz:
-            batch_latent = fixed_images_out[Output.BATCH_LATENT]
-            anchors_latents_normalized = F.normalize(anchors_latents, p=2, dim=-1)
-            batch_latent_normalized = F.normalize(batch_latent, p=2, dim=-1)
-            anchors_batch_latents_inner_product_normalized = anchors_latents_normalized @ batch_latent_normalized.T
-            to_log["anchors-vs-samples/inner-normalized"] = plot_matrix(
-                anchors_batch_latents_inner_product_normalized,
-                title="Anchors vs Samples images inner products",
-                labels={"x": "samples", "y": "anchors"},
-            )
-
-        if SupportedViz.INVARIANT_LATENT_DISTRIBUTION in self.supported_viz:
-            fig = plot_violin(
-                torch.cat([output[Output.INV_LATENTS] for output in outputs], dim=0),
-                title="Relative Latent Space distribution",
-                y_label="validation distribution",
-                x_label="anchors",
-            )
-            to_log["distributions/invariant-latent-space"] = wandb.Image(fig)
-            to_close.add(fig)
-
-        if SupportedViz.LATENT_SPACE in self.supported_viz:
-            to_log["latent/space"] = plot_latent_space(
-                metadata=self.metadata,
-                validation_stats_df=self.validation_stats_df,
-                epoch=self.current_epoch,
-                x_data="latent_0",
-                y_data="latent_1",
-                n_samples=self.hparams.plot_n_val_samples,
-            )
-
-        if SupportedViz.LATENT_SPACE_NORMALIZED in self.supported_viz:
-            to_log["latent/space-normalized"] = plot_latent_space(
-                metadata=self.metadata,
-                validation_stats_df=self.validation_stats_df,
-                epoch=self.current_epoch,
-                x_data="latent_0_normalized",
-                y_data="latent_1_normalized",
-                n_samples=self.hparams.plot_n_val_samples,
-            )
-
-        if SupportedViz.LATENT_SPACE_PCA in self.supported_viz:
-            to_log["latent/space-pca"] = plot_latent_space(
-                metadata=self.metadata,
-                validation_stats_df=self.validation_stats_df,
-                epoch=self.current_epoch,
-                x_data="latent_0_pca",
-                y_data="latent_1_pca",
-                n_samples=self.hparams.plot_n_val_samples,
-            )
-
-        if to_log:
-            self.logger.experiment.log(to_log, step=self.global_step)
-
-        for fig in to_close:
-            plt.close(fig)
+        validation_epoch_end_viz(
+            lightning_module=self,
+            outputs=outputs,
+            validation_stats_df=self.validation_stats_df,
+            anchors_reconstructed=anchors_reconstructed,
+            anchors_latents=anchors_latents,
+            fixed_images_out=fixed_images_out,
+        )
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
