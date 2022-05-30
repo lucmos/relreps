@@ -1,0 +1,5 @@
+_target_: rae.pl_modules.pl_variational.LightningVariational
+
+defaults:
+  - _self_
+  - model: vae # rae

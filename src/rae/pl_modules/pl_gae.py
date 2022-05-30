@@ -38,7 +38,9 @@ class LightningGAE(pl.LightningModule):
 
         self.metadata = metadata
 
-        self.autoencoder = hydra.utils.instantiate(kwargs["autoencoder"], metadata=metadata)
+        self.autoencoder = hydra.utils.instantiate(
+            kwargs["model"] if "model" in kwargs else kwargs["autoencoder"], metadata=metadata
+        )
 
         self.df_columns = [
             "image_index",

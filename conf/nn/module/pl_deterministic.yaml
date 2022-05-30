@@ -1,0 +1,5 @@
+_target_: rae.pl_modules.pl_deterministic.LightningDeterministic
+
+defaults:
+  - _self_
+  - model: ae
