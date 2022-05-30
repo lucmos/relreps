@@ -33,7 +33,7 @@ class AbstractLightningModule(pl.LightningModule):
 
     def configure_optimizers(
         self,
-    ) -> Union[Optimizer, Tuple[Sequence[Optimizer], Sequence[Any]]]:
+    ) -> Union[Optimizer, Sequence[Optimizer], Tuple[Sequence[Optimizer], Sequence[Any]]]:
         """Choose what optimizers and learning-rate schedulers to use in your optimization.
 
         Normally you'd need one. But in the case of GANs or similar you might have multiple.
