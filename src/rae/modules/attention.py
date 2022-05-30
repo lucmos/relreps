@@ -1,3 +1,4 @@
+import logging
 import math
 
 import torch
@@ -5,6 +6,8 @@ import torch.nn.functional as F
 from torch import nn
 
 from rae.modules.enumerations import NormalizationMode, RelativeEmbeddingMethod, ValuesMethod
+
+pylogger = logging.getLogger(__name__)
 
 
 class RelativeAttention(nn.Module):
@@ -31,6 +34,8 @@ class RelativeAttention(nn.Module):
             values_mode: if True use trainable parameters as queries otherwise use the anchors
         """
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
+
         self.in_features = in_features
         self.out_features = out_features
         self.n_anchors = n_anchors
@@ -111,6 +116,7 @@ class RelativeTransformerBlock(nn.Module):
             values_mode: if True use trainable parameters as queries otherwise use the anchors
         """
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.attention = RelativeAttention(
             n_anchors=n_anchors,

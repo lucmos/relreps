@@ -1,3 +1,4 @@
+import logging
 from typing import Dict
 
 import torch
@@ -7,6 +8,8 @@ from torch import nn
 from rae.modules.attention import RelativeTransformerBlock
 from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod, ValuesMethod
 from rae.utils.tensor_ops import infer_dimension
+
+pylogger = logging.getLogger(__name__)
 
 
 class RCNN(nn.Module):
@@ -34,6 +37,8 @@ class RCNN(nn.Module):
             values_mode
         """
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
+
         self.metadata = metadata
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
