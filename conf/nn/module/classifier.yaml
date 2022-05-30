@@ -1,0 +1,5 @@
+_target_: rae.pl_modules.pl_gclassifier.LightningClassifier
+
+defaults:
+  - _self_
+  - model: rcnn

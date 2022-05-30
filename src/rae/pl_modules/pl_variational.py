@@ -4,6 +4,7 @@ from typing import Any, Mapping
 from rae.losses.vae_loss import vae_loss
 from rae.modules.enumerations import Output
 from rae.pl_modules.pl_gae import LightningGAE
+from rae.utils.tensor_ops import detach_tensors
 
 pylogger = logging.getLogger(__name__)
 
@@ -24,5 +25,5 @@ class LightningVariational(LightningGAE):
         return {
             Output.LOSS: loss,
             Output.BATCH: batch,
-            **{key: self.normalize_output(value) for key, value in out.items()},
+            **{key: detach_tensors(value) for key, value in out.items()},
         }

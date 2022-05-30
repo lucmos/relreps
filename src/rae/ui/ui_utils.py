@@ -9,11 +9,16 @@ import wandb
 from matplotlib import pyplot as plt
 from sklearn.decomposition import PCA
 
-from nn_core.serialization import load_model
+from nn_core.serialization import NNCheckpointIO, load_model
 
 from rae.modules.enumerations import Output
 from rae.pl_modules.pl_gae import LightningGAE
 from rae.utils.plotting import plot_violin
+
+
+def show_code_version(code_version: str):
+    st.sidebar.markdown(f"Demo compatibility up to version: `{code_version}`")
+    st.sidebar.markdown("---")
 
 
 def compute_weights_difference(m1, m2):
@@ -31,15 +36,23 @@ def plot_image(img):
 
 
 @st.cache(allow_output_mutation=True)
-def get_model(checkpoint_path: Path):
-    model = load_model(
-        module_class=LightningGAE,
-        checkpoint_path=checkpoint_path,
-        map_location="cpu",
-        substitute_values={"rae.modules.rae.RAE": "rae.modules.rae_model.RAE"},
-    )
-    model.eval()
-    return model
+def get_model(checkpoint_path: Path, supported_code_version: str):
+    try:
+        model = load_model(
+            module_class=LightningGAE,
+            checkpoint_path=checkpoint_path,
+            map_location="cpu",
+            substitute_values={"rae.modules.rae.RAE": "rae.modules.rae_model.RAE"},
+        )
+        model.eval()
+        return model
+    except:  # noqa
+        ckpt_code_version = NNCheckpointIO.load(path=checkpoint_path, map_location="cpu")["cfg"]["core"]["version"]
+        st.error(
+            f"Codebase version mismatch. Checkpoint trained with version `{ckpt_code_version}` support version `{supported_code_version}"
+        )
+        st.stop()
+        return None
 
 
 def check_wandb_login():

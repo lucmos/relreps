@@ -16,10 +16,14 @@ from rae.ui.ui_utils import (
     display_latent,
     get_model,
     plot_image,
+    show_code_version,
 )
 
 plt.style.use("ggplot")
 st.set_page_config(layout="wide")
+
+CODE_VERSION = "0.0.1"
+show_code_version(code_version=CODE_VERSION)
 
 visualize_latent_space = st.sidebar.checkbox("Visualize latent space")
 visualize_relative_distribution = st.sidebar.checkbox("Visualize relative distribution")
@@ -35,10 +39,10 @@ st.sidebar.subheader(f"Logged in W&B as: {wandb.api.viewer()['entity']}")
 with torch.no_grad():
     st.sidebar.header("RAE checkpoints")
     rae_1_ckpt = select_checkpoint(st_key="rae_1_ckpt", default_run_path="gladia/rae/2c3w6plr")
-    rae_1: LightningGAE = get_model(checkpoint_path=rae_1_ckpt)
+    rae_1: LightningGAE = get_model(checkpoint_path=rae_1_ckpt, supported_code_version=CODE_VERSION)
     st.sidebar.markdown("---")
     rae_2_ckpt = select_checkpoint(st_key="rae_2_ckpt", default_run_path="gladia/rae/l1rnvm2u")
-    rae_2: LightningGAE = get_model(checkpoint_path=rae_2_ckpt)
+    rae_2: LightningGAE = get_model(checkpoint_path=rae_2_ckpt, supported_code_version=CODE_VERSION)
     st.sidebar.markdown("---")
 
     metadata = rae_1.metadata
@@ -175,10 +179,10 @@ with torch.no_grad():
 
         st.sidebar.subheader("VAE checkpoints")
         vae_1_ckpt = select_checkpoint(st_key="vae_1_ckpt", default_run_path="gladia/rae/3ufahj5a")
-        vae_1: LightningGAE = get_model(checkpoint_path=vae_1_ckpt)
+        vae_1: LightningGAE = get_model(checkpoint_path=vae_1_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
         vae_2_ckpt = select_checkpoint(st_key="vae_2_ckpt", default_run_path="gladia/rae/24d608t3")
-        vae_2: LightningGAE = get_model(checkpoint_path=vae_2_ckpt)
+        vae_2: LightningGAE = get_model(checkpoint_path=vae_2_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
 
         st.subheader("VAE")
@@ -288,10 +292,10 @@ with torch.no_grad():
 
         st.sidebar.subheader("AE checkpoints")
         ae_1_ckpt = select_checkpoint(st_key="ae_1_ckpt", default_run_path="gladia/rae/3a9iwpmo")
-        ae_1: LightningGAE = get_model(checkpoint_path=ae_1_ckpt)
+        ae_1: LightningGAE = get_model(checkpoint_path=ae_1_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
         ae_2_ckpt = select_checkpoint(st_key="ae_2_ckpt", default_run_path="gladia/rae/16tamf2p")
-        ae_2: LightningGAE = get_model(checkpoint_path=ae_2_ckpt)
+        ae_2: LightningGAE = get_model(checkpoint_path=ae_2_ckpt, supported_code_version=CODE_VERSION)
         st.sidebar.markdown("---")
 
         st.subheader("AE")

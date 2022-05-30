@@ -2,7 +2,7 @@ data:
   _target_: rae.data.datamodule.MyDataModule
 
   anchors_mode: "stratified_subset" # "stratified", "stratified_subset", "fixed", "random_images", "random_latents"
-  anchors_num: 10
+  anchors_num: 500
 
   # Different classes for anchors
   anchors_idxs: null #[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
@@ -53,33 +53,8 @@ data:
     test: 16
 
 module:
-  _target_: rae.pl_modules.pl_gclassifier.LightningClassifier
-
   plot_n_val_samples: 1000
   fit_pca_each_epoch: True
-
-  loss:
-    variational_beta: 1
-
-  model:
-    _target_: rae.modules.relative_classifier.RCNN
-    hidden_channels: 64
-
-    hidden_features: 64
-    normalization_mode: l2
-    similarity_mode: basis_change
-    values_mode: trainable
-
-#    reparametrize_anchors: False
-#
-#    normalize_latents: 'off'
-#    normalize_only_anchors_latents: True
-#
-#    normalize_means: l2
-#    normalize_only_anchors_means: False
-#
-#    relative_embedding_method: basis_change # inner, basis_change
-#    normalize_relative_embedding: 'off'
 
   optimizer:
     #  Adam-oriented deep learning
@@ -90,10 +65,16 @@ module:
     eps: 1e-08
     weight_decay: 0
 
-#  lr_scheduler:
-#    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
-#    T_0: 10
-#    T_mult: 2
-#    eta_min: 0 # min value for the lr
-#    last_epoch: -1
-#    verbose: False
+  #  lr_scheduler:
+  #    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+  #    T_0: 10
+  #    T_mult: 2
+  #    eta_min: 0 # min value for the lr
+  #    last_epoch: -1
+  #    verbose: False
+
+
+defaults:
+  - _self_
+  - data: mnist # pick one of the yamls in nn/data/
+  - module: pl_deterministic

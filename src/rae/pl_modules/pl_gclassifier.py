@@ -18,6 +18,7 @@ from nn_core.model_logging import NNLogger
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, SupportedViz
 from rae.utils.plotting import plot_images
+from rae.utils.tensor_ops import detach_tensors
 
 pylogger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ class LightningClassifier(pl.LightningModule):
         return {
             Output.LOSS: loss,
             Output.BATCH: batch,
-            **{key: self.normalize_output(value) for key, value in out.items()},
+            **{key: detach_tensors(value) for key, value in out.items()},
         }
 
     def configure_optimizers(
@@ -327,12 +328,6 @@ class LightningClassifier(pl.LightningModule):
     #
     #     for fig in to_close:
     #         plt.close(fig)
-
-    def normalize_output(self, x: Any) -> Any:
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu()
-        else:
-            return x
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")

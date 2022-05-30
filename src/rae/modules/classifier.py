@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from rae.modules.enumerations import Output
+from rae.utils.tensor_ops import infer_dimension
 
 
 class CNN(nn.Module):
@@ -19,11 +20,22 @@ class CNN(nn.Module):
         """
         super().__init__()
         self.hidden_channels = hidden_channels
-        self.conv1 = nn.Conv2d(in_channels=input_channels, out_channels=hidden_channels, kernel_size=3)
-        self.conv2 = nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3)
-        self.conv3 = nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3)
 
-        self.fc1 = nn.Linear(hidden_channels * 5 * 5, n_classes)
+        self.sequential = nn.Sequential(
+            nn.Conv2d(in_channels=input_channels, out_channels=hidden_channels, kernel_size=3),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3),
+            nn.ReLU(),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+        )
+
+        fake_out = infer_dimension(metadata.width, metadata.height, metadata.n_channels, model=self.sequential)
+        out_dimension = fake_out[0].nelement()
+
+        self.fc1 = nn.Linear(out_dimension, n_classes)
         self.fc2 = nn.Linear(n_classes, n_classes)
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
@@ -35,22 +47,7 @@ class CNN(nn.Module):
         Returns:
             predictions with size [batch, n_classes]
         """
-        x = self.conv1(x)
-        x = F.relu(x)
-        x = F.max_pool2d(x, kernel_size=2)
-
-        x = self.conv2(x)
-        x = F.relu(x)
-
-        # Not so easy to keep track of shapes... right?
-        # An useful trick while debugging is to feed the model a fixed sample batch
-        # and print the shape at each step, just to be sure that they match your expectations.
-
-        # print(x.shape)
-
-        x = self.conv3(x)
-        x = F.relu(x)
-        x = F.max_pool2d(x, kernel_size=2)
+        x = self.sequential(x)
 
         x = x.view(x.shape[0], -1)
         x = self.fc1(x)

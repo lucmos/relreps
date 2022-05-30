@@ -1,0 +1,7 @@
+_target_: rae.modules.relative_classifier.RCNN
+hidden_channels: 64
+
+hidden_features: 64
+normalization_mode: l2
+similarity_mode: basis_change
+values_mode: trainable

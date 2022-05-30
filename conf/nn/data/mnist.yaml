@@ -1,0 +1,29 @@
+_target_: rae.data.datamodule.MyDataModule
+
+anchors_mode: "stratified_subset" # "stratified", "stratified_subset", "fixed", "random_images", "random_latents"
+anchors_num: 50
+
+# Different classes for anchors
+anchors_idxs: null #[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
+
+#
+#   ALl anchors from class seven
+#  anchors_idx: [0, 17, 26, 34, 36, 41, 60, 64, 70, 75]
+
+
+
+datasets:
+  train:
+    _target_: rae.data.mnist.MNISTDataset
+
+  val:
+    - _target_: rae.data.mnist.MNISTDataset
+
+#    test:
+#      - _target_: rae.data.mnist.MNISTDataset
+
+transforms:
+  _target_: torchvision.transforms.Compose
+  transforms:
+#      - _target_: torchvision.transforms.Normalize
+    - _target_: torchvision.transforms.ToTensor

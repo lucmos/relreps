@@ -1,0 +1,14 @@
+_target_: rae.modules.rae_model.RAE
+latent_dim: 20
+hidden_channels: 64
+
+reparametrize_anchors: False
+
+normalize_latents: 'off'
+normalize_only_anchors_latents: True
+
+normalize_means: l2
+normalize_only_anchors_means: False
+
+relative_embedding_method: basis_change # inner, basis_change
+normalize_relative_embedding: 'off'
