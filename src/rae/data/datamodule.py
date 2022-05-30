@@ -83,6 +83,10 @@ class MetaData:
         self.fixed_images_targets: torch.Tensor = fixed_images_targets
         self.fixed_images_classes: torch.Tensor = fixed_images_classes
 
+        self.width = self.fixed_images.shape[2]
+        self.height = self.fixed_images.shape[3]
+        self.n_channels = self.fixed_images.shape[1]
+
     def __repr__(self):
         return f"MetaData(anchors_idxs={self.anchors_idxs}, ...)"
 
