@@ -342,12 +342,6 @@ class LightningGAE(pl.LightningModule):
         scheduler = hydra.utils.instantiate(self.hparams.lr_scheduler, optimizer=opt)
         return [opt], [scheduler]
 
-    def normalize_output(self, x: Any) -> Any:
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu()
-        else:
-            return x
-
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
 def main(cfg: omegaconf.DictConfig) -> None:
