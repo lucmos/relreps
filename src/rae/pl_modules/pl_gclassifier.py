@@ -38,6 +38,7 @@ class LightningClassifier(AbstractLightningModule):
             input_channels=metadata.anchors_images.shape[1],
             n_classes=len(metadata.class_to_idx),
         )
+        self.loss = hydra.utils.instantiate(self.hparams.loss)
 
         self.register_buffer("anchors_images", self.metadata.anchors_images)
         self.register_buffer("anchors_latents", self.metadata.anchors_latents)
@@ -104,7 +105,7 @@ class LightningClassifier(AbstractLightningModule):
         image_batch = batch["image"]
         out = self(image_batch)
 
-        loss = F.cross_entropy(out[Output.LOGITS], batch["target"])
+        loss = self.loss(out[Output.LOGITS], batch["target"])
 
         self.log_dict(
             {f"loss/{stage}": loss.cpu().detach()},
