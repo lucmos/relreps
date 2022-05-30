@@ -170,7 +170,10 @@ class LightningAutoencoder(AbstractLightningModule):
         if self.anchors_images is not None:
             anchors_num = self.anchors_images.shape[0]
             anchors_out = self(self.anchors_images)
-            anchors_latents = anchors_out[Output.ANCHORS_LATENT]
+            if Output.ANCHORS_LATENT in anchors_out:
+                anchors_latents = anchors_out[Output.ANCHORS_LATENT]
+            else:
+                anchors_latents = anchors_out[Output.DEFAULT_LATENT]
             anchors_reconstructed = anchors_out[Output.RECONSTRUCTION]
 
         else:
