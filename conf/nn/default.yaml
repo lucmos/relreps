@@ -62,8 +62,13 @@ module:
     variational_beta: 1
 
   model:
-    _target_: rae.modules.classifier.CNN
+    _target_: rae.modules.relative_classifier.RCNN
     hidden_channels: 64
+
+    hidden_features: 64
+    normalization_mode: l2
+    similarity_mode: basis_change
+    values_mode: trainable
 
 #    reparametrize_anchors: False
 #

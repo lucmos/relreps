@@ -26,29 +26,20 @@ class CNN(nn.Module):
         self.fc1 = nn.Linear(hidden_channels * 5 * 5, n_classes)
         self.fc2 = nn.Linear(n_classes, n_classes)
 
-    def forward(
-        self, x: torch.Tensor, return_conv1: bool = False, return_conv2: bool = False, return_conv3: bool = False
-    ) -> Dict[str, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass.
 
         Args:
             x: batch of images with size [batch, 1, w, h]
-            return_conv1: if True return the feature maps of the first convolution
-            return_conv2: if True return the feature maps of the second convolution
-            return_conv3: if True return the feature maps of the third convolution
 
         Returns:
             predictions with size [batch, n_classes]
         """
         x = self.conv1(x)
-        if return_conv1:
-            return x
         x = F.relu(x)
         x = F.max_pool2d(x, kernel_size=2)
 
         x = self.conv2(x)
-        if return_conv2:
-            return x
         x = F.relu(x)
 
         # Not so easy to keep track of shapes... right?
@@ -58,8 +49,6 @@ class CNN(nn.Module):
         # print(x.shape)
 
         x = self.conv3(x)
-        if return_conv3:
-            return x
         x = F.relu(x)
         x = F.max_pool2d(x, kernel_size=2)
 
