@@ -32,7 +32,12 @@ def plot_image(img):
 
 @st.cache(allow_output_mutation=True)
 def get_model(checkpoint_path: Path):
-    model = load_model(module_class=LightningGAE, checkpoint_path=checkpoint_path, map_location="cpu")
+    model = load_model(
+        module_class=LightningGAE,
+        checkpoint_path=checkpoint_path,
+        map_location="cpu",
+        substitute_values={"rae.modules.rae.RAE": "rae.modules.rae_model.RAE"},
+    )
     model.eval()
     return model
 
