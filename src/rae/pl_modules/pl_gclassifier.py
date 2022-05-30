@@ -16,7 +16,7 @@ from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
-from rae.modules.enumerations import Output, SupportedViz
+from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.modules.rae_model import RaeDecoder
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
@@ -66,8 +66,8 @@ class LightningClassifier(AbstractLightningModule):
         self.validation_accuracy = metric.clone()
 
         self.accuracies = {
-            "train": self.train_accuracy,
-            "val": self.validation_accuracy,
+            Stage.TRAIN: self.train_accuracy,
+            Stage.VAL: self.validation_accuracy,
         }
 
         self.supported_viz = self.supported_viz()
@@ -100,7 +100,7 @@ class LightningClassifier(AbstractLightningModule):
         # example
         return self.model(x)
 
-    def step(self, batch, batch_index: int, stage: str) -> Mapping[str, Any]:
+    def step(self, batch, batch_index: int, stage: Stage) -> Mapping[str, Any]:
         image_batch = batch["image"]
         out = self(image_batch)
 
@@ -108,7 +108,7 @@ class LightningClassifier(AbstractLightningModule):
 
         self.log_dict(
             {f"loss/{stage}": loss.cpu().detach()},
-            on_step=stage == "train",
+            on_step=stage == Stage.TRAIN,
             on_epoch=True,
             prog_bar=True,
             batch_size=batch["image"].shape[0],
@@ -146,10 +146,10 @@ class LightningClassifier(AbstractLightningModule):
             plt.close(fig)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        return self.step(batch, batch_idx, stage="train")
+        return self.step(batch, batch_idx, stage=Stage.TRAIN)
 
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        return self.step(batch, batch_idx, stage="val")
+        return self.step(batch, batch_idx, stage=Stage.VAL)
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
         if self.trainer.sanity_checking:
