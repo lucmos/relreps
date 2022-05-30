@@ -56,6 +56,8 @@ module:
   plot_n_val_samples: 1000
   fit_pca_each_epoch: True
 
+  loss: ???
+
   optimizer:
     #  Adam-oriented deep learning
     _target_: torch.optim.Adam
@@ -77,4 +79,4 @@ module:
 defaults:
   - _self_
   - data: mnist # pick one of the yamls in nn/data/
-  - module: pl_deterministic
+  - module: autoencoder

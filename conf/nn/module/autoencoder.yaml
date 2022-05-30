@@ -1,0 +1,9 @@
+_target_: rae.pl_modules.pl_gautoencoder.LightningAutoencoder
+
+loss:
+  _target_: rae.losses.vae_loss.VaeLoss
+  variational_beta: 1
+
+defaults:
+  - _self_
+  - model: rae # rae, ae

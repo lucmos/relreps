@@ -17,15 +17,17 @@ from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
+from rae.modules.ae import AE
 from rae.modules.enumerations import Output, SupportedViz
 from rae.modules.rae_model import RAE, RaeDecoder
 from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
 from rae.utils.plotting import plot_images, plot_latent_evolution, plot_latent_space, plot_matrix, plot_violin
+from rae.utils.tensor_ops import detach_tensors
 
 pylogger = logging.getLogger(__name__)
 
 
-class LightningGAE(pl.LightningModule):
+class LightningAutoencoder(pl.LightningModule):
     logger: NNLogger
 
     def __init__(self, metadata: Optional[MetaData] = None, *args, **kwargs) -> None:
@@ -70,6 +72,8 @@ class LightningGAE(pl.LightningModule):
         pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
 
         self.validation_pca: Optional[PCA] = None
+
+        self.loss = hydra.utils.instantiate(self.hparams.loss)
 
     def _determine_supported_viz(self) -> Set[SupportedViz]:
         supported_viz = set()
@@ -126,7 +130,24 @@ class LightningGAE(pl.LightningModule):
                 f"{stage}/{metric_name}", metric_value, on_step=False, on_epoch=True, batch_size=image_batch.shape[0]
             )
 
-        return out
+        if isinstance(self.autoencoder, AE):
+            loss = self.loss(
+                out[Output.RECONSTRUCTION],
+                image_batch,
+            )
+        else:
+            loss = self.loss(
+                out[Output.RECONSTRUCTION],
+                image_batch,
+                out[Output.LATENT_MU],
+                out[Output.LATENT_LOGVAR],
+            )
+
+        return {
+            Output.LOSS: loss,
+            Output.BATCH: batch,
+            **{key: detach_tensors(value) for key, value in out.items()},
+        }
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
         if self.trainer.sanity_checking:
