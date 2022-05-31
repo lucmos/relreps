@@ -7,7 +7,6 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
-from sklearn.decomposition import PCA
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
@@ -18,8 +17,8 @@ from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.modules.rae_model import RAE, RaeDecoder
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
-from rae.utils.dataframe_op import cat_anchors_stats_to_dataframe, cat_output_to_dataframe
 from rae.utils.tensor_ops import detach_tensors
+from rae.utils.utils import add_2D_latents, aggregate
 
 pylogger = logging.getLogger(__name__)
 
@@ -34,21 +33,6 @@ class LightningAutoencoder(AbstractLightningModule):
             kwargs["model"] if "model" in kwargs else kwargs["autoencoder"], metadata=metadata
         )
 
-        self.df_columns = [
-            "image_index",
-            "class",
-            "target",
-            "latent_0",
-            "latent_1",
-            "latent_0_normalized",
-            "latent_1_normalized",
-            "epoch",
-            "is_anchor",
-            "anchor",
-        ]
-
-        self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
-
         self.reconstruction_quality_metrics = {
             "mse": F.mse_loss,
             "l1": F.l1_loss,
@@ -57,8 +41,6 @@ class LightningAutoencoder(AbstractLightningModule):
         self.register_buffer("anchors_images", self.metadata.anchors_images)
         self.register_buffer("anchors_latents", self.metadata.anchors_latents)
         self.register_buffer("fixed_images", self.metadata.fixed_images)
-
-        self.validation_pca: Optional[PCA] = None
 
         self.loss = hydra.utils.instantiate(self.hparams.loss)
 
@@ -77,7 +59,7 @@ class LightningAutoencoder(AbstractLightningModule):
         if isinstance(self.autoencoder, RAE):
             supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
 
-        supported_viz.add(SupportedViz.LATENT_EVOLUTION_PLOTLY_ANIMATION)
+        # supported_viz.add(SupportedViz.LATENT_EVOLUTION_PLOTLY_ANIMATION)
         supported_viz.add(SupportedViz.ANCHORS_RECONSTRUCTED)
         supported_viz.add(SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED)
         supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
@@ -88,15 +70,6 @@ class LightningAutoencoder(AbstractLightningModule):
         supported_viz.add(SupportedViz.LATENT_SPACE_NORMALIZED)
         supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
         return supported_viz
-
-    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        checkpoint["validation_pca"] = self.validation_pca
-
-    def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        if "validation_pca" in checkpoint:
-            self.validation_pca = checkpoint["validation_pca"]
-        else:
-            self.validation_pca = PCA(n_components=2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Method for the forward pass.
@@ -151,7 +124,7 @@ class LightningAutoencoder(AbstractLightningModule):
         on_fit_start_viz(lightning_module=self, fixed_images=self.fixed_images, anchors_images=self.anchors_images)
 
     def on_fit_end(self) -> None:
-        on_fit_end_viz(lightning_module=self, validation_stats_df=self.validation_stats_df)
+        on_fit_end_viz(lightning_module=self, validation_stats_df=None)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         return self.step(batch, batch_idx, stage=Stage.TRAIN)
@@ -163,17 +136,17 @@ class LightningAutoencoder(AbstractLightningModule):
         if self.trainer.sanity_checking:
             return
 
-        if self.validation_pca is None or self.hparams.fit_pca_each_epoch:
-            all_default_latents = torch.cat([x[Output.DEFAULT_LATENT] for x in outputs], dim=0)
-            self.validation_pca = PCA(n_components=2)
-            self.validation_pca.fit(all_default_latents)
-
+        validation_aggregation = {}
         for output in outputs:
-            self.validation_stats_df = cat_output_to_dataframe(
-                validation_stats_df=self.validation_stats_df,
-                output=output,
-                current_epoch=self.current_epoch,
-                pca=self.validation_pca,
+            aggregate(
+                validation_aggregation,
+                image_index=output["batch"]["index"].cpu().tolist(),
+                class_name=output["batch"]["class"],
+                target=output["batch"]["target"].cpu(),
+                latents=output[Output.DEFAULT_LATENT].cpu(),
+                epoch=[self.current_epoch] * len(output["batch"]["index"]),
+                is_anchor=[False] * len(output["batch"]["index"]),
+                anchor_index=[None] * len(output["batch"]["index"]),
             )
 
         if self.anchors_images is not None:
@@ -197,19 +170,29 @@ class LightningAutoencoder(AbstractLightningModule):
             else:
                 anchors_reconstructed = self.autoencoder.decoder(self.anchors_latents)
 
-        self.validation_stats_df = cat_anchors_stats_to_dataframe(
-            validation_stats_df=self.validation_stats_df,
-            anchors_num=anchors_num,
-            anchors_latents=anchors_latents,
-            metadata=self.metadata,
-            current_epoch=self.current_epoch,
-            pca=self.validation_pca,
+        non_elements = ["none"] * anchors_num
+        aggregate(
+            validation_aggregation,
+            image_index=self.metadata.anchors_idxs
+            if self.metadata.anchors_idxs is not None
+            else list(range(anchors_num)),
+            class_name=self.metadata.anchors_classes if self.metadata.anchors_classes is not None else non_elements,
+            target=self.metadata.anchors_targets.cpu() if self.metadata.anchors_targets is not None else non_elements,
+            latents=anchors_latents.cpu(),
+            epoch=[self.current_epoch] * anchors_num,
+            is_anchor=[True] * anchors_num,
+            anchor_index=list(range(anchors_num)),
         )
+
+        latents = validation_aggregation["latents"]
+        self.fit_pca(latents)
+        add_2D_latents(validation_aggregation, latents=latents, pca=self.validation_pca)
+        del validation_aggregation["latents"]
 
         validation_epoch_end_viz(
             lightning_module=self,
             outputs=outputs,
-            validation_stats_df=self.validation_stats_df,
+            validation_stats_df=pd.DataFrame(validation_aggregation),
             anchors_reconstructed=anchors_reconstructed,
             anchors_latents=anchors_latents,
             fixed_images_out=self(self.fixed_images),

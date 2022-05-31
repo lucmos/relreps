@@ -1,9 +1,11 @@
 import abc
 import logging
-from typing import Any, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Set, Tuple, Union
 
 import hydra
 import pytorch_lightning as pl
+import torch
+from sklearn.decomposition import PCA
 from torch.optim import Optimizer
 
 from nn_core.model_logging import NNLogger
@@ -26,6 +28,22 @@ class AbstractLightningModule(pl.LightningModule):
         self.save_hyperparameters(logger=False, ignore=("metadata",))
 
         self.metadata = metadata
+
+        self.validation_pca: Optional[PCA] = None
+
+    def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        checkpoint["validation_pca"] = self.validation_pca
+
+    def on_load_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
+        if "validation_pca" in checkpoint:
+            self.validation_pca = checkpoint["validation_pca"]
+        else:
+            self.validation_pca = PCA(n_components=2)
+
+    def fit_pca(self, latents: torch.Tensor) -> None:
+        if self.validation_pca is None or self.hparams.fit_pca_each_epoch:
+            self.validation_pca = PCA(n_components=2)
+            self.validation_pca.fit(latents)
 
     @abc.abstractmethod
     def supported_viz(self) -> Set[SupportedViz]:
