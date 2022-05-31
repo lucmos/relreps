@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Type
 
 import pandas as pd
 import plotly.express as px
@@ -7,12 +7,13 @@ import streamlit as st
 import torchvision
 import wandb
 from matplotlib import pyplot as plt
+from pytorch_lightning import LightningModule
 from sklearn.decomposition import PCA
 
 from nn_core.serialization import NNCheckpointIO, load_model
 
 from rae.modules.enumerations import Output
-from rae.pl_modules.pl_gae import LightningGAE
+from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
 from rae.utils.plotting import plot_violin
 
 
@@ -36,10 +37,12 @@ def plot_image(img):
 
 
 @st.cache(allow_output_mutation=True)
-def get_model(checkpoint_path: Path, supported_code_version: str):
+def get_model(
+    checkpoint_path: Path, supported_code_version: str, module_class: Type[LightningModule] = LightningAutoencoder
+):
     try:
         model = load_model(
-            module_class=LightningGAE,
+            module_class=module_class,
             checkpoint_path=checkpoint_path,
             map_location="cpu",
             substitute_values={"rae.modules.rae.RAE": "rae.modules.rae_model.RAE"},

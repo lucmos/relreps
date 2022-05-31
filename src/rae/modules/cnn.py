@@ -1,3 +1,4 @@
+import logging
 from typing import Dict
 
 import torch
@@ -6,6 +7,8 @@ from torch import nn
 
 from rae.modules.enumerations import Output
 from rae.utils.tensor_ops import infer_dimension
+
+pylogger = logging.getLogger(__name__)
 
 
 class CNN(nn.Module):
@@ -19,6 +22,7 @@ class CNN(nn.Module):
             n_classes: expected size of the output
         """
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
         self.hidden_channels = hidden_channels
 
         self.sequential = nn.Sequential(

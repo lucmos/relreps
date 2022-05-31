@@ -56,3 +56,9 @@ class SupportedViz(StrEnum):
     ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED = auto()
     ANCHORS_SELF_INNER_PRODUCT_NORMALIZED = auto()
     INVARIANT_LATENT_DISTRIBUTION = auto()
+
+
+class Stage(StrEnum):
+    TRAIN = auto()
+    VAL = auto()
+    TEST = auto()

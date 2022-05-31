@@ -1,4 +1,5 @@
 import functools
+import logging
 from typing import Callable, Optional, Union
 
 import torch
@@ -7,6 +8,8 @@ from torch import nn
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod
+
+pylogger = logging.getLogger(__name__)
 
 
 class Encoder(nn.Module):
@@ -104,6 +107,7 @@ class RAE(nn.Module):
         normalize_relative_embedding: str = NormalizationMode.OFF,
     ):
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         if relative_embedding_method not in set(RelativeEmbeddingMethod):
             raise ValueError(f"Relative embedding method not valid: {relative_embedding_method}")

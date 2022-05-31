@@ -1,8 +1,8 @@
 _target_: rae.pl_modules.pl_gclassifier.LightningClassifier
 
 loss:
-  _target_: torch.nn.modules.loss.MSELoss
+  _target_: torch.nn.modules.loss.CrossEntropyLoss
 
 defaults:
   - _self_
-  - model: rcnn
+  - model: cnn

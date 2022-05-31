@@ -8,7 +8,7 @@ from pytorch_lightning import LightningModule
 from nn_core.serialization import NNCheckpointIO
 from tests.core.conftest import load_checkpoint
 
-from rae.pl_modules.pl_variational import LightningVariational
+from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
 from rae.run import run
 
 
@@ -48,14 +48,14 @@ def test_cfg_in_checkpoint(run_trainings_not_dry: str, cfg_all_not_dry: DictConf
     _check_run_path_in_checkpoint(checkpoint)
 
 
-class ModuleWithCustomCheckpoint(LightningVariational):
+class ModuleWithCustomCheckpoint(LightningAutoencoder):
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         checkpoint["test_key"] = "test_value"
 
 
 def test_on_save_checkpoint_hook(cfg_all_not_dry: DictConfig) -> None:
     cfg = OmegaConf.create(cfg_all_not_dry)
-    cfg.nn.module._target_ = "tests.test_checkpoint.ModuleWithCustomCheckpoint"
+    cfg.nn.module._target_ = "tests.core.test_checkpoint.ModuleWithCustomCheckpoint"
     output_path = Path(run(cfg))
 
     checkpoint = load_checkpoint(output_path)

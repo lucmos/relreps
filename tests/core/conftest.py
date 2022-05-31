@@ -29,7 +29,7 @@ TRAIN_MAX_NSTEPS = 1
 def cfg(tmp_path_factory: TempPathFactory) -> DictConfig:
     test_cfg_tmpdir = tmp_path_factory.mktemp("test_train_tmpdir")
 
-    with initialize(config_path="../conf"):
+    with initialize(config_path="../../conf"):
         cfg = compose(config_name="default", return_hydra_config=True)
         HydraConfig().set_config(cfg)
 
@@ -56,6 +56,9 @@ def cfg_simple_train(cfg: DictConfig) -> DictConfig:
 
     # Disable gpus
     cfg.train.trainer.gpus = 0
+
+    # Disable fast dev run
+    cfg.train.trainer.fast_dev_run = False
 
     # Disable logger
     cfg.train.logging.logger.mode = "disabled"

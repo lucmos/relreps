@@ -1,9 +1,13 @@
+import logging
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output
+
+pylogger = logging.getLogger(__name__)
 
 
 class Encoder(nn.Module):
@@ -59,6 +63,8 @@ class Decoder(nn.Module):
 class AE(nn.Module):
     def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool = False):
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
+
         self.metadata = metadata
         self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
         self.decoder = Decoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
