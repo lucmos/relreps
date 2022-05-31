@@ -79,4 +79,4 @@ module:
 defaults:
   - _self_
   - data: mnist # pick one of the yamls in nn/data/
-  - module: autoencoder
+  - module: ae_variational # classifier #  ae_deterministic #
