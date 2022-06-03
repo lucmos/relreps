@@ -52,7 +52,7 @@ logging:
     _target_: pytorch_lightning.loggers.WandbLogger
 
     project: ${core.project_name}
-    entity: null
+    entity: gladia
     log_model: ${..upload.run_files}
     mode: 'online'
     tags: ${core.tags}

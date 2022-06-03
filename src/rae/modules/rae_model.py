@@ -8,41 +8,49 @@ from torch import nn
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod
+from rae.utils.tensor_ops import infer_dimension
 
 pylogger = logging.getLogger(__name__)
 
 
 class Encoder(nn.Module):
-    def __init__(self, hidden_channels: int, latent_dim: int) -> None:
+    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int) -> None:
         super().__init__()
-        self.conv1 = nn.Conv2d(
-            in_channels=1, out_channels=hidden_channels, kernel_size=4, stride=2, padding=1
-        )  # out: hidden_channels x 14 x 14
+        # self.conv1 = nn.Conv2d(
+        #     in_channels=1, out_channels=hidden_channels, kernel_size=4, stride=2, padding=1
+        # )  # out: hidden_channels x 14 x 14
+        #
+        # self.conv2 = nn.Conv2d(
+        #     in_channels=hidden_channels, out_channels=hidden_channels * 2, kernel_size=4, stride=2, padding=1
+        # )  # out: (hidden_channels x 2) x 7 x 7
 
-        self.conv2 = nn.Conv2d(
-            in_channels=hidden_channels, out_channels=hidden_channels * 2, kernel_size=4, stride=2, padding=1
-        )  # out: (hidden_channels x 2) x 7 x 7
+        self.sequential = nn.Sequential(
+            nn.Conv2d(in_channels=metadata.n_channels, out_channels=hidden_channels, kernel_size=3),
+            nn.ReLU(),
+            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3),
+            nn.ReLU(),
+        )
 
-        self.fc_mu = nn.Linear(in_features=hidden_channels * 2 * 7 * 7, out_features=latent_dim)
-        self.fc_logvar = nn.Linear(in_features=hidden_channels * 2 * 7 * 7, out_features=latent_dim)
+        fake_out = infer_dimension(metadata.width, metadata.height, metadata.n_channels, model=self.sequential)
+        out_dimension = fake_out[0].nelement()
 
-        self.activation = nn.ReLU()
+        self.fc_mu = nn.Linear(in_features=out_dimension, out_features=latent_dim)
+        self.fc_logvar = nn.Linear(in_features=out_dimension, out_features=latent_dim)
 
     def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
-        x = self.activation(self.conv1(x))
-        x = self.activation(self.conv2(x))
+        x = self.sequential(x)
 
         x = x.view(x.shape[0], -1)
 
         x_mu = self.fc_mu(x)
         x_logvar = self.fc_logvar(x)
-
         return x_mu, x_logvar
 
 
 class RaeDecoder(nn.Module):
     def __init__(
         self,
+        metadata: MetaData,
         hidden_channels: int,
         latent_dim: int,
         relative_embedding_method: str,
@@ -56,7 +64,35 @@ class RaeDecoder(nn.Module):
         self.conv2 = nn.ConvTranspose2d(
             in_channels=hidden_channels * 2, out_channels=hidden_channels, kernel_size=4, stride=2, padding=1
         )
-        self.conv1 = nn.ConvTranspose2d(in_channels=hidden_channels, out_channels=1, kernel_size=4, stride=2, padding=1)
+        fake_out = infer_dimension(7, 7, self.hidden_channels * 2, model=self.conv2)
+
+        stride = (2, 2)
+        padding = (1, 1)
+        output_padding = (0, 0)
+        dilation = (1, 1)
+        # kernel_w = (metadata.width - (fake_out.width −1)×stride[0] + 2×padding[0] - output_padding[0]  - 1)/dilation[0] + 1
+        # kernel_h = (metadata.height - (fake_out.height −1)×stride[1] + 2×padding[1] - output_padding[1]  - 1)/dilation[1] + 1
+        kernel_w = (
+            metadata.width - (fake_out.size(2) - 1) * stride[0] + 2 * padding[0] - output_padding[0] - 1
+        ) / dilation[0] + 1
+        kernel_h = (
+            metadata.height - (fake_out.size(3) - 1) * stride[1] + 2 * padding[0] - output_padding[1] - 1
+        ) / dilation[1] + 1
+
+        self.conv1 = nn.ConvTranspose2d(
+            in_channels=fake_out.shape[1],
+            out_channels=metadata.n_channels,
+            kernel_size=(int(kernel_w), int(kernel_h)),
+            stride=stride,
+            padding=padding,
+        )
+
+        assert ((out := self.conv1(fake_out)).shape[2], out.shape[3]) == (metadata.width, metadata.height), (
+            out.shape[2],
+            out.shape[3],
+            metadata.width,
+            metadata.height,
+        )
 
         self.activation = nn.ReLU()
         self.relative_embedding_method = relative_embedding_method
@@ -86,9 +122,7 @@ class RaeDecoder(nn.Module):
         x = self.fc(relative_embedding)
         x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
         x = self.activation(self.conv2(x))
-        x = torch.sigmoid(
-            self.conv1(x)
-        )  # last layer before output is sigmoid, since we are using BCE as reconstruction loss
+        x = self.conv1(x)  # last layer before output is sigmoid, since we are using BCE as reconstruction loss
         return x, relative_embedding
 
 
@@ -130,8 +164,9 @@ class RAE(nn.Module):
         self.normalize_means = normalize_means
         self.normalize_only_anchors_means = normalize_only_anchors_means
 
-        self.encoder = Encoder(hidden_channels=hidden_channels, latent_dim=latent_dim)
+        self.encoder = Encoder(metadata=metadata, hidden_channels=hidden_channels, latent_dim=latent_dim)
         self.decoder = RaeDecoder(
+            metadata=metadata,
             hidden_channels=hidden_channels,
             latent_dim=(self.anchors_images if self.anchors_images is not None else self.anchors_latents).shape[0],
             relative_embedding_method=relative_embedding_method,
