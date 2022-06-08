@@ -23,6 +23,7 @@ class RCNN(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        **kwargs,
     ) -> None:
         """Simple model that uses convolutions.
 

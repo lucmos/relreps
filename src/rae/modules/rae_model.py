@@ -139,6 +139,7 @@ class RAE(nn.Module):
         normalize_only_anchors_latents: bool = False,
         relative_embedding_method: str = RelativeEmbeddingMethod.INNER,
         normalize_relative_embedding: str = NormalizationMode.OFF,
+        **kwargs,
     ):
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")

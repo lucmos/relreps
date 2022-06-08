@@ -84,7 +84,9 @@ class Decoder(nn.Module):
 
 
 class AE(nn.Module):
-    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool = False):
+    def __init__(
+        self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool = False, **kwargs
+    ):
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
