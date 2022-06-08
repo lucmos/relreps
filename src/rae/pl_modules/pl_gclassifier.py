@@ -122,6 +122,9 @@ class LightningClassifier(AbstractLightningModule):
             **{key: detach_tensors(value) for key, value in out.items()},
         }
 
+    def on_epoch_start(self) -> None:
+        self.model.set_finetune_mode()
+
     def on_fit_start(self) -> None:
         on_fit_start_viz(lightning_module=self, fixed_images=self.fixed_images, anchors_images=self.anchors_images)
 
