@@ -42,6 +42,12 @@ class Output(StrEnum):
     BATCH = auto()
 
 
+class AttentionOutput(StrEnum):
+    OUTPUT = auto()
+    SIMILARITIES = auto()
+    UNTRASFORMED_ATTENDED = auto()
+
+
 class SupportedViz(StrEnum):
     ANCHORS_SOURCE = auto()
     ANCHORS_RECONSTRUCTED = auto()
