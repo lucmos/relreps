@@ -28,3 +28,8 @@ def infer_dimension(width: int, height: int, n_channels: int, model: nn.Module, 
         fake_batch = torch.zeros([batch_size, n_channels, width, height])
         fake_out = model(fake_batch)
         return fake_out
+
+
+def freeze(model: nn.Module) -> None:
+    for param in model.parameters():
+        param.requires_grad = False
