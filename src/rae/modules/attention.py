@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from rae.modules.enumerations import NormalizationMode, RelativeEmbeddingMethod, ValuesMethod
+from rae.modules.enumerations import AttentionOutput, NormalizationMode, RelativeEmbeddingMethod, ValuesMethod
 
 pylogger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class RelativeAttention(nn.Module):
     def __init__(
         self,
         in_features: int,
-        out_features: int,
+        hidden_features: int,
         n_anchors: int,
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
@@ -27,7 +27,7 @@ class RelativeAttention(nn.Module):
 
         Args:
             in_features: hidden dimension of the input batch and anchors
-            out_features: hidden dimension of the output (the queries, if trainable)
+            hidden_features: hidden dimension of the output (the queries, if trainable)
             n_anchors: number of anchors
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
@@ -37,22 +37,18 @@ class RelativeAttention(nn.Module):
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.in_features = in_features
-        self.out_features = out_features
+        self.hidden_features = hidden_features
         self.n_anchors = n_anchors
         self.normalization_mode = normalization_mode
         self.similarity_mode = similarity_mode
         self.values_mode = values_mode
 
         if values_mode == ValuesMethod.TRAINABLE:
-            self.values = nn.Parameter(torch.randn(self.n_anchors, self.out_features))
-        elif values_mode == ValuesMethod.ANCHORS:
-            self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=False)
-        elif values_mode == ValuesMethod.SIMILARITIES:
-            self.linear = nn.Linear(in_features=n_anchors, out_features=out_features, bias=False)
-        else:
+            self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
+        elif values_mode not in ValuesMethod:
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
-    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor):
+    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """Forward pass.
 
         Args:
@@ -81,35 +77,41 @@ class RelativeAttention(nn.Module):
         # Compute the weighted average of the values
         if self.values_mode == ValuesMethod.TRAINABLE:
             weights = F.softmax(similarities, dim=-1)
-            output = raw_output = torch.einsum("bw, wh -> bh", weights, self.values)
+            output = torch.einsum("bw, wh -> bh", weights, self.values)
         elif self.values_mode == ValuesMethod.ANCHORS:
             weights = F.softmax(similarities, dim=-1)
-            weighted_average = raw_output = torch.einsum("bw, wh -> bh", weights, anchors)
-            output = self.linear(weighted_average)
+            output = torch.einsum("bw, wh -> bh", weights, anchors)
         elif self.values_mode == ValuesMethod.SIMILARITIES:
-            raw_output = similarities
-            output = self.linear(similarities)
+            output = similarities
         else:
             assert False
 
-        return output, raw_output, similarities
+        return {
+            AttentionOutput.OUTPUT: output,
+            AttentionOutput.SIMILARITIES: similarities,
+        }
 
 
-class RelativeTransformerBlock(nn.Module):
+class RelativeLinearBlock(nn.Module):
     def __init__(
         self,
         in_features: int,
+        hidden_features: int,
         out_features: int,
         n_anchors: int,
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
     ):
-        """Relative Transformer block.
+        """Relative Linear block.
+
+        Adds a Linear layer after a relative attention.
+        Ensures the output features have size out_features
 
         Args:
             in_features: hidden dimension of the input batch and anchors
-            out_features: hidden dimension of the output (the queries, if trainable)
+            hidden_features: hidden dimension of the output (the queries, if trainable)
+            out_features: number of features in the output
             n_anchors: number of anchors
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
@@ -121,6 +123,60 @@ class RelativeTransformerBlock(nn.Module):
         self.attention = RelativeAttention(
             n_anchors=n_anchors,
             in_features=in_features,
+            hidden_features=hidden_features,
+            normalization_mode=normalization_mode,
+            similarity_mode=similarity_mode,
+            values_mode=values_mode,
+        )
+
+        if values_mode == ValuesMethod.TRAINABLE:
+            self.linear = nn.Linear(in_features=hidden_features, out_features=out_features, bias=False)
+        elif values_mode == ValuesMethod.ANCHORS:
+            self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=False)
+        elif values_mode == ValuesMethod.SIMILARITIES:
+            self.linear = nn.Linear(in_features=n_anchors, out_features=out_features, bias=False)
+        else:
+            raise ValueError(f"Values mode not supported: {self.values_mode}")
+
+    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+        attention_output = self.attention(x=x, anchors=anchors)
+        output = self.linear(attention_output[AttentionOutput.OUTPUT])
+        return {
+            AttentionOutput.OUTPUT: output,
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.OUTPUT],
+        }
+
+
+class RelativeTransformerBlock(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        hidden_features: int,
+        out_features: int,
+        n_anchors: int,
+        normalization_mode: NormalizationMode,
+        similarity_mode: RelativeEmbeddingMethod,
+        values_mode: ValuesMethod,
+    ):
+        """Relative Transformer block.
+
+        Args:
+            in_features: hidden dimension of the input batch and anchors
+            hidden_features: hidden dimension of the output (the queries, if trainable)
+            out_features: number of features in the output
+            n_anchors: number of anchors
+            normalization_mode: normalization to apply to the anchors and batch before computing the attention
+            similarity_mode: how to compute similarities: inner, basis_change
+            values_mode: if True use trainable parameters as queries otherwise use the anchors
+        """
+        super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
+
+        self.attention = RelativeLinearBlock(
+            n_anchors=n_anchors,
+            in_features=in_features,
+            hidden_features=hidden_features,
             out_features=out_features,
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
@@ -136,9 +192,13 @@ class RelativeTransformerBlock(nn.Module):
             nn.Linear(4 * out_features, out_features),
         )
 
-    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor, torch.Tensor):
-        attended, raw_output, similarities = self.attention(x=x, anchors=anchors)
-        attended_normalized = self.norm1(attended)
+    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+        attention_output = self.attention(x=x, anchors=anchors)
+        attended_normalized = self.norm1(attention_output[AttentionOutput.OUTPUT])
         attended_transformed = self.ff(attended_normalized)
         output = self.norm2(attended_transformed + attended_normalized)
-        return output, raw_output, similarities
+        return {
+            AttentionOutput.OUTPUT: output,
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
+        }
