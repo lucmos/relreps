@@ -1,3 +1,5 @@
+import logging
+
 import hydra
 import omegaconf
 from torch.utils.data import Dataset
@@ -8,10 +10,14 @@ from nn_core.nn_types import Split
 
 from rae.utils.plotting import plot_images
 
+pylogger = logging.getLogger(__name__)
+
 
 class CIFAR100Dataset(Dataset):
     def __init__(self, split: Split, **kwargs):
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}> ('{split}')")
+
         self.split: Split = split
 
         # example
