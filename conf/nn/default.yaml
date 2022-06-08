@@ -37,7 +37,9 @@ data:
   transforms:
     _target_: torchvision.transforms.Compose
     transforms:
-#      - _target_: torchvision.transforms.Normalize
+      - _target_: torchvision.transforms.Resize
+        size: ${nn.module.model.input_size}
+
       - _target_: torchvision.transforms.ToTensor
 
   gpus: ${train.trainer.gpus}
@@ -53,6 +55,8 @@ data:
     test: 16
 
 module:
+  input_size: 32
+
   plot_n_val_samples: 1000
   fit_pca_each_epoch: True
 

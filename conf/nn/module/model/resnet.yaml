@@ -1,0 +1,5 @@
+_target_: rae.modules.resnet.ResNet50
+
+input_size: 224
+use_pretrained: True
+finetune: False

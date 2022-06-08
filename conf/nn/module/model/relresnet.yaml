@@ -1,0 +1,5 @@
+_target_: rae.modules.relresnet.RelResNet50
+
+input_size: 224
+use_pretrained: True
+finetune: False

@@ -4,6 +4,9 @@ loss:
   _target_: rae.losses.vae_loss.VaeLoss
   variational_beta: 1
 
+model:
+  input_size: 32
+
 defaults:
   - _self_
   - model: vae #  rae
