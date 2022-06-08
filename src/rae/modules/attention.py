@@ -45,7 +45,7 @@ class RelativeAttention(nn.Module):
 
         if values_mode == ValuesMethod.TRAINABLE:
             self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
-        elif values_mode not in ValuesMethod:
+        elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
     def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
