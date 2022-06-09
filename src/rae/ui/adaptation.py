@@ -24,12 +24,16 @@ plt.style.use("ggplot")
 
 
 st.set_page_config(layout="wide")
+st.title("Domain Adaptation")
 
 check_wandb_login()
 
 
 CODE_VERSION = "0.1.0"
 show_code_version(code_version=CODE_VERSION)
+
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
+st.sidebar.markdown(f'Device: `{device}`\n\n---')
 
 st.sidebar.header("Absolute Model")
 abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/1u70fmrq")
@@ -61,13 +65,19 @@ def get_model_transforms(cfg: Dict):
 def compute_accuracy(model: LightningClassifier, dataloader, new_anchors_images=None):
     accuracy: Accuracy = Accuracy(num_classes=len(model.metadata.class_to_idx))
     model.eval()
+    model = model.to(device)
+    if new_anchors_images is not None:
+        new_anchors_images = new_anchors_images.to(device)
+
     with torch.no_grad():
         for batch in stqdm(dataloader):
+            images = batch["image"].to(device)
+            targets = batch["target"].to(device)
             if new_anchors_images is None:
-                output = model(batch["image"])
+                output = model(images)
             else:
-                output = model(batch["image"], new_anchors_images=new_anchors_images)
-            accuracy(output[Output.LOGITS], batch["target"])
+                output = model(images, new_anchors_images=new_anchors_images)
+            accuracy(output[Output.LOGITS].cpu(), targets.cpu())
     st.metric("Accuracy", accuracy.compute().item())
 
 
