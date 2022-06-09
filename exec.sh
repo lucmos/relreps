@@ -1,4 +1,5 @@
 #!/bin/bash
 
-./sync.sh
-ssh -tt erdos 'cd rae; conda activate rae; python src/rae/run.py'
+./sync.sh "$1"
+echo ssh -tt $1 'cd rae; conda activate rae; python src/rae/run.py'
+ssh -tt $1 'cd rae; conda activate rae; python src/rae/run.py'
