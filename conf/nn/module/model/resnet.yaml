@@ -1,4 +1,5 @@
-_target_: rae.modules.resnet.ResNet50
+_target_: rae.modules.resnet.ResNet
+resnet_size: 18
 
 input_size: 224
 use_pretrained: True
