@@ -34,14 +34,6 @@ data:
 #    test:
 #      - _target_: rae.data.cifar100.CIFAR100Dataset
 
-  transforms:
-    _target_: torchvision.transforms.Compose
-    transforms:
-      - _target_: torchvision.transforms.Resize
-        size: ${nn.module.model.input_size}
-
-      - _target_: torchvision.transforms.ToTensor
-
   gpus: ${train.trainer.gpus}
 
   num_workers:
@@ -50,7 +42,7 @@ data:
     test: 0
 
   batch_size:
-    train: 128
+    train: 512
     val: 128
     test: 16
 
@@ -82,5 +74,5 @@ module:
 
 defaults:
   - _self_
-  - data: mnist # pick one of the yamls in nn/data/
-  - module: ae_variational # classifier #  ae_deterministic #
+  - data: cifar100 # pick one of the yamls in nn/data/
+  - module: classifier # ae_variational # classifier #  ae_deterministic #

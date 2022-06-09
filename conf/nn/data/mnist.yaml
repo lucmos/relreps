@@ -25,5 +25,7 @@ datasets:
 transforms:
   _target_: torchvision.transforms.Compose
   transforms:
-#      - _target_: torchvision.transforms.Normalize
+    - _target_: torchvision.transforms.Resize
+      size: ${nn.module.model.input_size}
+
     - _target_: torchvision.transforms.ToTensor
