@@ -82,7 +82,7 @@ class LightningClassifier(AbstractLightningModule):
         supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
         return supported_viz
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
         """Method for the forward pass.
 
         'training_step', 'validation_step' and 'test_step' should call
@@ -92,7 +92,7 @@ class LightningClassifier(AbstractLightningModule):
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
         # example
-        return self.model(x)
+        return self.model(x, **kwargs)
 
     def step(self, batch, batch_index: int, stage: Stage) -> Mapping[str, Any]:
         image_batch = batch["image"]

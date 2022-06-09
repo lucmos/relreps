@@ -1,20 +1,19 @@
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 from torch import nn
-from torchvision import models
 
 from rae.data.datamodule import MetaData
 from rae.modules.attention import RelativeLinearBlock
 from rae.modules.enumerations import AttentionOutput, NormalizationMode, Output, RelativeEmbeddingMethod, ValuesMethod
 from rae.modules.passthrough import PassThrough
-from rae.utils.tensor_ops import freeze
+from rae.utils.tensor_ops import freeze, get_resnet_model
 
 pylogger = logging.getLogger(__name__)
 
 
-class RelResNet50(nn.Module):
+class RelResNet(nn.Module):
     def __init__(
         self,
         metadata: MetaData,
@@ -24,6 +23,7 @@ class RelResNet50(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        resnet_size: int = 18,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -32,11 +32,10 @@ class RelResNet50(nn.Module):
         self.metadata = metadata
 
         self.finetune = finetune
-        self.out_features = 2048
-        self.resnet50 = models.resnet50(pretrained=use_pretrained)
-        self.resnet50.fc = PassThrough()
+        self.resnet, self.out_features = get_resnet_model(resnet_size=resnet_size, use_pretrained=use_pretrained)
+        self.resnet.fc = PassThrough()
         if not finetune:
-            freeze(self.resnet50)
+            freeze(self.resnet)
 
         self.linear_relative_attention = RelativeLinearBlock(
             in_features=self.out_features,
@@ -53,13 +52,13 @@ class RelResNet50(nn.Module):
 
     def set_finetune_mode(self) -> None:
         if not self.finetune:
-            self.resnet50.eval()
+            self.resnet.eval()
 
-    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
+    def forward(self, x: torch.Tensor, new_anchors_images: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
-            anchors_latents = self.resnet50(self.anchors_images)
+            anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else self.anchors_images)
 
-        batch_latents = self.resnet50(x)
+        batch_latents = self.resnet(x)
 
         attention_output = self.linear_relative_attention(x=batch_latents, anchors=anchors_latents)
 
@@ -70,7 +69,3 @@ class RelResNet50(nn.Module):
             Output.ANCHORS_LATENT: anchors_latents,
             Output.INV_LATENTS: attention_output[AttentionOutput.SIMILARITIES],
         }
-
-
-if __name__ == "__main__":
-    RelResNet50(True, False)
