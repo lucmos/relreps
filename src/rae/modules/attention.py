@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from rae.modules.blocks import LearningBlock
 from rae.modules.enumerations import AttentionOutput, NormalizationMode, RelativeEmbeddingMethod, ValuesMethod
 
 pylogger = logging.getLogger(__name__)
@@ -183,20 +184,11 @@ class RelativeTransformerBlock(nn.Module):
             values_mode=values_mode,
         )
 
-        self.norm1 = nn.LayerNorm(out_features)
-        self.norm2 = nn.LayerNorm(out_features)
-
-        self.ff = nn.Sequential(
-            nn.Linear(out_features, 4 * out_features),
-            nn.SiLU(),
-            nn.Linear(4 * out_features, out_features),
-        )
+        self.block = LearningBlock(num_features=out_features)
 
     def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         attention_output = self.attention(x=x, anchors=anchors)
-        attended_normalized = self.norm1(attention_output[AttentionOutput.OUTPUT])
-        attended_transformed = self.ff(attended_normalized)
-        output = self.norm2(attended_transformed + attended_normalized)
+        output = self.block(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
             AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],

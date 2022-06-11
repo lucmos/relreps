@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from rae.data.datamodule import MetaData
-from rae.modules.attention import RelativeLinearBlock
+from rae.modules.attention import RelativeTransformerBlock
 from rae.modules.enumerations import AttentionOutput, NormalizationMode, Output, RelativeEmbeddingMethod, ValuesMethod
 from rae.modules.passthrough import PassThrough
 from rae.utils.tensor_ops import freeze, get_resnet_model
@@ -32,20 +32,22 @@ class RelResNet(nn.Module):
         self.metadata = metadata
 
         self.finetune = finetune
-        self.resnet, self.out_features = get_resnet_model(resnet_size=resnet_size, use_pretrained=use_pretrained)
+        self.resnet, self.resnet_features = get_resnet_model(resnet_size=resnet_size, use_pretrained=use_pretrained)
         self.resnet.fc = PassThrough()
         if not finetune:
             freeze(self.resnet)
 
-        self.linear_relative_attention = RelativeLinearBlock(
-            in_features=self.out_features,
+        self.relative_attention_block = RelativeTransformerBlock(
+            in_features=self.resnet_features,
             hidden_features=hidden_features,
-            out_features=len(self.metadata.class_to_idx),
+            out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
         )
+
+        self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
 
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
@@ -60,10 +62,12 @@ class RelResNet(nn.Module):
 
         batch_latents = self.resnet(x)
 
-        attention_output = self.linear_relative_attention(x=batch_latents, anchors=anchors_latents)
+        attention_output = self.relative_attention_block(x=batch_latents, anchors=anchors_latents)
+
+        output = self.final_layer(attention_output[AttentionOutput.OUTPUT])
 
         return {
-            Output.LOGITS: attention_output[AttentionOutput.OUTPUT],
+            Output.LOGITS: output,
             Output.DEFAULT_LATENT: batch_latents,
             Output.BATCH_LATENT: batch_latents,
             Output.ANCHORS_LATENT: anchors_latents,
