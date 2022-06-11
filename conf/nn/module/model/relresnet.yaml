@@ -6,7 +6,7 @@ use_pretrained: True
 finetune: False
 
 # Relative params
-hidden_features: 256
+hidden_features: 512
 normalization_mode: l2
 similarity_mode: basis_change
 values_mode: similarities
