@@ -7,7 +7,7 @@ pylogger = logging.getLogger(__name__)
 
 
 class LearningBlock(nn.Module):
-    def __init__(self, num_features: int):
+    def __init__(self, num_features: int, dropout_p: float):
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
@@ -17,6 +17,7 @@ class LearningBlock(nn.Module):
         self.ff = nn.Sequential(
             nn.Linear(num_features, 4 * num_features),
             nn.SiLU(),
+            nn.Dropout(p=dropout_p),
             nn.Linear(4 * num_features, num_features),
         )
 

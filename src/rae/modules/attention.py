@@ -154,6 +154,7 @@ class RelativeTransformerBlock(nn.Module):
         self,
         in_features: int,
         hidden_features: int,
+        dropout_p: float,
         out_features: int,
         n_anchors: int,
         normalization_mode: NormalizationMode,
@@ -184,7 +185,7 @@ class RelativeTransformerBlock(nn.Module):
             values_mode=values_mode,
         )
 
-        self.block = LearningBlock(num_features=out_features)
+        self.block = LearningBlock(num_features=out_features, dropout_p=dropout_p)
 
     def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         attention_output = self.attention(x=x, anchors=anchors)

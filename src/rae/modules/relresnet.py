@@ -20,6 +20,7 @@ class RelResNet(nn.Module):
         use_pretrained: bool,
         finetune: bool,
         hidden_features: int,
+        dropout_p: float,
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
@@ -40,6 +41,7 @@ class RelResNet(nn.Module):
         self.relative_attention_block = RelativeTransformerBlock(
             in_features=self.resnet_features,
             hidden_features=hidden_features,
+            dropout_p=dropout_p,
             out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
             normalization_mode=normalization_mode,

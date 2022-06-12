@@ -6,3 +6,4 @@ use_pretrained: True
 finetune: False
 
 hidden_features: 512
+dropout_p: 0.5

@@ -7,6 +7,7 @@ finetune: False
 
 # Relative params
 hidden_features: 512
+dropout_p: 0.5
 normalization_mode: l2
 similarity_mode: basis_change
 values_mode: similarities

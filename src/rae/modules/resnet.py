@@ -15,7 +15,14 @@ pylogger = logging.getLogger(__name__)
 
 class ResNet(nn.Module):
     def __init__(
-        self, metadata: MetaData, resnet_size: int, hidden_features: int, use_pretrained: bool, finetune: bool, **kwargs
+        self,
+        metadata: MetaData,
+        resnet_size: int,
+        hidden_features: int,
+        dropout_p: float,
+        use_pretrained: bool,
+        finetune: bool,
+        **kwargs,
     ) -> None:
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -33,7 +40,7 @@ class ResNet(nn.Module):
             bias=True,
         )
 
-        self.block = LearningBlock(num_features=hidden_features)
+        self.block = LearningBlock(num_features=hidden_features, dropout_p=dropout_p)
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
 
