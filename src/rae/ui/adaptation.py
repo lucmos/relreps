@@ -32,17 +32,17 @@ check_wandb_login()
 CODE_VERSION = "0.1.0"
 show_code_version(code_version=CODE_VERSION)
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-st.sidebar.markdown(f'Device: `{device}`\n\n---')
+device = "cuda" if torch.cuda.is_available() else "cpu"
+st.sidebar.markdown(f"Device: `{device}`\n\n---")
 
 st.sidebar.header("Absolute Model")
-abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/1u70fmrq")
+abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/2pi13o2j")
 abs_model: LightningClassifier = get_model(
     module_class=LightningClassifier, checkpoint_path=abs_ckpt, supported_code_version=CODE_VERSION
 )
 
 st.sidebar.header("Relative Model")
-rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/tfvafdn0")
+rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/rkntehs9")
 rel_model = get_model(
     module_class=LightningClassifier,
     checkpoint_path=rel_ckpt,
