@@ -171,6 +171,7 @@ class RelativeTransformerBlock(nn.Module):
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
+            dropout_p: the dropout probability to use in the learning block
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")

@@ -1,7 +1,7 @@
-from torch import nn
 import logging
-import torch
 
+import torch
+from torch import nn
 
 pylogger = logging.getLogger(__name__)
 

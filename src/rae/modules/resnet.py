@@ -5,10 +5,10 @@ import torch
 from torch import nn
 
 from rae.data.datamodule import MetaData
+from rae.modules.blocks import LearningBlock
 from rae.modules.enumerations import Output
 from rae.modules.passthrough import PassThrough
 from rae.utils.tensor_ops import freeze, get_resnet_model
-from rae.modules.blocks import LearningBlock
 
 pylogger = logging.getLogger(__name__)
 
