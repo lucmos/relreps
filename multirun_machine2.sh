@@ -1,82 +1,57 @@
 #!/bin/bash
 
-# Variational RAE
+# RelResNet No Quantized
 python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
-    nn.module.autoencoder.normalize_only_anchors_latents=True \
-    nn.module.autoencoder.normalize_relative_embedding='off' \
-    nn.module.autoencoder.relative_embedding_method=basis_change \
-    core.tags='[rae, normalize-anchors, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_mode=fixed \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=2
+    core.tags='[resnet, pretrained, relative]' \
+    nn/module/model=relresnet \
+    nn.module.model.finetune=False \
+    nn.module.model.similarity_mode=inner \
+    nn.module.model.similarities_quantization_mode=null \
+    nn.module.model.similarities_bin_size=null
+
+# RelResNet
+python src/rae/run.py \
+    core.tags='[resnet, pretrained, quantization, relative]' \
+    nn/module/model=relresnet \
+    nn.module.model.finetune=False \
+    nn.module.model.similarity_mode=inner \
+    nn.module.model.similarities_quantization_mode=differentiable_round \
+    nn.module.model.similarities_bin_size=0.5
 
 python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
-    nn.module.autoencoder.normalize_only_anchors_latents=True \
-    nn.module.autoencoder.normalize_relative_embedding='off' \
-    nn.module.autoencoder.relative_embedding_method=basis_change \
-    core.tags='[rae, normalize-anchors, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_mode=fixed \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=10
+  core.tags='[resnet, pretrained, quantization, relative]' \
+  nn/module/model=relresnet \
+  nn.module.model.finetune=False \
+  nn.module.model.similarity_mode=inner \
+  nn.module.model.similarities_quantization_mode=differentiable_round \
+  nn.module.model.similarities_bin_size=0.25
 
 python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
-    nn.module.autoencoder.normalize_only_anchors_latents=True \
-    nn.module.autoencoder.normalize_relative_embedding='off' \
-    nn.module.autoencoder.relative_embedding_method=basis_change \
-    core.tags='[rae, normalize-anchors, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_mode=fixed \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=20
-
-
-# Variational RAE
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
-    nn.module.autoencoder.normalize_only_anchors_latents=False \
-    nn.module.autoencoder.normalize_relative_embedding='off' \
-    nn.module.autoencoder.relative_embedding_method=basis_change \
-    core.tags='[rae, normalize-anchors, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_mode=fixed \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=2
+  core.tags='[resnet, pretrained, quantization, relative]' \
+  nn/module/model=relresnet \
+  nn.module.model.finetune=False \
+  nn.module.model.similarity_mode=inner \
+  nn.module.model.similarities_quantization_mode=differentiable_round \
+  nn.module.model.similarities_bin_size=0.1
 
 python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
-    nn.module.autoencoder.normalize_only_anchors_latents=False \
-    nn.module.autoencoder.normalize_relative_embedding='off' \
-    nn.module.autoencoder.relative_embedding_method=basis_change \
-    core.tags='[rae, normalize-anchors, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_mode=fixed \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=10
+  core.tags='[resnet, pretrained, quantization, relative]' \
+  nn/module/model=relresnet \
+  nn.module.model.finetune=False \
+  nn.module.model.similarity_mode=inner \
+  nn.module.model.similarities_quantization_mode=differentiable_round \
+  nn.module.model.similarities_bin_size=0.05
 
 python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    nn.module.autoencoder.normalize_latents=layernorm_noaffine \
-    nn.module.autoencoder.normalize_only_anchors_latents=False \
-    nn.module.autoencoder.normalize_relative_embedding='off' \
-    nn.module.autoencoder.relative_embedding_method=basis_change \
-    core.tags='[rae, normalize-anchors, no-lr-scheduler]' \
-    train.seed_index=0 \
-    nn.data.anchors_mode=fixed \
-    nn.data.anchors_idxs='[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]' \
-    nn.module.autoencoder.latent_dim=20
+  core.tags='[resnet, pretrained, quantization, relative]' \
+  nn/module/model=relresnet \
+  nn.module.model.finetune=False \
+  nn.module.model.similarity_mode=inner \
+  nn.module.model.similarities_quantization_mode=differentiable_round \
+  nn.module.model.similarities_bin_size=0.005
+
+# ResNet
+python src/rae/run.py \
+  core.tags='[resnet, pretrained, absolute]' \
+  nn/module/model=resnet \
+  nn.module.model.finetune=False \
