@@ -11,3 +11,5 @@ dropout_p: 0.5
 normalization_mode: l2
 similarity_mode: basis_change
 values_mode: similarities
+similarities_quantization_mode: differentiable_round
+similarities_bin_size: 0.05
