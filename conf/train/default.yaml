@@ -20,8 +20,8 @@ restore:
   mode: null # null, finetune, hotstart, continue
 
 monitor:
-  metric: 'loss/val'
-  mode: 'min'
+  metric: 'acc/val'
+  mode: 'max'
 
 callbacks:
   - _target_: pytorch_lightning.callbacks.EarlyStopping
