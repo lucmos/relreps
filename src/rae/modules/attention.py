@@ -87,7 +87,9 @@ class RelativeAttention(nn.Module):
 
         # Compute queries-keys similarities
         if self.similarity_mode == RelativeEmbeddingMethod.INNER:
-            similarities = torch.einsum("bm, am -> ba", x, anchors) / math.sqrt(x.shape[-1])
+            similarities = torch.einsum("bm, am -> ba", x, anchors)
+            if self.normalization_mode == NormalizationMode.OFF:
+                similarities = similarities / math.sqrt(x.shape[-1])
         elif self.similarity_mode == RelativeEmbeddingMethod.BASIS_CHANGE:
             similarities = torch.linalg.lstsq(anchors.T, x.T)[0].T
         else:
