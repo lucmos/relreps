@@ -7,8 +7,8 @@ trainer:
   fast_dev_run: False # Enable this for debug purposes
   gpus: 1
   precision: 32
-  max_epochs: 100
-  max_steps: 100000
+  max_epochs: 1000
+  max_steps: 1000000
   accumulate_grad_batches: 1
   num_sanity_val_steps: 2
   gradient_clip_val: 10.0
@@ -52,7 +52,7 @@ logging:
     _target_: pytorch_lightning.loggers.WandbLogger
 
     project: ${core.project_name}
-    entity: null
+    entity: gladia
     log_model: ${..upload.run_files}
     mode: 'online'
     tags: ${core.tags}

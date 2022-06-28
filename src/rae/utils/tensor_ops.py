@@ -2,6 +2,7 @@ from typing import Any
 
 import torch
 from torch import nn
+from torchvision import models
 
 
 def detach_tensors(x: Any) -> Any:
@@ -28,3 +29,17 @@ def infer_dimension(width: int, height: int, n_channels: int, model: nn.Module, 
         fake_batch = torch.zeros([batch_size, n_channels, width, height])
         fake_out = model(fake_batch)
         return fake_out
+
+
+def freeze(model: nn.Module) -> None:
+    for param in model.parameters():
+        param.requires_grad = False
+
+
+def get_resnet_model(resnet_size: int, use_pretrained: bool) -> (nn.Module, int):
+    if resnet_size == 50:
+        return models.resnet50(pretrained=use_pretrained), 2048
+    elif resnet_size == 18:
+        return models.resnet18(pretrained=use_pretrained), 512
+    else:
+        raise NotImplementedError()

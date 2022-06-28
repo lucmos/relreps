@@ -362,7 +362,7 @@ class MyDataModule(pl.LightningDataModule):
                 )
             ]
 
-        if stage is None or stage == "test":
+        if stage == "test":
             raise NotImplementedError()
 
     def train_dataloader(self) -> DataLoader:

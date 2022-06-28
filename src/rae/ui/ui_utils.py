@@ -49,11 +49,12 @@ def get_model(
         )
         model.eval()
         return model
-    except:  # noqa
+    except Exception as e:  # noqa
         ckpt_code_version = NNCheckpointIO.load(path=checkpoint_path, map_location="cpu")["cfg"]["core"]["version"]
         st.error(
             f"Codebase version mismatch. Checkpoint trained with version `{ckpt_code_version}` support version `{supported_code_version}"
         )
+        st.write(e)
         st.stop()
         return None
 

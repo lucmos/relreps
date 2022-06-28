@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from rae.modules.attention import RelativeTransformerBlock
-from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod, ValuesMethod
+from rae.modules.enumerations import AttentionOutput, NormalizationMode, Output, RelativeEmbeddingMethod, ValuesMethod
 from rae.utils.tensor_ops import infer_dimension
 
 pylogger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ class RCNN(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        **kwargs,
     ) -> None:
         """Simple model that uses convolutions.
 
@@ -60,6 +61,7 @@ class RCNN(nn.Module):
 
         self.relative_transformer = RelativeTransformerBlock(
             in_features=hidden_features,
+            hidden_features=hidden_features,
             out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
             normalization_mode=normalization_mode,
@@ -75,6 +77,9 @@ class RCNN(nn.Module):
         x = self.fc1(x)
         return x
 
+    def set_finetune_mode(self):
+        pass
+
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass.
 
@@ -89,12 +94,12 @@ class RCNN(nn.Module):
         with torch.no_grad():
             anchors_latents = self.embed(self.anchors_images)
 
-        output, raw_output, similarities = self.relative_transformer(x=batch_latents, anchors=anchors_latents)
-        x = F.relu(output)
+        attention_output = self.relative_transformer(x=batch_latents, anchors=anchors_latents)
+        x = F.relu(attention_output[AttentionOutput.OUTPUT])
         x = self.fc2(x)
 
         return {
             Output.LOGITS: x,
-            Output.DEFAULT_LATENT: similarities,
-            Output.BATCH_LATENT: similarities,
+            Output.DEFAULT_LATENT: attention_output[AttentionOutput.SIMILARITIES],
+            Output.BATCH_LATENT: attention_output[AttentionOutput.SIMILARITIES],
         }

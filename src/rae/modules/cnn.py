@@ -12,7 +12,7 @@ pylogger = logging.getLogger(__name__)
 
 
 class CNN(nn.Module):
-    def __init__(self, metadata, input_channels: int, hidden_channels: int, n_classes: int) -> None:
+    def __init__(self, metadata, input_channels: int, hidden_channels: int, n_classes: int, **kwargs) -> None:
         """Simple model that uses convolutions.
 
         Args:

@@ -1,0 +1,9 @@
+_target_: rae.modules.resnet.ResNet
+resnet_size: 18
+
+input_size: 224
+use_pretrained: True
+finetune: False
+
+hidden_features: 512
+dropout_p: 0.5

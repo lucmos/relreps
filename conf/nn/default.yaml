@@ -34,12 +34,6 @@ data:
 #    test:
 #      - _target_: rae.data.cifar100.CIFAR100Dataset
 
-  transforms:
-    _target_: torchvision.transforms.Compose
-    transforms:
-#      - _target_: torchvision.transforms.Normalize
-      - _target_: torchvision.transforms.ToTensor
-
   gpus: ${train.trainer.gpus}
 
   num_workers:
@@ -48,11 +42,13 @@ data:
     test: 0
 
   batch_size:
-    train: 128
+    train: 512
     val: 128
     test: 16
 
 module:
+  input_size: 32
+
   plot_n_val_samples: 1000
   fit_pca_each_epoch: True
 
@@ -67,16 +63,16 @@ module:
     eps: 1e-08
     weight_decay: 0
 
-  #  lr_scheduler:
-  #    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
-  #    T_0: 10
-  #    T_mult: 2
-  #    eta_min: 0 # min value for the lr
-  #    last_epoch: -1
-  #    verbose: False
+  lr_scheduler:
+    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+    T_0: 10
+    T_mult: 2
+    eta_min: 0 # min value for the lr
+    last_epoch: -1
+    verbose: False
 
 
 defaults:
   - _self_
-  - data: mnist # pick one of the yamls in nn/data/
-  - module: ae_variational # classifier #  ae_deterministic #
+  - data: cifar100 # pick one of the yamls in nn/data/
+  - module: classifier # ae_variational # classifier #  ae_deterministic #

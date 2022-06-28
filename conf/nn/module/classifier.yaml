@@ -3,6 +3,9 @@ _target_: rae.pl_modules.pl_gclassifier.LightningClassifier
 loss:
   _target_: torch.nn.modules.loss.CrossEntropyLoss
 
+model:
+  input_size: 32
+
 defaults:
   - _self_
-  - model: cnn
+  - model: relresnet
