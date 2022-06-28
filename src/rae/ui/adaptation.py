@@ -36,13 +36,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 st.sidebar.markdown(f"Device: `{device}`\n\n---")
 
 st.sidebar.header("Absolute Model")
-abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/2pi13o2j")
+abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/t5wcyk17")
 abs_model: LightningClassifier = get_model(
     module_class=LightningClassifier, checkpoint_path=abs_ckpt, supported_code_version=CODE_VERSION
 )
 
 st.sidebar.header("Relative Model")
-rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/rkntehs9")
+rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/1ijcb2xg")
 rel_model = get_model(
     module_class=LightningClassifier,
     checkpoint_path=rel_ckpt,
