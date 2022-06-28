@@ -31,8 +31,8 @@ class RelResNet(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
-        similarities_quantization_mode: SimilaritiesQuantizationMode,
-        similarities_bin_size: Optional[float],
+        similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
+        similarities_bin_size: Optional[float] = None,
         resnet_size: int = 18,
         **kwargs,
     ) -> None:
