@@ -11,6 +11,7 @@ from rae.modules.enumerations import (
     NormalizationMode,
     Output,
     RelativeEmbeddingMethod,
+    SimilaritiesAggregationMode,
     SimilaritiesQuantizationMode,
     ValuesMethod,
 )
@@ -35,6 +36,7 @@ class RelResNet(nn.Module):
         similarities_bin_size: Optional[float] = None,
         resnet_size: int = 18,
         transform_resnet_features: bool = False,
+        similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -63,6 +65,7 @@ class RelResNet(nn.Module):
             values_mode=values_mode,
             similarities_quantization_mode=similarities_quantization_mode,
             similarities_bin_size=similarities_bin_size,
+            similarities_aggregation_mode=similarities_aggregation_mode,
         )
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))

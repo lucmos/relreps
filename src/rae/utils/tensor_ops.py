@@ -1,8 +1,37 @@
-from typing import Any
+from typing import Any, Optional
 
 import torch
 from torch import nn
 from torchvision import models
+
+
+def stratified_mean(samples: torch.Tensor, labels: torch.Tensor, num_classes: Optional[int] = None) -> torch.Tensor:
+    """Samples average along its last dimension stratified according to labels.
+
+    Args:
+        samples: tensor with shape [batch_size, num_samples] where each num_samples is associated to a given label
+        labels: tensor with shape [num_samples] whose values are in [0, num_classes]
+        num_classes: the number of classes. If None it is inferred as the maximum label in the labels tensor
+
+    Returns:
+        a tensor with shape [batch_size, num_classes], for each row contains the mean of the values in samples with
+        the same label.
+        The resulting row is sorted according to the label index.
+    """
+    if num_classes is None:
+        num_classes = labels.max() + 1
+
+    _, targets_inverse, targets_counts = labels.unique(sorted=True, return_counts=True, return_inverse=True)
+    # Build a matrix that performs the similarities average grouped by class
+    # Thus, the resulting matrix has n_classes features
+    sparse_avg_matrix = torch.sparse_coo_tensor(
+        torch.stack((labels, torch.arange(samples.shape[-1])), dim=0),
+        (1 / targets_counts)[targets_inverse],
+        size=[num_classes, samples.shape[-1]],
+        dtype=torch.float,
+    )
+    similarities = torch.mm(sparse_avg_matrix, samples.T).T
+    return similarities
 
 
 def detach_tensors(x: Any) -> Any:

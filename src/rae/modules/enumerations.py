@@ -7,6 +7,10 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
+class SimilaritiesAggregationMode(StrEnum):
+    STRATIFIED_AVG = auto()
+
+
 class SimilaritiesQuantizationMode(StrEnum):
     DIFFERENTIABLE_ROUND = auto()
     SMOOTH_STEPS = auto()

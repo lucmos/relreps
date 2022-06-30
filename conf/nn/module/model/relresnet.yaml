@@ -14,3 +14,4 @@ similarity_mode: inner
 values_mode: similarities
 similarities_quantization_mode: differentiable_round
 similarities_bin_size: 0.05
+similarities_aggregation_mode: stratified_avg
