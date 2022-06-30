@@ -34,18 +34,23 @@ class RelResNet(nn.Module):
         similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
         similarities_bin_size: Optional[float] = None,
         resnet_size: int = 18,
+        transform_resnet_features: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.metadata = metadata
+        self.transform_resnet_features = transform_resnet_features
 
         self.finetune = finetune
         self.resnet, self.resnet_features = get_resnet_model(resnet_size=resnet_size, use_pretrained=use_pretrained)
         self.resnet.fc = PassThrough()
         if not finetune:
             freeze(self.resnet)
+
+        if self.transform_resnet_features:
+            self.resnet_post_fc = nn.Linear(in_features=self.resnet_features, out_features=self.resnet_features)
 
         self.relative_attention_block = RelativeTransformerBlock(
             in_features=self.resnet_features,
@@ -72,8 +77,12 @@ class RelResNet(nn.Module):
     def forward(self, x: torch.Tensor, new_anchors_images: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
             anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else new_anchors_images)
+            if self.transform_resnet_features:
+                anchors_latents = self.resnet_post_fc(anchors_latents)
 
         batch_latents = self.resnet(x)
+        if self.transform_resnet_features:
+            batch_latents = self.resnet_post_fc(batch_latents)
 
         attention_output = self.relative_attention_block(x=batch_latents, anchors=anchors_latents)
 

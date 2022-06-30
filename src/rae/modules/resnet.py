@@ -22,17 +22,23 @@ class ResNet(nn.Module):
         dropout_p: float,
         use_pretrained: bool,
         finetune: bool,
+        transform_resnet_features: bool = False,
         **kwargs,
     ) -> None:
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.metadata = metadata
+        self.transform_resnet_features = transform_resnet_features
+
         self.finetune = finetune
         self.resnet, self.resnet_features = get_resnet_model(resnet_size=resnet_size, use_pretrained=use_pretrained)
         self.resnet.fc = PassThrough()
         if not finetune:
             freeze(self.resnet)
+
+        if self.transform_resnet_features:
+            self.resnet_post_fc = nn.Linear(in_features=self.resnet_features, out_features=self.resnet_features)
 
         self.linear_layer = nn.Linear(
             in_features=self.resnet_features,
@@ -50,6 +56,9 @@ class ResNet(nn.Module):
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         latents = self.resnet(x)
+        if self.transform_resnet_features:
+            latents = self.resnet_post_fc(latents)
+
         output = self.linear_layer(latents)
         output = self.block(output)
         output = self.final_layer(output)
