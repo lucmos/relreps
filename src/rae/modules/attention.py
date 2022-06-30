@@ -1,12 +1,19 @@
 import logging
 import math
+from typing import Optional
 
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 from rae.modules.blocks import LearningBlock
-from rae.modules.enumerations import AttentionOutput, NormalizationMode, RelativeEmbeddingMethod, ValuesMethod
+from rae.modules.enumerations import (
+    AttentionOutput,
+    NormalizationMode,
+    RelativeEmbeddingMethod,
+    SimilaritiesQuantizationMode,
+    ValuesMethod,
+)
 
 pylogger = logging.getLogger(__name__)
 
@@ -20,6 +27,8 @@ class RelativeAttention(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        similarities_quantization_mode: SimilaritiesQuantizationMode,
+        similarities_bin_size: Optional[float],
     ):
         """Relative attention block.
 
@@ -33,6 +42,8 @@ class RelativeAttention(nn.Module):
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
+            similarities_quantization_mode: the quantization modality to quantize the similarities
+            similarities_bin_size: the size of the bins in the quantized similarities
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -43,11 +54,18 @@ class RelativeAttention(nn.Module):
         self.normalization_mode = normalization_mode
         self.similarity_mode = similarity_mode
         self.values_mode = values_mode
+        self.similarities_quantization_mode = similarities_quantization_mode
+        self.similarities_bin_size = similarities_bin_size
 
         if values_mode == ValuesMethod.TRAINABLE:
             self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
         elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
+
+        if (similarities_quantization_mode in set(SimilaritiesQuantizationMode)) != (similarities_bin_size is not None):
+            raise ValueError(
+                f"Quantization '{similarities_quantization_mode}' not supported with bin size '{similarities_bin_size}'"
+            )
 
     def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
         """Forward pass.
@@ -69,27 +87,39 @@ class RelativeAttention(nn.Module):
 
         # Compute queries-keys similarities
         if self.similarity_mode == RelativeEmbeddingMethod.INNER:
-            similarities = torch.einsum("bm, am -> ba", x, anchors) / math.sqrt(x.shape[-1])
+            similarities = torch.einsum("bm, am -> ba", x, anchors)
+            if self.normalization_mode == NormalizationMode.OFF:
+                similarities = similarities / math.sqrt(x.shape[-1])
         elif self.similarity_mode == RelativeEmbeddingMethod.BASIS_CHANGE:
             similarities = torch.linalg.lstsq(anchors.T, x.T)[0].T
         else:
             raise ValueError(f"Similarity mode not supported: {self.similarity_mode}")
 
+        # Quantize similarities
+        quantized_similarities = similarities
+        if self.similarities_quantization_mode is None:
+            pass
+        elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.DIFFERENTIABLE_ROUND:
+            quantized_similarities = torch.round(similarities / self.similarities_bin_size) * self.similarities_bin_size
+            quantized_similarities = similarities + (quantized_similarities - similarities).detach()
+        elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.SMOOTH_STEPS:
+            raise NotImplementedError()
+
         # Compute the weighted average of the values
         if self.values_mode == ValuesMethod.TRAINABLE:
-            weights = F.softmax(similarities, dim=-1)
+            weights = F.softmax(quantized_similarities, dim=-1)
             output = torch.einsum("bw, wh -> bh", weights, self.values)
         elif self.values_mode == ValuesMethod.ANCHORS:
-            weights = F.softmax(similarities, dim=-1)
+            weights = F.softmax(quantized_similarities, dim=-1)
             output = torch.einsum("bw, wh -> bh", weights, anchors)
         elif self.values_mode == ValuesMethod.SIMILARITIES:
-            output = similarities
+            output = quantized_similarities
         else:
             assert False
 
         return {
             AttentionOutput.OUTPUT: output,
-            AttentionOutput.SIMILARITIES: similarities,
+            AttentionOutput.SIMILARITIES: quantized_similarities,
         }
 
 
@@ -103,6 +133,8 @@ class RelativeLinearBlock(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        similarities_quantization_mode: SimilaritiesQuantizationMode,
+        similarities_bin_size: Optional[float],
     ):
         """Relative Linear block.
 
@@ -117,6 +149,8 @@ class RelativeLinearBlock(nn.Module):
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
+            similarities_quantization_mode: the quantization modality to quantize the similarities
+            similarities_bin_size: the size of the bins in the quantized similarities
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -128,6 +162,8 @@ class RelativeLinearBlock(nn.Module):
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
+            similarities_quantization_mode=similarities_quantization_mode,
+            similarities_bin_size=similarities_bin_size,
         )
 
         if values_mode == ValuesMethod.TRAINABLE:
@@ -160,6 +196,8 @@ class RelativeTransformerBlock(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        similarities_quantization_mode: SimilaritiesQuantizationMode,
+        similarities_bin_size: Optional[float],
     ):
         """Relative Transformer block.
 
@@ -172,6 +210,8 @@ class RelativeTransformerBlock(nn.Module):
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
             dropout_p: the dropout probability to use in the learning block
+            similarities_quantization_mode: the quantization modality to quantize the similarities
+            similarities_bin_size: the size of the bins in the quantized similarities
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -184,6 +224,8 @@ class RelativeTransformerBlock(nn.Module):
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
+            similarities_quantization_mode=similarities_quantization_mode,
+            similarities_bin_size=similarities_bin_size,
         )
 
         self.block = LearningBlock(num_features=out_features, dropout_p=dropout_p)

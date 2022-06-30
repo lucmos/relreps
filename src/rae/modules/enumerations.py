@@ -7,6 +7,11 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
+class SimilaritiesQuantizationMode(StrEnum):
+    DIFFERENTIABLE_ROUND = auto()
+    SMOOTH_STEPS = auto()
+
+
 class NormalizationMode(StrEnum):
     L2 = auto()
     OFF = auto()

@@ -6,7 +6,14 @@ from torch import nn
 
 from rae.data.datamodule import MetaData
 from rae.modules.attention import RelativeTransformerBlock
-from rae.modules.enumerations import AttentionOutput, NormalizationMode, Output, RelativeEmbeddingMethod, ValuesMethod
+from rae.modules.enumerations import (
+    AttentionOutput,
+    NormalizationMode,
+    Output,
+    RelativeEmbeddingMethod,
+    SimilaritiesQuantizationMode,
+    ValuesMethod,
+)
 from rae.modules.passthrough import PassThrough
 from rae.utils.tensor_ops import freeze, get_resnet_model
 
@@ -24,6 +31,8 @@ class RelResNet(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
+        similarities_bin_size: Optional[float] = None,
         resnet_size: int = 18,
         **kwargs,
     ) -> None:
@@ -47,6 +56,8 @@ class RelResNet(nn.Module):
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
+            similarities_quantization_mode=similarities_quantization_mode,
+            similarities_bin_size=similarities_bin_size,
         )
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
@@ -60,7 +71,7 @@ class RelResNet(nn.Module):
 
     def forward(self, x: torch.Tensor, new_anchors_images: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
-            anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else self.anchors_images)
+            anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else new_anchors_images)
 
         batch_latents = self.resnet(x)
 
