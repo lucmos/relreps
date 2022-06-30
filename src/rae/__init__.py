@@ -32,8 +32,10 @@ logging.basicConfig(
     ],
 )
 
-
-OmegaConf.register_new_resolver("version", codebase_version)
+try:
+    OmegaConf.register_new_resolver("version", codebase_version)
+except ValueError:
+    pass
 
 try:
     from ._version import __version__ as __version__
