@@ -69,6 +69,7 @@ class RelResNet(nn.Module):
 
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
+        self.register_buffer("anchors_targets", metadata.anchors_targets)
 
     def set_finetune_mode(self) -> None:
         if not self.finetune:
@@ -84,7 +85,11 @@ class RelResNet(nn.Module):
         if self.transform_resnet_features:
             batch_latents = self.resnet_post_fc(batch_latents)
 
-        attention_output = self.relative_attention_block(x=batch_latents, anchors=anchors_latents)
+        attention_output = self.relative_attention_block(
+            x=batch_latents,
+            anchors=anchors_latents,
+            anchors_targets=self.anchors_targets,
+        )
 
         output = self.final_layer(attention_output[AttentionOutput.OUTPUT])
 

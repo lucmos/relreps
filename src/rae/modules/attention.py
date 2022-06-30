@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
 import torch.nn.functional as F
@@ -67,12 +67,18 @@ class RelativeAttention(nn.Module):
                 f"Quantization '{similarities_quantization_mode}' not supported with bin size '{similarities_bin_size}'"
             )
 
-    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+    def forward(
+        self,
+        x: torch.Tensor,
+        anchors: torch.Tensor,
+        anchors_targets: Optional[torch.Tensor] = None,
+    ) -> Dict[AttentionOutput, torch.Tensor]:
         """Forward pass.
 
         Args:
             x: [batch_size, hidden_dim]
             anchors: [num_anchors, hidden_dim]
+            anchors_targets: [num_anchors]
         """
         if x.shape[-1] != anchors.shape[-1]:
             raise ValueError(f"Inconsistent dimensions between batch and anchors: {x.shape}, {anchors.shape}")
@@ -94,6 +100,10 @@ class RelativeAttention(nn.Module):
             similarities = torch.linalg.lstsq(anchors.T, x.T)[0].T
         else:
             raise ValueError(f"Similarity mode not supported: {self.similarity_mode}")
+
+        # Aggregate similarities
+        # TODO: Add optional condition
+        # TODO; add possibility to perform partial aggregation
 
         # Quantize similarities
         quantized_similarities = similarities
@@ -175,8 +185,13 @@ class RelativeLinearBlock(nn.Module):
         else:
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
-    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
-        attention_output = self.attention(x=x, anchors=anchors)
+    def forward(
+        self,
+        x: torch.Tensor,
+        anchors: torch.Tensor,
+        anchors_targets: Optional[torch.Tensor] = None,
+    ) -> Dict[AttentionOutput, torch.Tensor]:
+        attention_output = self.attention(x=x, anchors=anchors, anchors_targets=anchors_targets)
         output = self.linear(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
@@ -230,8 +245,13 @@ class RelativeTransformerBlock(nn.Module):
 
         self.block = LearningBlock(num_features=out_features, dropout_p=dropout_p)
 
-    def forward(self, x: torch.Tensor, anchors: torch.Tensor) -> (torch.Tensor, torch.Tensor):
-        attention_output = self.attention(x=x, anchors=anchors)
+    def forward(
+        self,
+        x: torch.Tensor,
+        anchors: torch.Tensor,
+        anchors_targets: Optional[torch.Tensor] = None,
+    ) -> Dict[AttentionOutput, torch.Tensor]:
+        attention_output = self.attention(x=x, anchors=anchors, anchors_targets=anchors_targets)
         output = self.block(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
