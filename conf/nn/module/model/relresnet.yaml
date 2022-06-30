@@ -4,6 +4,7 @@ resnet_size: 18
 input_size: 224
 use_pretrained: True
 finetune: False
+transform_resnet_features: True
 
 # Relative params
 hidden_features: 512
