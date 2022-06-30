@@ -71,7 +71,7 @@ class RelResNet(nn.Module):
 
     def forward(self, x: torch.Tensor, new_anchors_images: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
-            anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else self.anchors_images)
+            anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else new_anchors_images)
 
         batch_latents = self.resnet(x)
 
