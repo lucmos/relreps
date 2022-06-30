@@ -118,7 +118,7 @@ class LightningClassifier(AbstractLightningModule):
 
         return {
             Output.LOSS: loss,
-            Output.BATCH: batch,
+            Output.BATCH: {key: detach_tensors(value) for key, value in batch.items()},
             **{key: detach_tensors(value) for key, value in out.items()},
         }
 
