@@ -9,6 +9,16 @@ def anchors_latents() -> torch.Tensor:
 
 
 @pytest.fixture
+def n_classes() -> int:
+    return 10
+
+
+@pytest.fixture
+def anchors_targets(n_classes) -> torch.Tensor:
+    return torch.randint(n_classes, size=(7,))
+
+
+@pytest.fixture
 def batch_latents() -> torch.Tensor:
     return torch.rand(16, 50)
 
