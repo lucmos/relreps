@@ -2,24 +2,19 @@
 
 
 python src/rae/run.py \
-  core.tags='[resnet, pretrained, finetuning, quantization, relative]' \
+  core.tags='[resnet, pretrained, finetuning, quantization, relative, trainable-values]' \
   nn/module/model=relresnet \
+  nn.module.model.values_mode=trainable \
   nn.module.model.finetune=True \
   nn.module.model.similarity_mode=inner \
   nn.module.model.similarities_quantization_mode=differentiable_round \
   nn.module.model.similarities_bin_size=0.1 \
   nn.module.model.transform_resnet_features=True
 
-# ResNet
 python src/rae/run.py \
-  core.tags='[resnet, pretrained, absolute]' \
-  nn/module/model=resnet \
-  nn.module.model.finetune=True \
-  nn.module.model.transform_resnet_features=True
-
-python src/rae/run.py \
-  core.tags='[resnet, pretrained, finetuning, quantization, relative]' \
+  core.tags='[resnet, pretrained, finetuning, quantization, relative, trainable-values]' \
   nn/module/model=relresnet \
+  nn.module.model.values_mode=trainable \
   nn.module.model.finetune=True \
   nn.module.model.similarity_mode=inner \
   nn.module.model.similarities_quantization_mode=differentiable_round \
@@ -27,8 +22,9 @@ python src/rae/run.py \
   nn.module.model.transform_resnet_features=True
 
 python src/rae/run.py \
-  core.tags='[resnet, pretrained, finetuning, quantization, relative]' \
+  core.tags='[resnet, pretrained, finetuning, quantization, relative, trainable-values]' \
   nn/module/model=relresnet \
+  nn.module.model.values_mode=trainable \
   nn.module.model.finetune=True \
   nn.module.model.similarity_mode=inner \
   nn.module.model.similarities_quantization_mode=differentiable_round \
@@ -36,8 +32,9 @@ python src/rae/run.py \
   nn.module.model.transform_resnet_features=True
 
 python src/rae/run.py \
-  core.tags='[resnet, pretrained, finetuning, quantization, relative]' \
+  core.tags='[resnet, pretrained, finetuning, quantization, relative, trainable-values]' \
   nn/module/model=relresnet \
+  nn.module.model.values_mode=trainable \
   nn.module.model.finetune=True \
   nn.module.model.similarity_mode=inner \
   nn.module.model.similarities_quantization_mode=differentiable_round \
@@ -45,10 +42,30 @@ python src/rae/run.py \
   nn.module.model.transform_resnet_features=True
 
 python src/rae/run.py \
-  core.tags='[resnet, pretrained, finetuning, quantization, relative]' \
+  core.tags='[resnet, pretrained, finetuning, quantization, relative, trainable-values]' \
   nn/module/model=relresnet \
+  nn.module.model.values_mode=trainable \
   nn.module.model.finetune=True \
   nn.module.model.similarity_mode=inner \
   nn.module.model.similarities_quantization_mode=differentiable_round \
   nn.module.model.similarities_bin_size=0.005 \
+  nn.module.model.transform_resnet_features=True
+
+python src/rae/run.py \
+  core.tags='[resnet, pretrained, finetuning, relative, trainable-values]' \
+  nn/module/model=relresnet \
+  nn.module.model.values_mode=trainable \
+  nn.module.model.finetune=True \
+  nn.module.model.similarity_mode=inner \
+  nn.module.model.similarities_quantization_mode=null \
+  nn.module.model.similarities_bin_size=null \
+  nn.module.model.transform_resnet_features=True
+
+python src/rae/run.py \
+  core.tags='[resnet, pretrained, finetuning, relative, trainable-values]' \
+  nn/module/model=relresnet \
+  nn.module.model.finetune=True \
+  nn.module.model.similarity_mode=inner \
+  nn.module.model.similarities_quantization_mode=null \
+  nn.module.model.similarities_bin_size=null \
   nn.module.model.transform_resnet_features=True
