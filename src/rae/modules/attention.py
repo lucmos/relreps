@@ -100,6 +100,7 @@ class RelativeAttention(nn.Module):
         if x.shape[-1] != anchors.shape[-1]:
             raise ValueError(f"Inconsistent dimensions between batch and anchors: {x.shape}, {anchors.shape}")
 
+        # Normalize latents
         if self.normalization_mode == NormalizationMode.OFF:
             pass
         elif self.normalization_mode == NormalizationMode.L2:
