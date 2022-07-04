@@ -33,6 +33,7 @@ class RelativeAttention(nn.Module):
         similarities_quantization_mode: SimilaritiesQuantizationMode,
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
+        similarities_aggregation_n_groups: int,
     ):
         """Relative attention block.
 
@@ -50,6 +51,7 @@ class RelativeAttention(nn.Module):
             similarities_quantization_mode: the quantization modality to quantize the similarities
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
+            similarities_aggregation_n_groups: number of groups when aggregating the similarities
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -64,10 +66,13 @@ class RelativeAttention(nn.Module):
         self.similarities_quantization_mode = similarities_quantization_mode
         self.similarities_bin_size = similarities_bin_size
         self.similarities_aggregation_mode = similarities_aggregation_mode
+        self.similarities_aggregation_n_groups = similarities_aggregation_n_groups
 
         if values_mode == ValuesMethod.TRAINABLE:
             if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
-                self.values = nn.Parameter(torch.randn(self.n_classes, self.hidden_features))
+                self.values = nn.Parameter(
+                    torch.randn(self.n_classes * self.similarities_aggregation_n_groups, self.hidden_features)
+                )
             else:
                 self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
 
@@ -125,7 +130,12 @@ class RelativeAttention(nn.Module):
             # Compute the mean of the similarities grouped by anchor targets
             if anchors_targets is None:
                 raise ValueError("Impossible to stratify the similarities without anchors targets")
-            similarities = stratified_mean(samples=similarities, labels=anchors_targets, num_classes=self.n_classes)
+            similarities = stratified_mean(
+                samples=similarities,
+                labels=anchors_targets,
+                n_groups=self.similarities_aggregation_n_groups,
+                num_classes=self.n_classes,
+            )
 
         # Quantize similarities
         quantized_similarities = similarities
@@ -169,6 +179,7 @@ class RelativeLinearBlock(nn.Module):
         similarities_quantization_mode: SimilaritiesQuantizationMode,
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
+        similarities_aggregation_n_groups: int,
     ):
         """Relative Linear block.
 
@@ -187,6 +198,7 @@ class RelativeLinearBlock(nn.Module):
             similarities_quantization_mode: the quantization modality to quantize the similarities
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
+            similarities_aggregation_n_groups: number of groups when aggregating the similarities
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -202,6 +214,7 @@ class RelativeLinearBlock(nn.Module):
             similarities_quantization_mode=similarities_quantization_mode,
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
+            similarities_aggregation_n_groups=similarities_aggregation_n_groups,
         )
 
         if values_mode == ValuesMethod.ANCHORS:
@@ -210,7 +223,9 @@ class RelativeLinearBlock(nn.Module):
             self.linear = nn.Linear(in_features=hidden_features, out_features=out_features, bias=False)
         elif values_mode == ValuesMethod.SIMILARITIES:
             if similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
-                self.linear = nn.Linear(in_features=n_classes, out_features=out_features, bias=False)
+                self.linear = nn.Linear(
+                    in_features=n_classes * similarities_aggregation_n_groups, out_features=out_features, bias=False
+                )
             else:
                 self.linear = nn.Linear(in_features=n_anchors, out_features=out_features, bias=False)
         else:
@@ -246,6 +261,7 @@ class RelativeTransformerBlock(nn.Module):
         similarities_quantization_mode: SimilaritiesQuantizationMode,
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
+        similarities_aggregation_n_groups: int,
     ):
         """Relative Transformer block.
 
@@ -262,6 +278,7 @@ class RelativeTransformerBlock(nn.Module):
             similarities_quantization_mode: the quantization modality to quantize the similarities
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
+            similarities_aggregation_n_groups: number of groups when aggregating the similarities
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -278,6 +295,7 @@ class RelativeTransformerBlock(nn.Module):
             similarities_quantization_mode=similarities_quantization_mode,
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
+            similarities_aggregation_n_groups=similarities_aggregation_n_groups,
         )
 
         self.block = LearningBlock(num_features=out_features, dropout_p=dropout_p)

@@ -37,6 +37,7 @@ class RelResNet(nn.Module):
         resnet_size: int = 18,
         transform_resnet_features: bool = False,
         similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
+        similarities_aggregation_n_groups: int = 1,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -60,12 +61,14 @@ class RelResNet(nn.Module):
             dropout_p=dropout_p,
             out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
+            n_classes=len(self.metadata.class_to_idx),
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
             similarities_quantization_mode=similarities_quantization_mode,
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
+            similarities_aggregation_n_groups=similarities_aggregation_n_groups,
         )
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
