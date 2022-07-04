@@ -44,13 +44,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 st.sidebar.markdown(f"Device: `{device}`\n\n---")
 
 st.sidebar.header("Absolute Model")
-abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/187jij1g")
+abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/1526hguc")
 abs_model: LightningClassifier = get_model(
     module_class=LightningClassifier, checkpoint_path=abs_ckpt, supported_code_version=CODE_VERSION
 )
 
 st.sidebar.header("Relative Model")
-rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/ayu5us63")
+rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/235uwwsh")
 rel_model = get_model(
     module_class=LightningClassifier,
     checkpoint_path=rel_ckpt,
@@ -70,7 +70,6 @@ def get_model_transforms(cfg: Dict):
     return hydra.utils.instantiate(used_transforms)
 
 
-@st.cache(allow_output_mutation=True, suppress_st_warning=True)
 def compute_accuracy(model: LightningClassifier, dataloader, new_anchors_images=None):
     accuracy: Accuracy = Accuracy(num_classes=len(model.metadata.class_to_idx))
     model.eval()
@@ -90,13 +89,14 @@ def compute_accuracy(model: LightningClassifier, dataloader, new_anchors_images=
             else:
                 output = model(images, new_anchors_images=new_anchors_images)
                 inv_latents.append(output[Output.INV_LATENTS])
-                batch_latents.append(output[Output.BATCH_LATENT])
                 anchors_latents.append(output[Output.ANCHORS_LATENT])
+            batch_latents.append(output[Output.BATCH_LATENT])
             accuracy(output[Output.LOGITS].cpu(), targets.cpu())
         if inv_latents:
-            inv_latents = torch.cat(inv_latents, dim=0)
-        batch_latents = torch.cat(batch_latents, dim=0)
-        anchors_latents = torch.cat(anchors_latents, dim=0)
+            inv_latents = torch.cat(inv_latents, dim=0).cpu()
+        batch_latents = torch.cat(batch_latents, dim=0).cpu()
+        if anchors_latents:
+            anchors_latents = torch.cat(anchors_latents, dim=0).cpu()
 
     return accuracy.compute().item(), inv_latents, batch_latents, anchors_latents
 
@@ -215,7 +215,7 @@ if st.checkbox("Evaluate on the original/novel sample"):
     st.markdown("Latent space old-novel anchors")
     pca = PCA(n_components=2)
     latents = torch.cat((original_anchors_latents, novel_anchors_latents), dim=0)
-    # latents = pca.fit_transform(latents)
+    latents = pca.fit_transform(latents)
     metadata: MetaData = rel_model.metadata
     df = pd.DataFrame(
         {
@@ -250,6 +250,21 @@ if st.checkbox("Evaluate on the original/novel sample"):
         # range_y=[-5, 5],
     )
     st.plotly_chart(latent_val_fig, use_container_width=True)
+
+
+    st.markdown("Anchors latent movements")
+    import plotly.figure_factory as ff
+    original_latents = latents[:original_anchors_latents.shape[0]]
+    novel_latents = latents[original_anchors_latents.shape[0]:]
+
+    scale = st.number_input("Arrows scale", 0., 1., 1.)
+    st.plotly_chart(ff.create_quiver(
+        original_latents[:, 0],
+        original_latents[:, 1],
+        novel_latents[:, 0] - original_latents[:, 0],
+        novel_latents[:, 1] - original_latents[:, 1],
+        name='quiver', line_width=1, scaleratio=1, scale=scale, arrow_scale=.25 ), use_container_width=True, )
+
 
     st.markdown("Original invariant latents for selected original sample")
     fig = px.bar(original_inv_latents.T, labels={"index": "anchors", "value": "Similarity"})
