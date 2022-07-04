@@ -1,20 +1,54 @@
 from pathlib import Path
-from typing import Optional, Type
+from typing import Dict, Optional, Tuple, Type
 
+import hydra
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import torch
 import torchvision
+import torchvision.transforms.functional as transformf
 import wandb
 from matplotlib import pyplot as plt
+from plotly.graph_objs import Figure
 from pytorch_lightning import LightningModule
 from sklearn.decomposition import PCA
+from stqdm import stqdm
+from torch.utils.data import DataLoader
+from torchmetrics import Accuracy
 
+from nn_core.common import PROJECT_ROOT
 from nn_core.serialization import NNCheckpointIO, load_model
 
+from rae.data.cifar100 import CIFAR100Dataset
+from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output
 from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
+from rae.pl_modules.pl_gclassifier import LightningClassifier
 from rae.utils.plotting import plot_violin
+
+AVAILABLE_TRANSFORMS = {
+    "brighter": lambda x: transformf.adjust_brightness(x, brightness_factor=1.5),
+    "darker": lambda x: transformf.adjust_brightness(x, brightness_factor=0.5),
+    "lower_contrast": lambda x: transformf.adjust_contrast(x, contrast_factor=0.5),
+    "higher_contrast": lambda x: transformf.adjust_contrast(x, contrast_factor=1.5),
+    "lower_gamma": lambda x: transformf.adjust_gamma(x, gamma=0.5),
+    "higher_gamma": lambda x: transformf.adjust_gamma(x, gamma=1.5),
+    "lower_hue": lambda x: transformf.adjust_hue(x, hue_factor=-0.5),
+    "higher_hue": lambda x: transformf.adjust_hue(x, hue_factor=0.5),
+    "lower_saturation": lambda x: transformf.adjust_saturation(x, saturation_factor=0.25),
+    "higher_saturation": lambda x: transformf.adjust_saturation(x, saturation_factor=0.75),
+    "lower_sharpness": lambda x: transformf.adjust_sharpness(x, sharpness_factor=0),
+    "higher_sharpness": lambda x: transformf.adjust_sharpness(x, sharpness_factor=4),
+    "autocontrast": lambda x: transformf.autocontrast(x),
+    "gaussian_blur": lambda x: transformf.gaussian_blur(x, kernel_size=5),
+    "hflip": lambda x: transformf.hflip(x),
+    "invert": lambda x: transformf.invert(x),
+    "rgb_to_grayscale": lambda x: transformf.rgb_to_grayscale(x, 3),
+    "solarize": lambda x: transformf.solarize(x, threshold=0.5),
+    "rotate": lambda x: transformf.rotate(x, 45),
+    "vflip": lambda x: transformf.vflip(x),
+}
 
 
 def show_code_version(code_version: str):
@@ -57,6 +91,33 @@ def get_model(
         st.write(e)
         st.stop()
         return None
+
+
+@st.cache
+def get_model_cfg(ckpt_path: str):
+    cfg = NNCheckpointIO.load(path=ckpt_path, map_location="cpu")["cfg"]
+    return cfg
+
+
+@st.cache
+def get_model_transforms(cfg: Dict):
+    used_transforms = cfg["nn"]["data"]["transforms"]
+    return hydra.utils.instantiate(used_transforms)
+
+
+@st.cache
+def get_val_dataset(original_transforms):
+    dataset = CIFAR100Dataset(
+        split="test",
+        transform=original_transforms,
+        path=PROJECT_ROOT / "data",
+    )
+    return dataset
+
+
+@st.cache
+def get_val_dataloader(dataset, batch_size=10):
+    return DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
 
 def check_wandb_login():
@@ -114,3 +175,79 @@ def display_distributions(st_container, model_out):
             x_label="anchors",
         )
     )
+
+
+def plot_latent_space_comparison(metadata: MetaData, original_latents, novel_latents) -> Tuple[Figure, torch.Tensor]:
+    pca = PCA(n_components=2)
+    latents = torch.cat((original_latents, novel_latents), dim=0)
+    latents = pca.fit_transform(latents)
+    df = pd.DataFrame(
+        {
+            "latent0": latents[:, 0],
+            "latent1": latents[:, 1],
+            "is_novel_anchor": [False] * novel_latents.shape[0] + [True] * novel_latents.shape[0],
+            "target": metadata.anchors_targets.tolist() + metadata.anchors_targets.tolist(),
+            "image_index": metadata.anchors_idxs + metadata.anchors_idxs,
+            "class_name": metadata.anchors_classes + metadata.anchors_classes,
+            "anchor_index": list(range(novel_latents.shape[0])) + list(range(novel_latents.shape[0])),
+        }
+    )
+    color_discrete_map = {
+        class_name: color
+        for class_name, color in zip(metadata.class_to_idx, px.colors.qualitative.Plotly[: len(metadata.class_to_idx)])
+    }
+    latent_val_fig = px.scatter(
+        df,
+        x="latent0",
+        y="latent1",
+        category_orders={"class_name": metadata.class_to_idx.keys()},
+        color="class_name",
+        hover_name="image_index",
+        hover_data=["image_index", "anchor_index"],
+        facet_col="is_novel_anchor",
+        color_discrete_map=color_discrete_map,
+        # symbol="is_anchor",
+        # symbol_map={False: "circle", True: "star"},
+        size_max=40,
+        # range_x=[-5, 5],
+        color_continuous_scale=None,
+        # range_y=[-5, 5],
+    )
+    return latent_val_fig, latents
+
+
+def compute_accuracy(model: LightningClassifier, dataloader, device, new_anchors_images=None):
+    accuracy: Accuracy = Accuracy(num_classes=len(model.metadata.class_to_idx))
+    model.eval()
+    model = model.to(device)
+    if new_anchors_images is not None:
+        new_anchors_images = new_anchors_images.to(device)
+
+    with torch.no_grad():
+        inv_latents = []
+        batch_latents = []
+        anchors_latents = []
+        for batch in stqdm(dataloader):
+            images = batch["image"].to(device)
+            targets = batch["target"].to(device)
+            if new_anchors_images is None:
+                output = model(images)
+            else:
+                output = model(images, new_anchors_images=new_anchors_images)
+                inv_latents.append(output[Output.INV_LATENTS])
+                anchors_latents.append(output[Output.ANCHORS_LATENT])
+            batch_latents.append(output[Output.BATCH_LATENT])
+            accuracy(output[Output.LOGITS].cpu(), targets.cpu())
+        if inv_latents:
+            inv_latents = torch.cat(inv_latents, dim=0).cpu()
+        batch_latents = torch.cat(batch_latents, dim=0).cpu()
+        if anchors_latents:
+            anchors_latents = torch.cat(anchors_latents, dim=0).cpu()
+
+    return accuracy.compute().item(), inv_latents, batch_latents, anchors_latents
+
+
+def plot_bar(data, **kwargs) -> Figure:
+    fig = px.bar(data, **kwargs)
+    fig.update_layout(showlegend=False)
+    return fig
