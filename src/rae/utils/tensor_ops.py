@@ -22,10 +22,19 @@ def subdivide_labels(labels: torch.Tensor, n_groups: int, num_classes: int) -> t
         return_inverse=False,
     )
     virtual_labels = labels.clone().detach()
-    max_range = num_classes * (torch.arange(counts.max()) % n_groups)
+    max_range = num_classes * (torch.arange(counts.max(), device=labels.device) % n_groups)
     for value, count in zip(unique, counts):
         virtual_labels[labels == value] = max_range[:count] + value
     return virtual_labels
+    # https://stackoverflow.com/questions/72862624/subdivide-values-in-a-tensor
+    # counts = torch.unique(labels, return_counts=True)[1]
+    # idx = counts.cumsum(0)
+    # id_arr = torch.ones(idx[-1], dtype=torch.long)
+    # id_arr[0] = 0
+    # id_arr[idx[:-1]] = -counts[:-1] + 1
+    # rng = id_arr.cumsum(0)[labels.argsort().argsort()] % n_groups
+    # maxr = torch.arange(n_groups) * num_classes
+    # return maxr[rng] + labels
 
 
 def stratified_mean(
@@ -61,10 +70,11 @@ def stratified_mean(
     # Build a matrix that performs the similarities average grouped by class
     # Thus, the resulting matrix has n_classes features
     sparse_avg_matrix = torch.sparse_coo_tensor(
-        torch.stack((labels, torch.arange(samples.shape[-1])), dim=0),
+        torch.stack((labels, torch.arange(samples.shape[-1], device=samples.device)), dim=0),
         (1 / targets_counts)[targets_inverse],
         size=[num_classes * n_groups, samples.shape[-1]],
         dtype=samples.dtype,
+        device=samples.device,
     )
     return torch.mm(sparse_avg_matrix, samples.T).T
 
