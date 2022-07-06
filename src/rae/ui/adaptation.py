@@ -1,13 +1,19 @@
+import logging
+
 import plotly.figure_factory as ff
 import streamlit as st
 import torch
 import torch.nn.functional as F
 from matplotlib import pyplot as plt
 from pytorch_lightning import seed_everything
+from stqdm import stqdm
+from torch import optim
+from torch.utils.data import DataLoader, Dataset
 from torchvision.transforms import transforms
 
 from nn_core.ui import select_checkpoint
 
+from rae.modules.enumerations import Output
 from rae.pl_modules.pl_gclassifier import LightningClassifier
 from rae.ui.ui_utils import (
     AVAILABLE_TRANSFORMS,
@@ -24,6 +30,36 @@ from rae.ui.ui_utils import (
     show_code_version,
 )
 from rae.utils.plotting import plot_images
+
+pylogger = logging.getLogger(__name__)
+
+
+class DatasetFromTensor(Dataset):
+    def __init__(self, images, targets, class_to_idx):
+        super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
+
+        self.images = images
+        self.targets = targets
+        self.class_to_idx = class_to_idx
+        self.idx_to_class = {y: x for x, y in class_to_idx.items()}
+
+    @property
+    def class_vocab(self):
+        return self.class_to_idx
+
+    def __len__(self) -> int:
+        # example
+        return len(self.targets)
+
+    def __getitem__(self, index: int):
+        # example
+        image, target = self.images[index], self.targets[index]
+        return {"index": index, "image": image, "target": target, "class": self.idx_to_class[target.item()]}
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__qualname__}(n_instances={len(self)})"
+
 
 seed_everything(0)
 
@@ -46,15 +82,15 @@ st.sidebar.header("Absolute Model")
 abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/1526hguc")
 abs_model: LightningClassifier = get_model(
     module_class=LightningClassifier, checkpoint_path=abs_ckpt, supported_code_version=CODE_VERSION
-)
+).to(device)
 
 st.sidebar.header("Relative Model")
-rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/235uwwsh")
+rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/1er5zuzt")
 rel_model = get_model(
     module_class=LightningClassifier,
     checkpoint_path=rel_ckpt,
     supported_code_version=CODE_VERSION,
-)
+).to(device)
 
 
 cfg = get_model_cfg(rel_ckpt)
@@ -97,7 +133,41 @@ if st.sidebar.checkbox("Show anchors"):
         st.pyplot(plot_images(novel_anchors_images, title="novel anchors"))
 
 
-if st.checkbox("Evaluate on the original/novel sample"):
+def finetune(model, parameters_to_tune, dataloader, lr, epochs, new_anchors_images):
+    st.write(f"tot: {sum(x.sum().detach() for x in parameters_to_tune)}")
+    model.train()
+    opt = optim.Adam(parameters_to_tune, lr=lr, weight_decay=1e-5)
+    for epoch in (bar := stqdm(range(epochs))):
+        epoch_loss = 0
+        num_batches = 0
+
+        for batch in dataloader:
+            image = batch["image"].to(device)
+            target = batch["target"].to(device)
+
+            opt.zero_grad()
+            if new_anchors_images is not None:
+                out = model(image, new_anchors_images=novel_anchors_images)
+            else:
+                out = model(image)
+
+            loss = model.loss(out[Output.LOGITS], target)
+
+            loss.backward()
+            opt.step()
+
+            num_batches += 1
+            epoch_loss += loss.detach().cpu().item()
+
+        bar.set_description(
+            f"Loss: {epoch_loss / num_batches:.3f}, tot: {sum(x.sum().detach() for x in parameters_to_tune)}"
+        )
+    st.write(epoch_loss / num_batches)
+    model.eval()
+    return model
+
+
+if sample_eval := st.checkbox("Evaluate on the original/novel sample"):
     _, original_inv_latents, original_batch_latents, original_anchors_latents = compute_accuracy(
         rel_model,
         # dataloader=[{"image": novel_sample["image"][None], "target": torch.as_tensor(novel_sample["target"])[None]}],
@@ -108,6 +178,45 @@ if st.checkbox("Evaluate on the original/novel sample"):
         new_anchors_images=original_anchors_images,
     )
 
+if st.checkbox("Fine tune on transformed anchors"):
+    finetune_dataset = DatasetFromTensor(
+        images=novel_anchors_images,
+        targets=rel_model.metadata.anchors_targets,
+        class_to_idx=rel_model.metadata.class_to_idx,
+    )
+    finetune_dataloader = DataLoader(finetune_dataset, batch_size=256, shuffle=True)
+
+    novel_val_dataloader = get_val_dataloader(novel_val_dataset, batch_size=256)
+
+    rel_model = finetune(
+        model=rel_model,
+        parameters_to_tune=(
+            *rel_model.model.resnet.parameters(),
+            *rel_model.model.resnet_post_fc.parameters(),
+            rel_model.model.relative_attention_block.attention.attention.values,
+            # *rel_model.model.relative_attention_block.attention.linear.parameters(),
+        ),
+        dataloader=finetune_dataloader,
+        lr=0.0002,
+        epochs=100,
+        new_anchors_images=novel_anchors_images,
+    )
+
+    abs_model = finetune(
+        model=abs_model,
+        parameters_to_tune=(
+            *abs_model.model.resnet.parameters(),
+            *abs_model.model.resnet_post_fc.parameters(),
+            #            abs_model.model.relative_attention_block.attention.attention.values,
+            # *abs_model.model.relative_attention_block.attention.linear.parameters(),
+        ),
+        dataloader=finetune_dataloader,
+        lr=0.0002,
+        epochs=100,
+        new_anchors_images=None,
+    )
+
+if sample_eval:
     _, novel_inv_latents, novel_batch_latents, novel_anchors_latents = compute_accuracy(
         rel_model,
         dataloader=[{"image": novel_sample["image"][None], "target": torch.as_tensor(novel_sample["target"])[None]}],
@@ -142,10 +251,8 @@ if st.checkbox("Evaluate on the original/novel sample"):
     st.plotly_chart(latent_val_fig, use_container_width=True)
 
     st.markdown("Anchors latent movements")
-
     original_latents = latents[: original_anchors_latents.shape[0]]
     novel_latents = latents[original_anchors_latents.shape[0] :]
-
     scale = st.number_input("Arrows scale", 0.0, 1.0, 1.0)
     st.plotly_chart(
         ff.create_quiver(
