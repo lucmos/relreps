@@ -142,8 +142,10 @@ if st.checkbox("Evaluate on the original/novel sample"):
     st.plotly_chart(latent_val_fig, use_container_width=True)
 
     st.markdown("Anchors latent movements")
+
     original_latents = latents[: original_anchors_latents.shape[0]]
     novel_latents = latents[original_anchors_latents.shape[0] :]
+
     scale = st.number_input("Arrows scale", 0.0, 1.0, 1.0)
     st.plotly_chart(
         ff.create_quiver(

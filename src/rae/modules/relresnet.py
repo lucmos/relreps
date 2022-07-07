@@ -11,6 +11,7 @@ from rae.modules.enumerations import (
     NormalizationMode,
     Output,
     RelativeEmbeddingMethod,
+    SimilaritiesAggregationMode,
     SimilaritiesQuantizationMode,
     ValuesMethod,
 )
@@ -35,6 +36,8 @@ class RelResNet(nn.Module):
         similarities_bin_size: Optional[float] = None,
         resnet_size: int = 18,
         transform_resnet_features: bool = False,
+        similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
+        similarities_aggregation_n_groups: int = 1,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -58,17 +61,21 @@ class RelResNet(nn.Module):
             dropout_p=dropout_p,
             out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
+            n_classes=len(self.metadata.class_to_idx),
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
             similarities_quantization_mode=similarities_quantization_mode,
             similarities_bin_size=similarities_bin_size,
+            similarities_aggregation_mode=similarities_aggregation_mode,
+            similarities_aggregation_n_groups=similarities_aggregation_n_groups,
         )
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
 
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
+        self.register_buffer("anchors_targets", metadata.anchors_targets)
 
     def set_finetune_mode(self) -> None:
         if not self.finetune:
@@ -84,7 +91,11 @@ class RelResNet(nn.Module):
         if self.transform_resnet_features:
             batch_latents = self.resnet_post_fc(batch_latents)
 
-        attention_output = self.relative_attention_block(x=batch_latents, anchors=anchors_latents)
+        attention_output = self.relative_attention_block(
+            x=batch_latents,
+            anchors=anchors_latents,
+            anchors_targets=self.anchors_targets,
+        )
 
         output = self.final_layer(attention_output[AttentionOutput.OUTPUT])
 

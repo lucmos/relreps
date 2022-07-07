@@ -7,19 +7,23 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
+class SimilaritiesAggregationMode(StrEnum):
+    STRATIFIED_AVG = auto()
+
+
 class SimilaritiesQuantizationMode(StrEnum):
     DIFFERENTIABLE_ROUND = auto()
-    SMOOTH_STEPS = auto()
+    # SMOOTH_STEPS = auto()
 
 
 class NormalizationMode(StrEnum):
     L2 = auto()
     OFF = auto()
-    BATCHNORM = auto()
-    INSTANCENORM = auto()
-    LAYERNORM = auto()
-    INSTANCENORM_NOAFFINE = auto()
-    LAYERNORM_NOAFFINE = auto()
+    # BATCHNORM = auto()
+    # INSTANCENORM = auto()
+    # LAYERNORM = auto()
+    # INSTANCENORM_NOAFFINE = auto()
+    # LAYERNORM_NOAFFINE = auto()
 
 
 class RelativeEmbeddingMethod(StrEnum):
