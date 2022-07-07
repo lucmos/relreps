@@ -71,12 +71,15 @@ st.title("Domain Adaptation")
 
 check_wandb_login()
 
+execute_all = st.checkbox("Execute all")
+
 
 CODE_VERSION = "0.1.0"
 show_code_version(code_version=CODE_VERSION)
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-st.sidebar.markdown(f"Device: `{device}`\n\n---")
+device = "cpu"
+best_device = "cuda" if torch.cuda.is_available() else "cpu"
+st.sidebar.markdown(f"Device: `{best_device}`\n\n---")
 
 st.sidebar.header("Absolute Model")
 abs_ckpt = select_checkpoint(st_key="relative_resnet", default_run_path="gladia/rae/1526hguc")
@@ -85,7 +88,7 @@ abs_model: LightningClassifier = get_model(
 ).to(device)
 
 st.sidebar.header("Relative Model")
-rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/1er5zuzt")
+rel_ckpt = select_checkpoint(st_key="absolute_resnet", default_run_path="gladia/rae/u0uhfmny")
 rel_model = get_model(
     module_class=LightningClassifier,
     checkpoint_path=rel_ckpt,
@@ -133,7 +136,11 @@ if st.sidebar.checkbox("Show anchors"):
         st.pyplot(plot_images(novel_anchors_images, title="novel anchors"))
 
 
-def finetune(model, parameters_to_tune, dataloader, lr, epochs, new_anchors_images):
+def finetune(model, parameters_to_tune, dataloader, lr, epochs, new_anchors_images, compute_device):
+    model = model.to(compute_device)
+    if new_anchors_images is not None:
+        new_anchors_images = new_anchors_images.to(compute_device)
+
     st.write(f"tot: {sum(x.sum().detach() for x in parameters_to_tune)}")
     model.train()
     opt = optim.Adam(parameters_to_tune, lr=lr, weight_decay=1e-5)
@@ -142,12 +149,12 @@ def finetune(model, parameters_to_tune, dataloader, lr, epochs, new_anchors_imag
         num_batches = 0
 
         for batch in dataloader:
-            image = batch["image"].to(device)
-            target = batch["target"].to(device)
+            image = batch["image"].to(compute_device)
+            target = batch["target"].to(compute_device)
 
             opt.zero_grad()
             if new_anchors_images is not None:
-                out = model(image, new_anchors_images=novel_anchors_images)
+                out = model(image, new_anchors_images=new_anchors_images)
             else:
                 out = model(image)
 
@@ -164,21 +171,21 @@ def finetune(model, parameters_to_tune, dataloader, lr, epochs, new_anchors_imag
         )
     st.write(epoch_loss / num_batches)
     model.eval()
-    return model
+    return model.to('cpu')
 
 
-if sample_eval := st.checkbox("Evaluate on the original/novel sample"):
+if sample_eval := st.checkbox("Evaluate on the original/novel sample", value=execute_all):
     _, original_inv_latents, original_batch_latents, original_anchors_latents = compute_accuracy(
         rel_model,
         # dataloader=[{"image": novel_sample["image"][None], "target": torch.as_tensor(novel_sample["target"])[None]}],
         dataloader=[
             {"image": original_sample["image"][None], "target": torch.as_tensor(original_sample["target"])[None]}
         ],
-        device=device,
+               compute_device=best_device,
         new_anchors_images=original_anchors_images,
     )
 
-if st.checkbox("Fine tune on transformed anchors"):
+if st.checkbox("Fine tune on transformed anchors", value=execute_all):
     finetune_dataset = DatasetFromTensor(
         images=novel_anchors_images,
         targets=rel_model.metadata.anchors_targets,
@@ -193,13 +200,14 @@ if st.checkbox("Fine tune on transformed anchors"):
         parameters_to_tune=(
             *rel_model.model.resnet.parameters(),
             *rel_model.model.resnet_post_fc.parameters(),
-            rel_model.model.relative_attention_block.attention.attention.values,
+            # rel_model.model.relative_attention_block.attention.attention.values,
             # *rel_model.model.relative_attention_block.attention.linear.parameters(),
         ),
         dataloader=finetune_dataloader,
-        lr=0.0002,
-        epochs=100,
+        lr=0.002,
+        epochs=10,
         new_anchors_images=novel_anchors_images,
+        compute_device=best_device,
     )
 
     abs_model = finetune(
@@ -207,20 +215,21 @@ if st.checkbox("Fine tune on transformed anchors"):
         parameters_to_tune=(
             *abs_model.model.resnet.parameters(),
             *abs_model.model.resnet_post_fc.parameters(),
-            #            abs_model.model.relative_attention_block.attention.attention.values,
+            # abs_model.model.relative_attention_block.attention.attention.values,
             # *abs_model.model.relative_attention_block.attention.linear.parameters(),
         ),
         dataloader=finetune_dataloader,
-        lr=0.0002,
-        epochs=100,
+        lr=0.002,
+        epochs=10,
         new_anchors_images=None,
+        compute_device=best_device,
     )
 
 if sample_eval:
     _, novel_inv_latents, novel_batch_latents, novel_anchors_latents = compute_accuracy(
         rel_model,
         dataloader=[{"image": novel_sample["image"][None], "target": torch.as_tensor(novel_sample["target"])[None]}],
-        device=device,
+               compute_device=best_device,
         new_anchors_images=novel_anchors_images,
     )
 
@@ -295,7 +304,7 @@ if sample_eval:
         "Cosine similarity old-novel invariant latents", F.cosine_similarity(original_inv_latents, novel_inv_latents)
     )
 
-if st.sidebar.checkbox("Evaluate on the CIFAR100 validation set"):
+if st.sidebar.checkbox("Evaluate on the CIFAR100 validation set", value=execute_all):
     novel_val_dataloader = get_val_dataloader(novel_val_dataset, batch_size=512)
 
     col1, col2 = st.columns(2)
@@ -305,7 +314,8 @@ if st.sidebar.checkbox("Evaluate on the CIFAR100 validation set"):
             rel_model,
             dataloader=novel_val_dataloader,
             new_anchors_images=novel_anchors_images,
-            device=device,
+                   compute_device=best_device,
+
         )
         st.metric("Accuracy", acc)
 
@@ -314,6 +324,7 @@ if st.sidebar.checkbox("Evaluate on the CIFAR100 validation set"):
         acc, _, batch_latents, anchors_latents = compute_accuracy(
             abs_model,
             dataloader=novel_val_dataloader,
-            device=device,
+                   compute_device=best_device,
+
         )
         st.metric("Accuracy", acc)

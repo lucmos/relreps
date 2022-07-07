@@ -224,20 +224,20 @@ def plot_latent_space_comparison(metadata: MetaData, original_latents, novel_lat
     return latent_val_fig, latents
 
 
-def compute_accuracy(model: LightningClassifier, dataloader, device, new_anchors_images=None):
+def compute_accuracy(model: LightningClassifier, dataloader, compute_device, new_anchors_images=None, ):
     accuracy: Accuracy = Accuracy(num_classes=len(model.metadata.class_to_idx))
     model.eval()
-    model = model.to(device)
+    model = model.to(compute_device)
     if new_anchors_images is not None:
-        new_anchors_images = new_anchors_images.to(device)
+        new_anchors_images = new_anchors_images.to(compute_device)
 
     with torch.no_grad():
         inv_latents = []
         batch_latents = []
         anchors_latents = []
         for batch in stqdm(dataloader):
-            images = batch["image"].to(device)
-            targets = batch["target"].to(device)
+            images = batch["image"].to(compute_device)
+            targets = batch["target"].to(compute_device)
             if new_anchors_images is None:
                 output = model(images)
             else:
