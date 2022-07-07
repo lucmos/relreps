@@ -78,6 +78,7 @@ class RelResNet(nn.Module):
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
 
+        # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
         self.register_buffer("anchors_targets", metadata.anchors_targets)
