@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Type
 
@@ -71,7 +72,7 @@ def plot_image(img):
 
 
 @st.cache(allow_output_mutation=True)
-def get_model(
+def _get_model(
     checkpoint_path: Path, supported_code_version: str, module_class: Type[LightningModule] = LightningAutoencoder
 ):
     try:
@@ -91,6 +92,13 @@ def get_model(
         st.write(e)
         st.stop()
         return None
+
+
+def get_model(
+    checkpoint_path: Path, supported_code_version: str, module_class: Type[LightningModule] = LightningAutoencoder
+):
+    model = _get_model(checkpoint_path, supported_code_version, module_class)
+    return copy.deepcopy(model)
 
 
 @st.cache
