@@ -7,6 +7,7 @@ from torch import nn
 from rae.data.datamodule import MetaData
 from rae.modules.attention import RelativeTransformerBlock
 from rae.modules.enumerations import (
+    AnchorsSamplingMode,
     AttentionOutput,
     NormalizationMode,
     Output,
@@ -38,6 +39,8 @@ class RelResNet(nn.Module):
         transform_resnet_features: bool = False,
         similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
         similarities_aggregation_n_groups: int = 1,
+        anchors_sampling_mode: Optional[AnchorsSamplingMode] = None,
+        n_anchors_sampling_per_class: Optional[int] = None,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -69,6 +72,8 @@ class RelResNet(nn.Module):
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
             similarities_aggregation_n_groups=similarities_aggregation_n_groups,
+            anchors_sampling_mode=anchors_sampling_mode,
+            n_anchors_sampling_per_class=n_anchors_sampling_per_class,
         )
 
         self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
