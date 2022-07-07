@@ -171,7 +171,7 @@ def finetune(model, parameters_to_tune, dataloader, lr, epochs, new_anchors_imag
         )
     st.write(epoch_loss / num_batches)
     model.eval()
-    return model.to('cpu')
+    return model.to("cpu")
 
 
 if sample_eval := st.checkbox("Evaluate on the original/novel sample", value=execute_all):
@@ -181,7 +181,7 @@ if sample_eval := st.checkbox("Evaluate on the original/novel sample", value=exe
         dataloader=[
             {"image": original_sample["image"][None], "target": torch.as_tensor(original_sample["target"])[None]}
         ],
-               compute_device=best_device,
+        compute_device=best_device,
         new_anchors_images=original_anchors_images,
     )
 
@@ -229,7 +229,7 @@ if sample_eval:
     _, novel_inv_latents, novel_batch_latents, novel_anchors_latents = compute_accuracy(
         rel_model,
         dataloader=[{"image": novel_sample["image"][None], "target": torch.as_tensor(novel_sample["target"])[None]}],
-               compute_device=best_device,
+        compute_device=best_device,
         new_anchors_images=novel_anchors_images,
     )
 
@@ -314,8 +314,7 @@ if st.sidebar.checkbox("Evaluate on the CIFAR100 validation set", value=execute_
             rel_model,
             dataloader=novel_val_dataloader,
             new_anchors_images=novel_anchors_images,
-                   compute_device=best_device,
-
+            compute_device=best_device,
         )
         st.metric("Accuracy", acc)
 
@@ -324,7 +323,6 @@ if st.sidebar.checkbox("Evaluate on the CIFAR100 validation set", value=execute_
         acc, _, batch_latents, anchors_latents = compute_accuracy(
             abs_model,
             dataloader=novel_val_dataloader,
-                   compute_device=best_device,
-
+            compute_device=best_device,
         )
         st.metric("Accuracy", acc)

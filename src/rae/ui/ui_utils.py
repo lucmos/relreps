@@ -224,7 +224,12 @@ def plot_latent_space_comparison(metadata: MetaData, original_latents, novel_lat
     return latent_val_fig, latents
 
 
-def compute_accuracy(model: LightningClassifier, dataloader, compute_device, new_anchors_images=None, ):
+def compute_accuracy(
+    model: LightningClassifier,
+    dataloader,
+    compute_device,
+    new_anchors_images=None,
+):
     accuracy: Accuracy = Accuracy(num_classes=len(model.metadata.class_to_idx))
     model.eval()
     model = model.to(compute_device)
