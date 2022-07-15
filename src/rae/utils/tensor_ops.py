@@ -5,6 +5,30 @@ from torch import nn
 from torchvision import models
 
 
+def stratified_sampling(targets: torch.Tensor, samples_per_class: int) -> torch.Tensor:
+    """Stratified sampling from the targets tensor.
+
+    Returns the indices of the desired elements, the sampled targets are sorted
+
+    NOTE: the targets should contain all the possible values at least once, otherwise the targets ordering is not
+    guaranteed to be consistent across different executions
+
+    Args:
+        targets: the tensor to sample from, with shape [num_samples]
+        samples_per_class: the number of sampling to perform for each class
+
+    Returns:
+        the indices to use to sample from the targets tensor
+    """
+    uniques = targets.unique()
+    indices = []
+    for class_label in uniques:
+        class_idxs = torch.nonzero(targets == class_label).squeeze(1)
+        idxs = torch.randint(low=0, high=class_idxs.numel(), size=(samples_per_class,), device=targets.device)
+        indices.append(class_idxs[idxs])
+    return torch.cat(indices)
+
+
 def subdivide_labels(labels: torch.Tensor, n_groups: int, num_classes: int) -> torch.Tensor:
     """Divide each label in groups introducing virtual labels.
 

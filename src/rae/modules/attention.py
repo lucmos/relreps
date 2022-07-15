@@ -8,6 +8,7 @@ from torch import nn
 
 from rae.modules.blocks import LearningBlock
 from rae.modules.enumerations import (
+    AnchorsSamplingMode,
     AttentionOutput,
     NormalizationMode,
     RelativeEmbeddingMethod,
@@ -15,7 +16,7 @@ from rae.modules.enumerations import (
     SimilaritiesQuantizationMode,
     ValuesMethod,
 )
-from rae.utils.tensor_ops import stratified_mean
+from rae.utils.tensor_ops import stratified_mean, stratified_sampling
 
 pylogger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ class RelativeAttention(nn.Module):
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
         similarities_aggregation_n_groups: int,
+        anchors_sampling_mode: AnchorsSamplingMode,
+        n_anchors_sampling_per_class: int,
     ):
         """Relative attention block.
 
@@ -52,6 +55,8 @@ class RelativeAttention(nn.Module):
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
             similarities_aggregation_n_groups: number of groups when aggregating the similarities
+            anchors_sampling_mode: how to sample the anchors from the available ones at each step
+            n_anchors_sampling_per_class: how many anchors must be sampled for each class
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -67,11 +72,17 @@ class RelativeAttention(nn.Module):
         self.similarities_bin_size = similarities_bin_size
         self.similarities_aggregation_mode = similarities_aggregation_mode
         self.similarities_aggregation_n_groups = similarities_aggregation_n_groups
+        self.anchors_sampling_mode = anchors_sampling_mode
+        self.n_anchors_sampling_per_class = n_anchors_sampling_per_class
 
         if values_mode == ValuesMethod.TRAINABLE:
             if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
                 self.values = nn.Parameter(
                     torch.randn(self.n_classes * self.similarities_aggregation_n_groups, self.hidden_features)
+                )
+            elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
+                self.values = nn.Parameter(
+                    torch.randn(self.n_classes * self.n_anchors_sampling_per_class, self.hidden_features)
                 )
             else:
                 self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
@@ -89,6 +100,16 @@ class RelativeAttention(nn.Module):
         ):
             raise ValueError(f"Similarity aggregation mode not supported: {similarities_aggregation_mode}")
 
+        if anchors_sampling_mode is not None and anchors_sampling_mode not in set(AnchorsSamplingMode):
+            raise ValueError(f"Anchors sampling mode not supported: {anchors_sampling_mode}")
+        if anchors_sampling_mode is not None and n_anchors_sampling_per_class is None:
+            raise ValueError(
+                f"Impossible to sample with mode: {anchors_sampling_mode} without specifying the number of anchors per class"
+            )
+
+        if self.similarity_mode == RelativeEmbeddingMethod.BASIS_CHANGE and self.n_anchors_sampling_per_class > 1:
+            raise ValueError("The basis change is not deterministic with possibly repeated basis vectors")
+
     def forward(
         self,
         x: torch.Tensor,
@@ -104,6 +125,18 @@ class RelativeAttention(nn.Module):
         """
         if x.shape[-1] != anchors.shape[-1]:
             raise ValueError(f"Inconsistent dimensions between batch and anchors: {x.shape}, {anchors.shape}")
+
+        # Sample anchors
+        if self.anchors_sampling_mode is None:
+            pass
+        elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
+            sampling_idxs = stratified_sampling(
+                targets=anchors_targets, samples_per_class=self.n_anchors_sampling_per_class
+            )
+            anchors_targets = anchors_targets[sampling_idxs]
+            anchors = anchors[sampling_idxs, :]
+        else:
+            raise ValueError(f"Sampling mode not supported: {self.anchors_sampling_mode}")
 
         # Normalize latents
         if self.normalization_mode == NormalizationMode.OFF:
@@ -180,6 +213,8 @@ class RelativeLinearBlock(nn.Module):
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
         similarities_aggregation_n_groups: int,
+        anchors_sampling_mode: AnchorsSamplingMode,
+        n_anchors_sampling_per_class: int,
     ):
         """Relative Linear block.
 
@@ -199,6 +234,8 @@ class RelativeLinearBlock(nn.Module):
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
             similarities_aggregation_n_groups: number of groups when aggregating the similarities
+            anchors_sampling_mode: how to sample the anchors from the available ones at each step
+            n_anchors_sampling_per_class: how many anchors must be sampled for each class
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -215,6 +252,8 @@ class RelativeLinearBlock(nn.Module):
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
             similarities_aggregation_n_groups=similarities_aggregation_n_groups,
+            anchors_sampling_mode=anchors_sampling_mode,
+            n_anchors_sampling_per_class=n_anchors_sampling_per_class,
         )
 
         if values_mode == ValuesMethod.ANCHORS:
@@ -225,6 +264,10 @@ class RelativeLinearBlock(nn.Module):
             if similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
                 self.linear = nn.Linear(
                     in_features=n_classes * similarities_aggregation_n_groups, out_features=out_features, bias=False
+                )
+            elif anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
+                self.linear = nn.Linear(
+                    in_features=n_classes * n_anchors_sampling_per_class, out_features=out_features, bias=False
                 )
             else:
                 self.linear = nn.Linear(in_features=n_anchors, out_features=out_features, bias=False)
@@ -262,6 +305,8 @@ class RelativeTransformerBlock(nn.Module):
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
         similarities_aggregation_n_groups: int,
+        anchors_sampling_mode: AnchorsSamplingMode,
+        n_anchors_sampling_per_class: int,
     ):
         """Relative Transformer block.
 
@@ -279,6 +324,8 @@ class RelativeTransformerBlock(nn.Module):
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
             similarities_aggregation_n_groups: number of groups when aggregating the similarities
+            anchors_sampling_mode: how to sample the anchors from the available ones at each step
+            n_anchors_sampling_per_class: how many anchors must be sampled for each class
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
@@ -296,6 +343,8 @@ class RelativeTransformerBlock(nn.Module):
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
             similarities_aggregation_n_groups=similarities_aggregation_n_groups,
+            anchors_sampling_mode=anchors_sampling_mode,
+            n_anchors_sampling_per_class=n_anchors_sampling_per_class,
         )
 
         self.block = LearningBlock(num_features=out_features, dropout_p=dropout_p)

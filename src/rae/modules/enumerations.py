@@ -7,6 +7,10 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
+class AnchorsSamplingMode(StrEnum):
+    STRATIFIED = auto()
+
+
 class SimilaritiesAggregationMode(StrEnum):
     STRATIFIED_AVG = auto()
 
