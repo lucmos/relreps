@@ -4,7 +4,7 @@ deterministic: False
 
 # PyTorch Lightning Trainer https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
 trainer:
-  fast_dev_run: False # Enable this for debug purposes
+  fast_dev_run: True # Enable this for debug purposes
   gpus: 1
   precision: 32
   max_epochs: 1000
