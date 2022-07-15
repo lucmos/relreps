@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import Dict, Optional
+from typing import Dict, Iterable, Optional, Set
 
 import torch
 import torch.nn.functional as F
@@ -9,6 +9,7 @@ from torch import nn
 from rae.modules.blocks import LearningBlock
 from rae.modules.enumerations import (
     AnchorsSamplingMode,
+    AttentionElement,
     AttentionOutput,
     NormalizationMode,
     RelativeEmbeddingMethod,
@@ -21,6 +22,58 @@ from rae.utils.tensor_ops import stratified_mean, stratified_sampling
 pylogger = logging.getLogger(__name__)
 
 
+class PreTransforms(nn.Module):
+    def __init__(
+        self,
+        transform_elements: Iterable[AttentionElement],
+        in_features: int,
+        hidden_features: int,
+        values_mode: ValuesMethod,
+    ):
+        """Block that gathers the transformation of the queries, keys and values in the attention.
+
+        If values_mode = TRAINABLE we are invariant to batch-anchors rotations, if it is false we are equivariant
+        to batch-anchors rotations
+
+        Args:
+            in_features: hidden dimension of the input batch and anchors
+            hidden_features: hidden dimension of the transformed tensor
+            transform_elements: the attention elements to independently transform with a linear layer
+            values_mode: if True use trainable parameters as queries otherwise use the anchors
+        """
+        super().__init__()
+
+        self.transform_elements = set(transform_elements)
+        self.module_dict = nn.ModuleDict(
+            {
+                element: nn.Linear(
+                    in_features=in_features,
+                    out_features=hidden_features,
+                    bias=False,
+                )
+                for element in self.transform_elements
+            }
+        )
+
+        if AttentionElement.ATTENTION_VALUES in self.transform_elements and not values_mode == ValuesMethod.ANCHORS:
+            raise ValueError(f"Impossible to transform values if the values mode is {values_mode}")
+
+    def forward(self, x: torch.Tensor, element: AttentionElement) -> torch.Tensor:
+        if element in self.module_dict:
+            return self.module_dict[element](x)
+        else:
+            return x
+
+    def get_keys(self, x: torch.Tensor) -> torch.Tensor:
+        return self(x=x, element=AttentionElement.ATTENTION_KEYS)
+
+    def get_queries(self, x: torch.Tensor) -> torch.Tensor:
+        return self(x=x, element=AttentionElement.ATTENTION_QUERIES)
+
+    def get_values(self, x: torch.Tensor) -> torch.Tensor:
+        return self(x=x, element=AttentionElement.ATTENTION_VALUES)
+
+
 class RelativeAttention(nn.Module):
     def __init__(
         self,
@@ -28,9 +81,7 @@ class RelativeAttention(nn.Module):
         hidden_features: int,
         n_anchors: int,
         n_classes: int,
-        transform_into_queries: bool,
-        transform_into_keys: bool,
-        transform_into_values: bool,
+        transform_elements: Set[AttentionElement],
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
@@ -51,9 +102,7 @@ class RelativeAttention(nn.Module):
             hidden_features: hidden dimension of the output (the queries, if trainable)
             n_anchors: number of anchors
             n_classes: number of classes
-            transform_into_queries: if True, independently the latents into queries with a linear layer
-            transform_into_keys: if True, independently the latents into keys with a linear layer
-            transform_into_values: if True, independently the latents into values with a linear layer
+            transform_elements: the attention elements to independently transform with a linear layer
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
@@ -71,9 +120,7 @@ class RelativeAttention(nn.Module):
         self.hidden_features = hidden_features
         self.n_anchors = n_anchors
         self.n_classes = n_classes
-        self.transform_into_queries = transform_into_queries
-        self.transform_into_keys = transform_into_keys
-        self.transform_into_values = transform_into_values
+        self.transform_elements = transform_elements
         self.normalization_mode = normalization_mode
         self.similarity_mode = similarity_mode
         self.values_mode = values_mode
@@ -84,17 +131,12 @@ class RelativeAttention(nn.Module):
         self.anchors_sampling_mode = anchors_sampling_mode
         self.n_anchors_sampling_per_class = n_anchors_sampling_per_class
 
-        if transform_into_keys:
-            self.to_keys = nn.Linear(in_features=self.in_features, out_features=self.hidden_features, bias=False)
-
-        if transform_into_queries:
-            self.to_queries = nn.Linear(in_features=self.in_features, out_features=self.hidden_features, bias=False)
-
-        if transform_into_values:
-            self.to_values = nn.Linear(in_features=self.in_features, out_features=self.hidden_features, bias=False)
-
-        if transform_into_values and not values_mode == ValuesMethod.ANCHORS:
-            raise ValueError(f"Impossible to transform into values if the values mode is {values_mode}")
+        self.pre_attention_transforms = PreTransforms(
+            in_features=in_features,
+            hidden_features=hidden_features,
+            transform_elements=transform_elements,
+            values_mode=values_mode,
+        )
 
         if values_mode == ValuesMethod.TRAINABLE:
             if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
@@ -160,10 +202,8 @@ class RelativeAttention(nn.Module):
             raise ValueError(f"Sampling mode not supported: {self.anchors_sampling_mode}")
 
         # Transform into keys and queries
-        if self.transform_into_queries:
-            x = self.to_queries(x)
-        if self.transform_into_keys:
-            anchors = self.to_keys(anchors)
+        x = self.pre_attention_transforms.get_queries(x)
+        anchors = self.pre_attention_transforms.get_keys(anchors)
 
         # Normalize latents
         if self.normalization_mode == NormalizationMode.OFF:
@@ -212,11 +252,12 @@ class RelativeAttention(nn.Module):
             weights = F.softmax(quantized_similarities, dim=-1)
             output = torch.einsum("bw, wh -> bh", weights, self.values)
         elif self.values_mode == ValuesMethod.ANCHORS:
-            values = anchors
-            if self.transform_into_values:
-                values = self.to_values(values)
             weights = F.softmax(quantized_similarities, dim=-1)
-            output = torch.einsum("bw, wh -> bh", weights, values)
+            output = torch.einsum(
+                "bw, wh -> bh",
+                weights,
+                self.pre_attention_transforms.get_values(anchors),
+            )
         elif self.values_mode == ValuesMethod.SIMILARITIES:
             output = quantized_similarities
         else:
@@ -236,9 +277,7 @@ class RelativeLinearBlock(nn.Module):
         out_features: int,
         n_anchors: int,
         n_classes: int,
-        transform_into_queries: bool,
-        transform_into_keys: bool,
-        transform_into_values: bool,
+        transform_elements: Set[AttentionElement],
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
@@ -260,9 +299,7 @@ class RelativeLinearBlock(nn.Module):
             out_features: number of features in the output
             n_anchors: number of anchors
             n_classes: number of classes
-            transform_into_queries: if True, independently the latents into queries with a linear layer
-            transform_into_keys: if True, independently the latents into keys with a linear layer
-            transform_into_values: if True, independently the latents into values with a linear layer
+            transform_elements: the attention elements to independently transform with a linear layer
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
@@ -281,9 +318,7 @@ class RelativeLinearBlock(nn.Module):
             n_classes=n_classes,
             in_features=in_features,
             hidden_features=hidden_features,
-            transform_into_queries=transform_into_queries,
-            transform_into_keys=transform_into_keys,
-            transform_into_values=transform_into_values,
+            transform_elements=transform_elements,
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
@@ -337,9 +372,7 @@ class RelativeTransformerBlock(nn.Module):
         out_features: int,
         n_anchors: int,
         n_classes: int,
-        transform_into_queries: bool,
-        transform_into_keys: bool,
-        transform_into_values: bool,
+        transform_elements: Set[AttentionElement],
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
@@ -358,9 +391,7 @@ class RelativeTransformerBlock(nn.Module):
             out_features: number of features in the output
             n_anchors: number of anchors
             n_classes: number of classes
-            transform_into_queries: if True, independently the latents into queries with a linear layer
-            transform_into_keys: if True, independently the latents into keys with a linear layer
-            transform_into_values: if True, independently the latents into values with a linear layer
+            transform_elements: the attention elements to independently transform with a linear layer
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
@@ -380,9 +411,7 @@ class RelativeTransformerBlock(nn.Module):
             n_classes=n_classes,
             in_features=in_features,
             hidden_features=hidden_features,
-            transform_into_queries=transform_into_queries,
-            transform_into_keys=transform_into_keys,
-            transform_into_values=transform_into_values,
+            transform_elements=transform_elements,
             out_features=out_features,
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,

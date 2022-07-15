@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 import torch
 from torch import nn
@@ -8,6 +8,7 @@ from rae.data.datamodule import MetaData
 from rae.modules.attention import RelativeTransformerBlock
 from rae.modules.enumerations import (
     AnchorsSamplingMode,
+    AttentionElement,
     AttentionOutput,
     NormalizationMode,
     Output,
@@ -30,6 +31,7 @@ class RelResNet(nn.Module):
         finetune: bool,
         hidden_features: int,
         dropout_p: float,
+        transform_elements: Set[AttentionElement],
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
@@ -65,6 +67,7 @@ class RelResNet(nn.Module):
             out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
             n_classes=len(self.metadata.class_to_idx),
+            transform_elements=transform_elements,
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
