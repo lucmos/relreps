@@ -44,6 +44,8 @@ class PreTransforms(nn.Module):
         super().__init__()
 
         self.transform_elements = set(transform_elements)
+        pylogger.info(f"Transforming: {self.transform_elements}")
+
         self.module_dict = nn.ModuleDict(
             {
                 element: nn.Linear(
