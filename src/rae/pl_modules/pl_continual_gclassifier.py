@@ -113,6 +113,7 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.macro_accuracies[stage].update(probs, batch["target"])
         self.log_dict(
             {
+                "task": float(self.trainer.datamodule.train_dataset.current_task) if self.trainer is not None else None,
                 f"loss/{stage}": loss.cpu().detach(),
                 f"acc/{stage}": self.micro_accuracies[stage].compute().cpu(),
             },
@@ -140,13 +141,6 @@ class LightningContinualClassifier(AbstractLightningModule):
 
     def on_epoch_start(self) -> None:
         self.model.set_finetune_mode()
-
-        self.log_dict(
-            {
-                "task": float(self.trainer.datamodule.train_dataset.current_task) if self.trainer is not None else None,
-            },
-            prog_bar=True,
-        )
 
     def on_fit_start(self) -> None:
         on_fit_start_viz(lightning_module=self, fixed_images=self.fixed_images, anchors_images=self.anchors_images)
