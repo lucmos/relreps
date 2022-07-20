@@ -8,4 +8,4 @@ model:
 
 defaults:
   - _self_
-  - model: relresnet
+  - model: cnn
