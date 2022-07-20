@@ -44,9 +44,9 @@ def perform_computation(
         pytest.skip("The linsolve is not guaranteed to return the same coefficients with repeated elements")
 
     if (
-        AttentionElement.KEYS in transform_elements
-        or AttentionElement.QUERIES in transform_elements
-        or AttentionElement.VALUES in transform_elements
+        AttentionElement.ATTENTION_KEYS in transform_elements
+        or AttentionElement.ATTENTION_QUERIES in transform_elements
+        or AttentionElement.ATTENTION_VALUES in transform_elements
     ):
         pytest.skip(
             f"Transforming the features into the {transform_elements} does not maintain any guarantee on the invariance"
@@ -97,8 +97,8 @@ def perform_computation(
     "transform_elements",
     (
         {},
-        # {AttentionElement.KEYS, AttentionElement.QUERIES},
-        # {AttentionElement.KEYS, AttentionElement.QUERIES, AttentionElement.VALUES},
+        # {AttentionElement.ATTENTION_KEYS, AttentionElement.ATTENTION_QUERIES},
+        # {AttentionElement.ATTENTION_KEYS, AttentionElement.ATTENTION_QUERIES, AttentionElement.ATTENTION_VALUES},
     ),
 )
 @pytest.mark.parametrize("normalization_mode", (NormalizationMode.OFF, NormalizationMode.L2))
@@ -176,8 +176,8 @@ def test_invariance(
     "transform_elements",
     (
         {},
-        # {AttentionElement.KEYS, AttentionElement.QUERIES},
-        # {AttentionElement.KEYS, AttentionElement.QUERIES, AttentionElement.VALUES},
+        # {AttentionElement.ATTENTION_KEYS, AttentionElement.ATTENTION_QUERIES},
+        # {AttentionElement.ATTENTION_KEYS, AttentionElement.ATTENTION_QUERIES, AttentionElement.ATTENTION_VALUES},
     ),
 )
 @pytest.mark.parametrize("normalization_mode", (NormalizationMode.OFF, NormalizationMode.L2))
