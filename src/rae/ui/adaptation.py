@@ -74,7 +74,7 @@ check_wandb_login()
 execute_all = st.checkbox("Execute all")
 
 
-CODE_VERSION = "0.1.0"
+CODE_VERSION = "0.0.2"
 show_code_version(code_version=CODE_VERSION)
 
 device = "cpu"

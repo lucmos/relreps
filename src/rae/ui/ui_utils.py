@@ -53,7 +53,7 @@ AVAILABLE_TRANSFORMS = {
 
 
 def show_code_version(code_version: str):
-    st.sidebar.markdown(f"Demo compatibility up to version: `{code_version}`")
+    st.sidebar.markdown(f"Demo compatibility with version: `{code_version}`")
     st.sidebar.markdown("---")
 
 
