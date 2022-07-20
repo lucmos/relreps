@@ -5,7 +5,7 @@ from typing import Iterable
 import hydra
 import numpy as np
 import omegaconf
-from pytorch_lightning import Trainer
+from pytorch_lightning import LightningDataModule
 from torch.utils.data import Dataset, Subset
 from torchvision.datasets import CIFAR10
 
@@ -21,7 +21,7 @@ class ContinualCIFAR10Dataset(Dataset):
         split: Split,
         tasks_epochs: Iterable[int],
         tasks_progression: Iterable[Iterable[int]],
-        trainer: Trainer,
+        datamodule: LightningDataModule,
         **kwargs,
     ):
         super().__init__()
@@ -31,7 +31,7 @@ class ContinualCIFAR10Dataset(Dataset):
         self.tasks_epochs = tasks_epochs
         self._task_epochs_cumsum = np.asarray(tasks_epochs).cumsum()
         self.tasks_progression = tasks_progression
-        self.trainer = trainer
+        self.datamodule = datamodule
 
         # example
         self.cifar = CIFAR10(
@@ -62,7 +62,7 @@ class ContinualCIFAR10Dataset(Dataset):
     @property
     def current_task(self):
         return min(
-            bisect(self._task_epochs_cumsum, getattr(self.trainer, "current_epoch", 0)),
+            bisect(self._task_epochs_cumsum, self.datamodule.trainer.current_epoch),
             len(self.tasks_progression) - 1,
         )
 
@@ -118,16 +118,16 @@ def main(cfg: omegaconf.DictConfig) -> None:
     """
     from torchvision.transforms import transforms
 
-    def fake_trainer():
+    def fake_datamodule():
         pass
 
-    trainer = fake_trainer
-    trainer.current_epoch = 0
+    datamodule = fake_datamodule
+    datamodule.current_epoch = 0
 
     dataset: Dataset = hydra.utils.instantiate(
         cfg.nn.data.datasets.train,
         split="train",
-        trainer=trainer,
+        datamodule=datamodule,
         path=PROJECT_ROOT / "data",
         transform=transforms.Compose([transforms.ToTensor()]),  # , transforms.Normalize((0.1307,), (0.3081,))]),
         _recursive_=False,

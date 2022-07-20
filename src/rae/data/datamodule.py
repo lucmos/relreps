@@ -354,7 +354,7 @@ class MyDataModule(pl.LightningDataModule):
                 split="train",
                 transform=transform,
                 path=PROJECT_ROOT / "data",
-                trainer=self.trainer,
+                datamodule=self,
             )
 
             self.train_dataset = hydra.utils.instantiate(
@@ -362,7 +362,7 @@ class MyDataModule(pl.LightningDataModule):
                 split="train",
                 transform=transform,
                 path=PROJECT_ROOT / "data",
-                trainer=self.trainer,
+                datamodule=self,
             )
 
             self.val_datasets = [
@@ -371,7 +371,7 @@ class MyDataModule(pl.LightningDataModule):
                     split="test",
                     transform=transform,
                     path=PROJECT_ROOT / "data",
-                    trainer=self.trainer,
+                    datamodule=self,
                 )
             ]
 
