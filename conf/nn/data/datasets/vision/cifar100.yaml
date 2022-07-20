@@ -1,3 +1,6 @@
+anchors:
+  _target_: rae.data.cifar100.CIFAR100Dataset
+
 train:
   _target_: rae.data.cifar100.CIFAR100Dataset
 

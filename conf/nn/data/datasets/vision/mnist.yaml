@@ -1,3 +1,6 @@
+anchors:
+  _target_: rae.data.mnist.MNISTDataset
+
 train:
   _target_: rae.data.mnist.MNISTDataset
 

@@ -188,6 +188,7 @@ class MyDataModule(pl.LightningDataModule):
         # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#gpus
         self.pin_memory: bool = gpus is not None and str(gpus) != "0"
 
+        self.anchors_dataset: Optional[Dataset] = None
         self.train_dataset: Optional[Dataset] = None
         self.val_datasets: Optional[Sequence[Dataset]] = None
         self.test_datasets: Optional[Sequence[Dataset]] = None
@@ -228,10 +229,12 @@ class MyDataModule(pl.LightningDataModule):
         }
 
     def get_anchors(self) -> Dict[str, torch.Tensor]:
+        dataset_to_consider = self.anchors_dataset
+
         if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
             shuffled_idxs, shuffled_targets = shuffle(
-                np.asarray(list(range(len(self.train_dataset)))),
-                np.asarray(self.train_dataset.targets),
+                np.asarray(list(range(len(dataset_to_consider)))),
+                np.asarray(dataset_to_consider.targets),
                 random_state=0,
             )
             all_targets = sorted(set(shuffled_targets))
@@ -246,7 +249,7 @@ class MyDataModule(pl.LightningDataModule):
                         break
                 i += 1
 
-            anchors = self.extract_batch(self.train_dataset, anchor_indices)
+            anchors = self.extract_batch(dataset_to_consider, anchor_indices)
             return {
                 "anchors_idxs": anchor_indices,
                 "anchors_images": anchors["images"],
@@ -255,18 +258,18 @@ class MyDataModule(pl.LightningDataModule):
                 "anchors_latents": None,
             }
         elif self.anchors_mode == AnchorsMode.STRATIFIED:
-            if self.anchors_num >= len(self.train_dataset.classes):
+            if self.anchors_num >= len(dataset_to_consider.classes):
                 _, anchor_indices = train_test_split(
-                    list(range(len(self.train_dataset))),
+                    list(range(len(dataset_to_consider))),
                     test_size=self.anchors_num,
-                    stratify=self.train_dataset.targets
-                    if self.anchors_num >= len(self.train_dataset.classes)
+                    stratify=dataset_to_consider.targets
+                    if self.anchors_num >= len(dataset_to_consider.classes)
                     else None,
                     random_state=0,
                 )
             else:
                 anchor_indices = HARDCODED_ANCHORS[: self.anchors_num]
-            anchors = self.extract_batch(self.train_dataset, anchor_indices)
+            anchors = self.extract_batch(dataset_to_consider, anchor_indices)
             return {
                 "anchors_idxs": anchor_indices,
                 "anchors_images": anchors["images"],
@@ -275,7 +278,7 @@ class MyDataModule(pl.LightningDataModule):
                 "anchors_latents": None,
             }
         elif self.anchors_mode == AnchorsMode.FIXED:
-            anchors = self.extract_batch(self.train_dataset, self.anchors_idxs)
+            anchors = self.extract_batch(dataset_to_consider, self.anchors_idxs)
             return {
                 "anchors_idxs": self.anchors_idxs,
                 "anchors_images": anchors["images"],
@@ -284,7 +287,7 @@ class MyDataModule(pl.LightningDataModule):
                 "anchors_latents": None,
             }
         elif self.anchors_mode == AnchorsMode.RANDOM_IMAGES:
-            random_images = torch.rand_like(self.extract_batch(self.train_dataset, [0] * self.anchors_num)["images"])
+            random_images = torch.rand_like(self.extract_batch(dataset_to_consider, [0] * self.anchors_num)["images"])
             return {
                 "anchors_idxs": None,
                 "anchors_images": random_images,
@@ -346,6 +349,14 @@ class MyDataModule(pl.LightningDataModule):
         # Here you should instantiate your datasets, you may also split the train into train and validation if needed.
         if (stage is None or stage == "fit") and (self.train_dataset is None and self.val_datasets is None):
             # example
+            self.anchors_dataset = hydra.utils.instantiate(
+                self.datasets.anchors,
+                split="train",
+                transform=transform,
+                path=PROJECT_ROOT / "data",
+                trainer=self.trainer,
+            )
+
             self.train_dataset = hydra.utils.instantiate(
                 self.datasets.train,
                 split="train",

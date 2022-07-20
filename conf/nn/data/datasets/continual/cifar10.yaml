@@ -22,6 +22,9 @@ tasks_progression:
   - [8]
   - [9]
 
+anchors:
+  _target_: rae.data.cifar10.CIFAR10Dataset
+
 train:
   _target_: rae.data.continual.cifar10.ContinualCIFAR10Dataset
   tasks_epochs: ${nn.data.datasets.tasks_epochs}
