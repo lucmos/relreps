@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 import pytest
 import torch
@@ -10,6 +10,7 @@ from tests.modules.conftest import LATENT_DIM, N_CLASSES
 from rae.modules.attention import RelativeLinearBlock, RelativeTransformerBlock
 from rae.modules.enumerations import (
     AnchorsSamplingMode,
+    AttentionElement,
     AttentionOutput,
     NormalizationMode,
     RelativeEmbeddingMethod,
@@ -26,6 +27,7 @@ def perform_computation(
     values_mode: ValuesMethod,
     hidden_features: int,
     out_features: int,
+    transform_elements: Set[AttentionElement],
     normalization_mode: NormalizationMode,
     anchors_latents: torch.Tensor,
     batch_latents: torch.Tensor,
@@ -41,11 +43,21 @@ def perform_computation(
     if similarity_mode == RelativeEmbeddingMethod.BASIS_CHANGE and n_anchors_sampling_per_class > 1:
         pytest.skip("The linsolve is not guaranteed to return the same coefficients with repeated elements")
 
+    if (
+        AttentionElement.KEYS in transform_elements
+        or AttentionElement.QUERIES in transform_elements
+        or AttentionElement.VALUES in transform_elements
+    ):
+        pytest.skip(
+            f"Transforming the features into the {transform_elements} does not maintain any guarantee on the invariance"
+        )
+
     op = op(
         in_features=LATENT_DIM,
         hidden_features=hidden_features,
         out_features=out_features,
         n_anchors=anchors_latents.shape[0],
+        transform_elements=transform_elements,
         normalization_mode=normalization_mode,
         similarity_mode=similarity_mode,
         values_mode=values_mode,
@@ -81,6 +93,14 @@ def perform_computation(
 @pytest.mark.parametrize("op, op_kwargs", ((RelativeLinearBlock, {}), (RelativeTransformerBlock, {"dropout_p": 0})))
 @pytest.mark.parametrize("hidden_features", (10,))
 @pytest.mark.parametrize("out_features", (20,))
+@pytest.mark.parametrize(
+    "transform_elements",
+    (
+        {},
+        # {AttentionElement.KEYS, AttentionElement.QUERIES},
+        # {AttentionElement.KEYS, AttentionElement.QUERIES, AttentionElement.VALUES},
+    ),
+)
 @pytest.mark.parametrize("normalization_mode", (NormalizationMode.OFF, NormalizationMode.L2))
 @pytest.mark.parametrize("similarity_mode", (RelativeEmbeddingMethod.BASIS_CHANGE, RelativeEmbeddingMethod.INNER))
 @pytest.mark.parametrize("values_mode", (ValuesMethod.SIMILARITIES, ValuesMethod.TRAINABLE))
@@ -110,6 +130,7 @@ def test_invariance(
     values_mode: ValuesMethod,
     hidden_features: int,
     out_features: int,
+    transform_elements: Set[AttentionElement],
     normalization_mode: NormalizationMode,
     anchors_latents: torch.Tensor,
     batch_latents: torch.Tensor,
@@ -129,6 +150,7 @@ def test_invariance(
         values_mode=values_mode,
         hidden_features=hidden_features,
         out_features=out_features,
+        transform_elements=transform_elements,
         normalization_mode=normalization_mode,
         anchors_latents=anchors_latents,
         batch_latents=batch_latents,
@@ -150,6 +172,14 @@ def test_invariance(
 @pytest.mark.parametrize("op, op_kwargs", ((RelativeLinearBlock, {}), (RelativeTransformerBlock, {"dropout_p": 0})))
 @pytest.mark.parametrize("hidden_features", (10,))
 @pytest.mark.parametrize("out_features", (20,))
+@pytest.mark.parametrize(
+    "transform_elements",
+    (
+        {},
+        # {AttentionElement.KEYS, AttentionElement.QUERIES},
+        # {AttentionElement.KEYS, AttentionElement.QUERIES, AttentionElement.VALUES},
+    ),
+)
 @pytest.mark.parametrize("normalization_mode", (NormalizationMode.OFF, NormalizationMode.L2))
 @pytest.mark.parametrize("similarity_mode", (RelativeEmbeddingMethod.BASIS_CHANGE, RelativeEmbeddingMethod.INNER))
 @pytest.mark.parametrize("values_mode", (ValuesMethod.ANCHORS,))
@@ -178,6 +208,7 @@ def test_equivariance(
     similarity_mode: RelativeEmbeddingMethod,
     values_mode: ValuesMethod,
     out_features: int,
+    transform_elements: Set[AttentionElement],
     hidden_features: int,
     normalization_mode: NormalizationMode,
     anchors_latents: torch.Tensor,
@@ -198,6 +229,7 @@ def test_equivariance(
         values_mode=values_mode,
         hidden_features=hidden_features,
         out_features=out_features,
+        transform_elements=transform_elements,
         normalization_mode=normalization_mode,
         anchors_latents=anchors_latents,
         batch_latents=batch_latents,

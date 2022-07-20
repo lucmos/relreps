@@ -55,6 +55,12 @@ class Output(StrEnum):
     BATCH = auto()
 
 
+class AttentionElement(StrEnum):
+    ATTENTION_KEYS = auto()
+    ATTENTION_QUERIES = auto()
+    ATTENTION_VALUES = auto()
+
+
 class AttentionOutput(StrEnum):
     OUTPUT = auto()
     SIMILARITIES = auto()
