@@ -34,7 +34,7 @@ data:
     test: 0
 
   batch_size:
-    train: 512
+    train: 128
     val: 128
     test: 16
 
@@ -67,4 +67,4 @@ module:
 defaults:
   - _self_
   - data: default # pick one of the yamls in nn/data/
-  - module: classifier # ae_variational # classifier #  ae_deterministic #
+  - module: continual_classifier # ae_variational # classifier #  ae_deterministic #
