@@ -74,10 +74,10 @@ repos:
     hooks:
     -   id: nbstripout
 
-  - repo: https://github.com/PyCQA/bandit
-    rev: '1.7.1'
-    hooks:
-    - id: bandit
-      args: ['-c', 'pyproject.toml', '--recursive', 'src']
-      additional_dependencies:
-        - toml
+#  - repo: https://github.com/PyCQA/bandit
+#    rev: '1.7.1'
+#    hooks:
+#    - id: bandit
+#      args: ['-c', 'pyproject.toml', '--recursive', 'src']
+#      additional_dependencies:
+#        - toml

@@ -1,0 +1,8 @@
+train:
+  _target_: rae.data.cifar100.CIFAR100Dataset
+
+val:
+  - _target_: rae.data.cifar100.CIFAR100Dataset
+
+#    test:
+#      - _target_: rae.data.cifar100.CIFAR100Dataset

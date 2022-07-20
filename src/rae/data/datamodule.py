@@ -351,6 +351,7 @@ class MyDataModule(pl.LightningDataModule):
                 split="train",
                 transform=transform,
                 path=PROJECT_ROOT / "data",
+                trainer=self.trainer,
             )
 
             self.val_datasets = [
@@ -359,6 +360,7 @@ class MyDataModule(pl.LightningDataModule):
                     split="test",
                     transform=transform,
                     path=PROJECT_ROOT / "data",
+                    trainer=self.trainer,
                 )
             ]
 
