@@ -1,0 +1,578 @@
+import logging
+from abc import abstractmethod
+from enum import auto
+from functools import cached_property, lru_cache, partial
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Sequence, Union
+
+import fasttext
+import hydra
+import numpy as np
+import omegaconf
+import pytorch_lightning as pl
+import spacy
+import spacy.cli as spacy_down
+import torch
+from omegaconf import DictConfig
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+from spacy.tokens import Doc, Span
+from spacy.tokens.token import Token
+from torch import nn
+from torch.types import Device
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.dataloader import default_collate
+from transformers import AutoModel, AutoTokenizer, BatchEncoding, PreTrainedModel, PreTrainedTokenizer
+
+from nn_core.common import PROJECT_ROOT
+from nn_core.nn_types import Split
+
+try:
+    # be ready for 3.10 when it drops
+    from enum import StrEnum
+except ImportError:
+    from backports.strenum import StrEnum
+
+pylogger = logging.getLogger(__name__)
+
+HARDCODED_ANCHORS: List[int] = [0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
+
+
+class AnchorsMode(StrEnum):
+    STRATIFIED = auto()
+    STRATIFIED_SUBSET = auto()
+    FIXED = auto()
+    RANDOM_SAMPLES = auto()
+    RANDOM_LATENTS = auto()
+
+
+class SpacyManager:
+    _lang2model = {
+        # "zh": "zh_core_web_sm",
+        # "zh_cn": "zh_core_web_sm",
+        "ja": "ja_core_news_sm",
+        # "ro": "ro_core_news_sm",
+        # "de": "de_core_news_sm",
+        # "pl": "pl_core_news_sm",
+        "en": "en_core_web_sm",
+        # "ca": "ca_core_news_sm",
+        # "nl": "nl_core_news_sm",
+        "fr": "fr_core_news_sm",
+        "es": "es_core_news_sm",
+        # "it": "it_core_news_sm",
+        # "pt": "pt_core_news_sm",
+        # "ru": "ru_core_news_sm",
+        # "el": "el_core_news_sm",
+    }
+
+    @classmethod
+    def instantiate(cls, language: str):
+        model_name = SpacyManager._lang2model[language]
+
+        try:
+            pipeline = spacy.load(model_name)
+        except Exception as e:  # noqa
+            spacy_down.download(model_name)
+            pipeline = spacy.load(model_name)
+
+        return pipeline
+
+
+class EncodingLevel(StrEnum):
+    TOKEN = auto()
+    SENTENCE = auto()
+    TEXT = auto()
+
+
+class TextEncoder(nn.Module):
+    def __init__(self, encoding_level: EncodingLevel):
+        super().__init__()
+        self.encoding_level = encoding_level
+
+    @abstractmethod
+    def encoding_dim(self) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    def encode(self, text: str) -> torch.Tensor:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save(self, dst_dir: Path):
+        raise NotImplementedError
+
+    @classmethod
+    def load(cls, src_dir: Path):
+        data = torch.load(src_dir / "text_encoder.pt")
+        encoder_class = data["encoder_class"]
+        del data["encoder_class"]
+
+        return encoder_class(**data)
+
+
+class FastTextEncoder(TextEncoder):
+    def encoding_dim(self) -> int:
+        return 300
+
+    def save(self, dst_dir: Path):
+        dst_path: Path = dst_dir / "text_encoder.pt"
+        assert not dst_path.exists()
+        torch.save(
+            dict(
+                encoder_class=FastTextEncoder,
+                language=self.language,
+                lemmatize=self.lemmatize,
+                encoding_level=self.encoding_level,
+            ),
+            dst_path,
+        )
+
+    def __init__(self, language: str, lemmatize: bool, encoding_level: EncodingLevel):
+        super().__init__(encoding_level=encoding_level)
+        self.language: str = language
+        self.lemmatize: bool = lemmatize
+
+        self.model = fasttext.load_model(PROJECT_ROOT / "fasttext" / f"cc.{language}.300.bin")
+        self.pipeline = SpacyManager.instantiate(language)
+
+    @lru_cache(maxsize=50_000)
+    def _encode_token(self, token: str) -> torch.Tensor:
+        return torch.tensor(self.model[token])
+
+    @torch.no_grad()
+    def encode(self, text: str) -> torch.Tensor:
+        document: Doc = self.pipeline(text=text)
+        sentences: List[Span] = list(document.sents)
+        sentences: List[List[Token]] = [list(sentence) for sentence in sentences]
+        encoding: Sequence[Sequence[str]] = [
+            [token.lemma_ if self.lemmatize else token.text for token in sentence] for sentence in sentences
+        ]
+        encoding: Sequence[List[torch.Tensor]] = [
+            [self._encode_token(token=token) for token in sentence] for sentence in encoding
+        ]
+        if self.encoding_level == EncodingLevel.TOKEN:
+            return torch.stack(
+                [token_encoding for sentence_encoding in encoding for token_encoding in sentence_encoding], dim=0
+            )
+
+        encoding: torch.Tensor = torch.stack([torch.stack(sentence).mean(dim=0) for sentence in encoding], dim=0)
+        if self.encoding_level == EncodingLevel.SENTENCE:
+            return encoding
+
+        encoding: torch.Tensor = encoding.mean(dim=0)
+        assert self.encoding_level == EncodingLevel.TEXT
+
+        return encoding
+
+
+class TransformerEncoder(TextEncoder):
+    def encoding_dim(self) -> int:
+        transformer_config = self.transformer.config.to_dict()
+        transformer_encoding_dim = transformer_config["hidden_size" if "hidden_size" in transformer_config else "dim"]
+
+        return transformer_encoding_dim
+
+    def save(self, dst_dir: Path):
+        dst_path: Path = dst_dir / "text_encoder.pt"
+        assert not dst_path.exists()
+        torch.save(
+            dict(
+                encoder_class=TransformerEncoder,
+                transformer_name=self.transformer_name,
+                encoding_level=self.encoding_level,
+            ),
+            dst_path,
+        )
+
+    def __init__(self, transformer_name: str, device: Device, encoding_level: EncodingLevel):
+        super().__init__(encoding_level=encoding_level)
+        self.transformer_name: str = transformer_name
+        self.device: Device = device
+
+        if encoding_level == EncodingLevel.SENTENCE:
+            raise NotImplementedError
+
+        self.tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(transformer_name, use_fast=True)
+        self.transformer: PreTrainedModel = (
+            AutoModel.from_pretrained(transformer_name, output_hidden_states=True, return_dict=True)
+            .eval()
+            .to(self.device)
+        )
+
+    @torch.no_grad()
+    def encode(self, text: str) -> torch.Tensor:
+        encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt").to(self.device)
+        encoding: torch.Tensor = self.transformer(**encoding)["hidden_states"]
+        # encoding ~ (text, bpe, hidden)
+        encoding: torch.Tensor = encoding.squeeze(dim=0)
+        # encoding ~ (bpe, hidden)
+
+        if self.encoding_level == EncodingLevel.TOKEN:
+            return encoding.cpu()
+
+        if self.encoding_level == EncodingLevel.TEXT:
+            # TODO: use special token indices
+            return encoding[0, 1:-1, :].mean(dim=1).cpu()
+
+
+class MetaData:
+    def __init__(
+        self,
+        anchor_idxs: Optional[List[int]],
+        anchor_samples: Optional[torch.Tensor],
+        anchor_targets: Optional[torch.Tensor],
+        anchor_classes: Optional[torch.Tensor],
+        anchor_latents: Optional[torch.Tensor],
+        fixed_sample_idxs: List[int],
+        fixed_samples: torch.Tensor,
+        fixed_sample_targets: torch.Tensor,
+        fixed_sample_classes: torch.Tensor,
+        class_to_idx: Dict[str, int],
+        idx_to_class: Dict[int, str],
+        text_encoder: TextEncoder,
+    ):
+        """The data information the Lightning Module will be provided with.
+
+        This is a "bridge" between the Lightning DataModule and the Lightning Module.
+        There is no constraint on the class name nor in the stored information, as long as it exposes the
+        `save` and `load` methods.
+
+        The Lightning Module will receive an instance of MetaData when instantiated,
+        both in the train loop or when restored from a checkpoint.
+
+        This decoupling allows the architecture to be parametric (e.g. in the number of classes) and
+        DataModule/Trainer independent (useful in prediction scenarios).
+        MetaData should contain all the information needed at test time, derived from its train dataset.
+
+        Examples are the class names in a classification task or the vocabulary in NLP tasks.
+        MetaData exposes `save` and `load`. Those are two user-defined methods that specify
+        how to serialize and de-serialize the information contained in its attributes.
+        This is needed for the checkpointing restore to work properly.
+        """
+        self.class_to_idx: Dict[str, int] = class_to_idx
+        self.idx_to_class: Dict[int, str] = idx_to_class
+        self.anchors_idxs: List[int] = anchor_idxs
+        self.anchor_samples: torch.Tensor = anchor_samples
+        self.anchor_targets: torch.Tensor = anchor_targets
+        self.anchor_classes: torch.Tensor = anchor_classes
+        self.anchor_latents: torch.Tensor = anchor_latents
+
+        self.fixed_sample_idxs: torch.Tensor = fixed_sample_idxs
+        self.fixed_samples: torch.Tensor = fixed_samples
+        self.fixed_sample_targets: torch.Tensor = fixed_sample_targets
+        self.fixed_sample_classes: torch.Tensor = fixed_sample_classes
+
+        self.text_encoder: TextEncoder = text_encoder
+
+    def __repr__(self):
+        return f"MetaData({self.anchors_idxs=}, ...)"
+
+    def save(self, dst_path: Path) -> None:
+        """Serialize the MetaData attributes into the zipped checkpoint in dst_path.
+
+        Args:
+            dst_path: the root folder of the metadata inside the zipped checkpoint
+        """
+        pylogger.debug(f"Saving MetaData to '{dst_path}'")
+
+        for field_name in (
+            "class_to_idx",
+            "idx_to_class",
+            "anchors_idxs",
+            "anchor_samples",
+            "anchor_targets",
+            "anchor_classes",
+            "anchor_latents",
+            "fixed_sample_idxs",
+            "fixed_samples",
+            "fixed_sample_targets",
+            "fixed_sample_classes",
+        ):
+            torch.save(getattr(self, field_name), f=dst_path / f"{field_name}.pt")
+
+        self.text_encoder.save(dst_path)
+
+    @staticmethod
+    def load(src_path: Path) -> "MetaData":
+        """Deserialize the MetaData from the information contained inside the zipped checkpoint in src_path.
+
+        Args:
+            src_path: the root folder of the metadata inside the zipped checkpoint
+
+        Returns:
+            an instance of MetaData containing the information in the checkpoint
+        """
+        pylogger.debug(f"Loading MetaData from '{src_path}'")
+
+        field_name2value = {
+            field_name: torch.load(f=src_path / f"{field_name}.pt")
+            for field_name in (
+                "class_to_idx",
+                "idx_to_class",
+                "anchors_idxs",
+                "anchor_samples",
+                "anchor_targets",
+                "anchor_classes",
+                "anchor_latents",
+                "fixed_sample_idxs",
+                "fixed_samples",
+                "fixed_sample_targets",
+                "fixed_sample_classes",
+            )
+        }
+
+        text_encoder: TextEncoder = TextEncoder.load(src_path)
+        field_name2value["text_encoder"] = text_encoder
+
+        return MetaData(**field_name2value)
+
+
+def collate_fn(samples: List, split: Split, metadata: MetaData):
+    """Custom collate function for dataloaders with access to split and metadata.
+
+    Args:
+        samples: A list of samples coming from the Dataset to be merged into a batch
+        split: The data split (e.g. train/val/test)
+        metadata: The MetaData instance coming from the DataModule or the restored checkpoint
+
+    Returns:
+        A batch generated from the given samples
+    """
+    return default_collate(samples)
+
+
+class MyDataModule(pl.LightningDataModule):
+    def __init__(
+        self,
+        datasets: DictConfig,
+        num_workers: DictConfig,
+        batch_size: DictConfig,
+        gpus: Optional[Union[List[int], str, int]],
+        val_fixed_sample_idxs: List[int],
+        anchors_mode: str,
+        anchors_num: int,
+        anchors_idxs: List[int],
+        latent_dim: int,
+        transforms: Sequence[Dict[str, str]],
+        text_encoder: TextEncoder,
+    ):
+        super().__init__()
+        self.datasets = datasets
+        self.num_workers = num_workers
+        self.batch_size = batch_size
+        # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#gpus
+        self.pin_memory: bool = gpus is not None and str(gpus) != "0"
+
+        self.train_dataset: Optional[Dataset] = None
+        self.val_datasets: Optional[Sequence[Dataset]] = None
+        self.test_datasets: Optional[Sequence[Dataset]] = None
+
+        self.anchors_mode = anchors_mode
+        self.anchors_num = anchors_num
+        self.anchor_idxs: List[int] = anchors_idxs
+        if anchors_mode not in set(AnchorsMode):
+            raise ValueError(f"Invalid anchors selection mode: '{anchors_mode}'")
+        if anchors_mode != AnchorsMode.FIXED and self.anchor_idxs is not None:
+            raise ValueError(f"The anchors indexes '{anchors_idxs}' are ignored if the anchors mode is not 'fixed'!")
+        if anchors_mode == AnchorsMode.FIXED and self.anchors_num is not None:
+            raise ValueError(f"The anchor number '{anchors_num}' is ignored if the anchors mode is 'fixed'!")
+
+        self.latent_dim = latent_dim
+
+        self.val_fixed_sample_idxs: List[int] = val_fixed_sample_idxs
+        self.anchors: Dict[str, Any] = None
+        self.transforms = transforms
+        self.text_encoder = text_encoder
+
+    def get_anchors(self) -> Dict[str, torch.Tensor]:
+        if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
+            shuffled_idxs, shuffled_targets = shuffle(
+                np.asarray(list(range(len(self.train_dataset)))),
+                np.asarray(self.train_dataset.targets),
+                random_state=0,
+            )
+            all_targets = sorted(set(shuffled_targets))
+            class2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
+
+            anchor_indices = []
+            i = 0
+            while len(anchor_indices) < self.anchors_num:
+                for target, target_idxs in class2idxs.items():
+                    anchor_indices.append(target_idxs[i])
+                    if len(anchor_indices) == self.anchors_num:
+                        break
+                i += 1
+
+            anchors = collate_fn(
+                samples=[self.train_dataset[idx] for idx in anchor_indices], split="train", metadata=None
+            )
+
+            return {
+                "anchors_idxs": anchor_indices,
+                "anchor_samples": anchors["samples"],
+                "anchor_targets": anchors["targets"],
+                "anchor_classes": anchors["classes"],
+                "anchor_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.STRATIFIED:
+            if self.anchors_num >= len(self.train_dataset.classes):
+                _, anchor_indices = train_test_split(
+                    list(range(len(self.train_dataset))),
+                    test_size=self.anchors_num,
+                    stratify=self.train_dataset.targets
+                    if self.anchors_num >= len(self.train_dataset.classes)
+                    else None,
+                    random_state=0,
+                )
+            else:
+                anchor_indices = HARDCODED_ANCHORS[: self.anchors_num]
+            anchors = collate_fn(
+                samples=[self.train_dataset[idx] for idx in anchor_indices], split="train", metadata=None
+            )
+            return {
+                "anchor_idxs": anchor_indices,
+                "anchor_samples": anchors["samples"],
+                "anchor_targets": anchors["targets"],
+                "anchor_classes": anchors["classes"],
+                "anchor_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.FIXED:
+            anchors = collate_fn(
+                samples=[self.train_dataset[idx] for idx in self.anchor_idxs], split="train", metadata=None
+            )
+            return {
+                "anchor_idxs": self.anchor_idxs,
+                "anchor_samples": anchors["samples"],
+                "anchor_targets": anchors["targets"],
+                "anchor_classes": anchors["classes"],
+                "anchor_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.RANDOM_SAMPLES:
+            random_samples = torch.rand_like(
+                collate_fn(
+                    samples=[self.train_dataset[idx] for idx in [0] * self.anchors_num], split="train", metadata=None
+                )["samples"]
+            )
+            return {
+                "anchor_idxs": None,
+                "anchor_samples": random_samples,
+                "anchor_targets": None,
+                "anchor_classes": None,
+                "anchor_latents": None,
+            }
+        elif self.anchors_mode == AnchorsMode.RANDOM_LATENTS:
+            random_latents = torch.randn(self.anchors_num, self.latent_dim)
+            return {
+                "anchor_idxs": None,
+                "anchor_samples": None,
+                "anchor_targets": None,
+                "anchor_classes": None,
+                "anchor_latents": random_latents,
+            }
+        else:
+            raise RuntimeError()
+
+    @cached_property
+    def metadata(self) -> MetaData:
+        """Data information to be fed to the Lightning Module as parameter.
+
+        Examples are vocabularies, number of classes...
+
+        Returns:
+            metadata: everything the model should know about the data, wrapped in a MetaData object.
+        """
+        # Since MetaData depends on the training data, we need to ensure the setup method has been called.
+        if self.train_dataset is None:
+            self.setup(stage="fit")
+
+        class_to_idx = self.train_dataset.class_vocab
+        idx_to_class = {x: y for y, x in class_to_idx.items()}
+
+        if self.anchors is None:
+            self.anchors = self.get_anchors()
+
+        fixed_samples = collate_fn(
+            [self.val_datasets[0][idx] for idx in self.val_fixed_sample_idxs], split="val", metadata=None
+        )
+
+        return MetaData(
+            fixed_sample_idxs=self.val_fixed_sample_idxs,
+            fixed_samples=fixed_samples["samples"],
+            fixed_sample_targets=fixed_samples["targets"],
+            fixed_sample_classes=fixed_samples["classes"],
+            class_to_idx=class_to_idx,
+            idx_to_class=idx_to_class,
+            **self.anchors,
+            text_encoder=self.text_encoder,
+        )
+
+    def prepare_data(self) -> None:
+        # download only
+        pass
+
+    def setup(self, stage: Optional[str] = None):
+        # transform = transforms.Compose([transforms.ToTensor()])  # , transforms.Normalize((0.1307,), (0.3081,))])
+        transform = hydra.utils.instantiate(self.transforms)
+
+        # Here you should instantiate your datasets, you may also split the train into train and validation if needed.
+        if (stage is None or stage == "fit") and (self.train_dataset is None and self.val_datasets is None):
+            # example
+            self.train_dataset = hydra.utils.instantiate(
+                self.datasets.train,
+                split="train",
+                transform=transform,
+                path=PROJECT_ROOT / "data",
+            )
+
+            self.val_datasets = [
+                hydra.utils.instantiate(
+                    self.datasets.train,
+                    split="test",
+                    transform=transform,
+                    path=PROJECT_ROOT / "data",
+                )
+            ]
+
+        if stage == "test":
+            raise NotImplementedError()
+
+    def train_dataloader(self) -> DataLoader:
+        return DataLoader(
+            self.train_dataset,
+            shuffle=True,
+            batch_size=self.batch_size.train,
+            num_workers=self.num_workers.train,
+            pin_memory=True,
+            collate_fn=partial(collate_fn, split="train", metadata=self.metadata),
+        )
+
+    def val_dataloader(self) -> Sequence[DataLoader]:
+        return [
+            DataLoader(
+                dataset,
+                shuffle=False,
+                batch_size=self.batch_size.val,
+                num_workers=self.num_workers.val,
+                pin_memory=True,
+                collate_fn=partial(collate_fn, split="val", metadata=self.metadata),
+            )
+            for dataset in self.val_datasets
+        ]
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(" f"{self.datasets=}, " f"{self.num_workers=}, " f"{self.batch_size=})"
+
+
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+def main(cfg: omegaconf.DictConfig) -> None:
+    """Debug main to quickly develop the DataModule.
+
+    Args:
+        cfg: the hydra configuration
+    """
+    m: pl.LightningDataModule = hydra.utils.instantiate(cfg.nn.data, _recursive_=False)
+    m.metadata
+
+
+if __name__ == "__main__":
+    main()
