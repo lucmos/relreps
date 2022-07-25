@@ -47,7 +47,7 @@ class RCNN(nn.Module):
         Args:
             metadata: the metadata object
             input_channels: number of color channels in the image
-            hidden_channels: size of the hidden channels to use in the convolutions
+            hidden_features: size of the hidden channels to use in the convolutions
             n_classes: expected size of the output
             normalization_mode: how the inputs and anchors should be normalized
             similarity_mode: how to compute the anchors similarities

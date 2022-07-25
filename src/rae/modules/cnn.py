@@ -15,7 +15,7 @@ class CNN(nn.Module):
     def __init__(
         self,
         metadata,
-        hidden_channels: int,
+        hidden_features: int,
         dropout_p: float,
         **kwargs,
     ) -> None:
@@ -24,12 +24,12 @@ class CNN(nn.Module):
         Args:
             metadata: the metadata object
             input_channels: number of color channels in the image
-            hidden_channels: size of the hidden dimensions to use
+            hidden_features: size of the hidden dimensions to use
             dropout_p: the dropout probability
         """
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
-        self.hidden_channels = hidden_channels
+        self.hidden_features = hidden_features
 
         self.conv = nn.Sequential(
             nn.Conv2d(in_channels=metadata.n_channels, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
@@ -53,10 +53,10 @@ class CNN(nn.Module):
         )
         fake_out = infer_dimension(metadata.width, metadata.height, metadata.n_channels, model=self.conv)
         out_dimension = fake_out[0].nelement()
-        self.conv_fc = nn.Linear(out_dimension, hidden_channels)
+        self.conv_fc = nn.Linear(out_dimension, hidden_features)
 
-        self.block = LearningBlock(num_features=hidden_channels, dropout_p=dropout_p)
-        self.block_fc = nn.Linear(hidden_channels, len(metadata.class_to_idx))
+        self.block = LearningBlock(num_features=hidden_features, dropout_p=dropout_p)
+        self.block_fc = nn.Linear(hidden_features, len(metadata.class_to_idx))
 
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass.
