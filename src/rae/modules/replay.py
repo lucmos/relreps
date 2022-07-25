@@ -39,8 +39,8 @@ class ReplayBuffer(nn.Module):
 
         self.anchors = [
             {
-                "index": default_convert(metadata.anchors_idxs[i]),
-                "image": module.anchors_images[i],
+                "index": default_convert(metadata.anchors_idxs[i]).to(module.device),
+                "image": module.anchors_images[i].to(module.device),
                 "target": default_convert(metadata.anchors_targets[i]).to(module.device),
                 "class": default_convert(metadata.anchors_classes[i]),
             }
