@@ -14,4 +14,4 @@ replay:
 
 defaults:
   - _self_
-  - model: cnn
+  - model: rcnn

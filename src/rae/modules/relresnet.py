@@ -90,7 +90,12 @@ class RelResNet(nn.Module):
         if not self.finetune:
             self.resnet.eval()
 
-    def forward(self, x: torch.Tensor, new_anchors_images: Optional[torch.Tensor] = None) -> Dict[str, torch.Tensor]:
+    def forward(
+        self,
+        x: torch.Tensor,
+        new_anchors_images: Optional[torch.Tensor] = None,
+        new_anchors_targets: Optional[torch.Tensor] = None,
+    ) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
             anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else new_anchors_images)
             if self.transform_resnet_features:
@@ -103,7 +108,7 @@ class RelResNet(nn.Module):
         attention_output = self.relative_attention_block(
             x=batch_latents,
             anchors=anchors_latents,
-            anchors_targets=self.anchors_targets,
+            anchors_targets=self.anchors_targets if new_anchors_targets is None else new_anchors_targets,
         )
 
         output = self.final_layer(attention_output[AttentionOutput.OUTPUT])

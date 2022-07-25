@@ -1,7 +1,17 @@
 _target_: rae.modules.relative_classifier.RCNN
-hidden_channels: 64
 
+# Relative params
 hidden_features: 64
+dropout_p: 0.5
+transform_elements:
+  - "attention_keys"
+  - "attention_queries"
 normalization_mode: l2
-similarity_mode: basis_change
-values_mode: trainable
+similarity_mode: inner
+values_mode: similarities
+similarities_quantization_mode: null
+similarities_bin_size: null
+similarities_aggregation_mode: null
+similarities_aggregation_n_groups: null
+anchors_sampling_mode: null
+n_anchors_sampling_per_class: null
