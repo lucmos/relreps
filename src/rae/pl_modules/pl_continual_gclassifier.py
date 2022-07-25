@@ -39,6 +39,12 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.register_buffer("anchors_latents", self.metadata.anchors_latents)
         self.register_buffer("fixed_images", self.metadata.fixed_images)
 
+        self.replay_buffer = hydra.utils.instantiate(
+            kwargs["replay"],
+            metadata=metadata,
+            module=self,
+        )
+
         self.df_columns = [
             "image_index",
             "class",
@@ -149,6 +155,7 @@ class LightningContinualClassifier(AbstractLightningModule):
         on_fit_end_viz(lightning_module=self, validation_stats_df=None)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
+        batch = self.replay_buffer(batch)
         return self.step(batch, batch_idx, stage=Stage.TRAIN)
 
     def training_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:

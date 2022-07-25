@@ -6,6 +6,12 @@ loss:
 model:
   input_size: 32
 
+replay:
+  _target_: rae.modules.replay.ReplayBuffer
+  max_size: 100
+  substitute_p: 0.5
+  anchors_p: 0.5
+
 defaults:
   - _self_
   - model: cnn
