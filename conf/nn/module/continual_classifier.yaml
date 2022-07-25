@@ -8,7 +8,7 @@ model:
 
 replay:
   _target_: rae.modules.replay.ReplayBuffer
-  max_size: 100
+  max_size: 0
   substitute_p: 0.5
   anchors_p: 0.5
 

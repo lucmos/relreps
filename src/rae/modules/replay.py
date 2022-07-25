@@ -23,7 +23,6 @@ class ReplayBuffer:
         All the anchors are always in the replay buffer by default
         """
         super().__init__()
-        assert max_size > 0, "Empty buffer or trying to create a black hole. Be careful."
         self.metadata = metadata
         self.module = module
 
@@ -60,7 +59,7 @@ class ReplayBuffer:
                         element[key] = self.anchors[i][key]
                         if isinstance(element[key], torch.Tensor):
                             element[key] = element[key].to(self.module.device)
-                else:
+                elif len(self.buffer):
                     i = random.randint(0, len(self.buffer) - 1)
                     for key in self.batch_keys:
                         self.buffer[i][key], element[key] = element[key], self.buffer[i][key]
