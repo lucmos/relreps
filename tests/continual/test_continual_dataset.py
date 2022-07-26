@@ -1,6 +1,7 @@
 import random
 from collections import Counter, defaultdict
 
+import numpy as np
 import pytest
 from pytorch_lightning import Trainer
 
@@ -40,25 +41,58 @@ from rae.data.continual.cifar10 import ContinualCIFAR10Dataset
             [1, 1, 2, 1],
             [[0], [2], [1], [0]],
         ),
+        (
+            [10, 10, 10, 10, 10, 10, 10, 10, 10],
+            [
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [4, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [8, 9],
+            ],
+        ),
+        (
+            [10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+            [
+                [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                [0, 1],
+                [1, 2],
+                [2, 3],
+                [3, 4],
+                [4, 5],
+                [5, 6],
+                [6, 7],
+                [7, 8],
+                [8, 9],
+            ],
+        ),
     ),
 )
 def test_continual_dataset(dataset_class, dataset_kwargs, tasks_epochs, tasks_progression):
-    trainer: Trainer = lambda x: x
-    trainer.current_epoch = 0
+    datamodule = lambda x: x
+    datamodule.trainer: Trainer = lambda x: x
+    datamodule.trainer.current_epoch = 0
 
     dataset = dataset_class(
         split="train",
         tasks_epochs=tasks_epochs,
         tasks_progression=tasks_progression,
-        trainer=trainer,
+        datamodule=datamodule,
         **dataset_kwargs,
     )
 
     for _ in range(5):
         task2retrieved_targets = defaultdict(list)
         task2epochs_done = Counter()
-        for epoch in range(15):
-            trainer.current_epoch = epoch
+        tasks_sequence = []
+        for epoch in range(np.asarray(tasks_epochs).sum()):
+            datamodule.trainer.current_epoch = epoch
+            task = dataset.current_task
+            tasks_sequence.append(task)
             for k in range(20):
                 sample = dataset[random.randint(0, len(dataset) - 1)]
                 task2retrieved_targets[dataset.current_task].append(sample["target"])
@@ -66,7 +100,8 @@ def test_continual_dataset(dataset_class, dataset_kwargs, tasks_epochs, tasks_pr
             task2epochs_done[dataset.current_task] += 1
 
         # Test correct number of epochs per task
-        for task_idx in range(len(tasks_progression) - 1):
+        assert np.arange(len(tasks_epochs)).repeat(tasks_epochs).tolist() == tasks_sequence
+        for task_idx in range(len(tasks_progression)):
             assert task2epochs_done[task_idx] == tasks_epochs[task_idx]
 
         # Test correct targets per tasks
