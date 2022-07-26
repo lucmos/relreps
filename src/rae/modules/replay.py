@@ -49,11 +49,13 @@ class ReplayBuffer:
 
         for i in range(batch["image"].shape[0]):
             element = {key: batch[key][i] for key in self.batch_keys}
+            element["replay"] = False
 
             if len(self.buffer) < self.max_size:
                 self.buffer.append(element)
 
             if random.uniform(a=0, b=1) > self.substitute_p:
+                element["replay"] = True
                 if random.uniform(a=0, b=1) > self.anchors_p:
                     i = random.randint(0, len(self.anchors) - 1)
                     for key in self.batch_keys:

@@ -166,7 +166,16 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.micro_accuracies[Stage.TRAIN].reset()
         self.macro_accuracies[Stage.TRAIN].reset()
 
-        self.targets_seen_in_epoch = torch.cat([output[Output.BATCH]["target"] for output in outputs]).unique()
+        self.targets_seen_in_epoch = torch.cat(
+            [
+                (
+                    output[Output.BATCH]["target"][output[Output.BATCH]["replay"].logical_not()]
+                    if "replay" in output[Output.BATCH]
+                    else output[Output.BATCH]["target"]
+                )
+                for output in outputs
+            ]
+        ).unique()
         self.memory_loss.update(
             outputs[-1][Output.ANCHORS_OUT][Output.DEFAULT_LATENT],
             self.anchors_targets,
