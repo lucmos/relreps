@@ -21,6 +21,7 @@ class StaticMemoryLoss:
         running_average_n: int,
         start_epoch: int,
         limit_target_representation: bool,
+        loss_weight: float,
     ):
         super().__init__()
         self.metadata = metadata
@@ -28,7 +29,7 @@ class StaticMemoryLoss:
         self.running_average_n = running_average_n
         self.start_epoch = start_epoch
         self.limit_target_representation = limit_target_representation
-
+        self.loss_weight = loss_weight
         self.targets = None
         self.index2latent = None
 
@@ -77,7 +78,7 @@ class StaticMemoryLoss:
                 selected_memorized_latents[:, target_masks],
             )
 
-        return F.mse_loss(selected_image_latents, selected_memorized_latents)
+        return F.mse_loss(selected_image_latents, selected_memorized_latents) * self.loss_weight
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.2")

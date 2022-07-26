@@ -17,6 +17,7 @@ memory:
   running_average_n: 3
   start_epoch: 5
   limit_target_representation: True
+  loss_weight: 100
 
 defaults:
   - _self_
