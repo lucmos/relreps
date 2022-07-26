@@ -35,6 +35,7 @@ class LightningContinualClassifier(AbstractLightningModule):
 
         self.register_buffer("anchors_images", self.metadata.anchors_images)
         self.register_buffer("anchors_latents", self.metadata.anchors_latents)
+        self.register_buffer("anchors_targets", self.metadata.anchors_targets)
         self.register_buffer("fixed_images", self.metadata.fixed_images)
 
         self.replay_buffer = hydra.utils.instantiate(
@@ -108,7 +109,7 @@ class LightningContinualClassifier(AbstractLightningModule):
         classification_loss = self.loss(out[Output.LOGITS], batch["target"])
         mem_loss = self.memory_loss.compute(
             out_anchors[Output.DEFAULT_LATENT],
-            self.metadata.anchors_targets,
+            self.anchors_targets,
             targets_to_consider=self.learned_targets,
         )
 
@@ -120,10 +121,10 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.log_dict(
             {
                 "task": float(self.trainer.datamodule.train_dataset.current_task) if self.trainer is not None else None,
-                f"loss/{stage}": loss.cpu().detach(),
-                f"loss/{stage}/mem_loss": mem_loss.cpu().detach(),
-                f"loss/{stage}/classification_loss": classification_loss.cpu().detach(),
-                f"acc/{stage}": self.micro_accuracies[stage].compute().cpu(),
+                f"loss/{stage}": detach_tensors(loss),
+                f"loss/{stage}/mem_loss": detach_tensors(mem_loss),
+                f"loss/{stage}/classification_loss": detach_tensors(classification_loss),
+                f"acc/{stage}": detach_tensors(self.micro_accuracies[stage].compute()),
             },
             on_step=stage == Stage.TRAIN,
             on_epoch=True,
@@ -165,16 +166,16 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.micro_accuracies[Stage.TRAIN].reset()
         self.macro_accuracies[Stage.TRAIN].reset()
 
-        self.targets_seen_in_epoch = torch.cat([output[Output.BATCH]["target"] for output in outputs]).unique().detach()
+        self.targets_seen_in_epoch = torch.cat([output[Output.BATCH]["target"] for output in outputs]).unique()
         self.memory_loss.update(
             outputs[-1][Output.ANCHORS_OUT][Output.DEFAULT_LATENT],
-            self.metadata.anchors_targets,
+            self.anchors_targets,
             targets_to_consider=self.targets_seen_in_epoch,
         )
         if self.learned_targets is None:
             self.learned_targets = self.targets_seen_in_epoch
         else:
-            self.learned_targets = torch.cat([self.learned_targets, self.targets_seen_in_epoch]).unique().detach()
+            self.learned_targets = torch.cat([self.learned_targets, self.targets_seen_in_epoch]).unique()
 
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         return self.step(batch, batch_idx, stage=Stage.VAL)
