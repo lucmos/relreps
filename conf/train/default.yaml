@@ -13,6 +13,7 @@ trainer:
   num_sanity_val_steps: 2
   gradient_clip_val: 10.0
   check_val_every_n_epoch: 1
+  reload_dataloaders_every_n_epochs: ${ifthenelse:1, ${oc.select:nn.data.datasets.tasks_progression, False}, 0}
   deterministic: ${train.deterministic}
 
 restore:
