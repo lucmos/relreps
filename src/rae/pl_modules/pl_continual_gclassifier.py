@@ -3,7 +3,6 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 
 import hydra
 import omegaconf
-import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torchmetrics
@@ -16,7 +15,6 @@ from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
 from rae.utils.tensor_ops import detach_tensors
-from rae.utils.utils import add_2D_latents, aggregate
 
 pylogger = logging.getLogger(__name__)
 
@@ -45,20 +43,13 @@ class LightningContinualClassifier(AbstractLightningModule):
             module=self,
         )
 
-        self.df_columns = [
-            "image_index",
-            "class",
-            "target",
-            "latent_0",
-            "latent_1",
-            "latent_0_normalized",
-            "latent_1_normalized",
-            "epoch",
-            "is_anchor",
-            "anchor",
-        ]
-
-        self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
+        self.memory_loss = hydra.utils.instantiate(
+            kwargs["memory"],
+            metadata=metadata,
+            module=self,
+        )
+        self.targets_seen_in_epoch = None
+        self.learned_targets = None
 
         micro_metric = torchmetrics.Accuracy(num_classes=len(metadata.class_to_idx))
         # FIXME: workaround to avoid lightnign error of missing attribute
@@ -112,7 +103,16 @@ class LightningContinualClassifier(AbstractLightningModule):
         image_batch = batch["image"]
         out = self(image_batch)
 
-        loss = self.loss(out[Output.LOGITS], batch["target"])
+        out_anchors = self(self.anchors_images)
+
+        classification_loss = self.loss(out[Output.LOGITS], batch["target"])
+        mem_loss = self.memory_loss.compute(
+            out_anchors[Output.DEFAULT_LATENT],
+            self.metadata.anchors_targets,
+            targets_to_consider=self.learned_targets,
+        )
+
+        loss = classification_loss + mem_loss
 
         probs = torch.softmax(out[Output.LOGITS], dim=-1)
         self.micro_accuracies[stage].update(probs, batch["target"])
@@ -121,6 +121,8 @@ class LightningContinualClassifier(AbstractLightningModule):
             {
                 "task": float(self.trainer.datamodule.train_dataset.current_task) if self.trainer is not None else None,
                 f"loss/{stage}": loss.cpu().detach(),
+                f"loss/{stage}/mem_loss": mem_loss.cpu().detach(),
+                f"loss/{stage}/classification_loss": classification_loss.cpu().detach(),
                 f"acc/{stage}": self.micro_accuracies[stage].compute().cpu(),
             },
             on_step=stage == Stage.TRAIN,
@@ -143,6 +145,7 @@ class LightningContinualClassifier(AbstractLightningModule):
             Output.LOSS: loss,
             Output.BATCH: {key: detach_tensors(value) for key, value in batch.items()},
             **{key: detach_tensors(value) for key, value in out.items()},
+            Output.ANCHORS_OUT: {key: detach_tensors(value) for key, value in out_anchors.items()},
         }
 
     def on_epoch_start(self) -> None:
@@ -162,6 +165,17 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.micro_accuracies[Stage.TRAIN].reset()
         self.macro_accuracies[Stage.TRAIN].reset()
 
+        self.targets_seen_in_epoch = torch.cat([output[Output.BATCH]["target"] for output in outputs]).unique().detach()
+        self.memory_loss.update(
+            outputs[-1][Output.ANCHORS_OUT][Output.DEFAULT_LATENT],
+            self.metadata.anchors_targets,
+            targets_to_consider=self.targets_seen_in_epoch,
+        )
+        if self.learned_targets is None:
+            self.learned_targets = self.targets_seen_in_epoch
+        else:
+            self.learned_targets = torch.cat([self.learned_targets, self.targets_seen_in_epoch]).unique().detach()
+
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
         return self.step(batch, batch_idx, stage=Stage.VAL)
 
@@ -172,21 +186,7 @@ class LightningContinualClassifier(AbstractLightningModule):
         self.micro_accuracies[Stage.VAL].reset()
         self.macro_accuracies[Stage.VAL].reset()
 
-        validation_aggregation = {}
-        for output in outputs:
-            aggregate(
-                validation_aggregation,
-                image_index=output["batch"]["index"].cpu().tolist(),
-                class_name=output["batch"]["class"],
-                target=output["batch"]["target"].cpu(),
-                latents=output[Output.DEFAULT_LATENT].cpu(),
-                epoch=[self.current_epoch] * len(output["batch"]["index"]),
-                is_anchor=[False] * len(output["batch"]["index"]),
-                anchor_index=[None] * len(output["batch"]["index"]),
-            )
-
         if self.anchors_images is not None:
-            anchors_num = self.anchors_images.shape[0]
             anchors_out = self(self.anchors_images)
             if Output.ANCHORS_LATENT in anchors_out:
                 anchors_latents = anchors_out[Output.ANCHORS_LATENT]
@@ -195,29 +195,10 @@ class LightningContinualClassifier(AbstractLightningModule):
         else:
             raise NotImplementedError()
 
-        non_elements = ["none"] * anchors_num
-        aggregate(
-            validation_aggregation,
-            image_index=self.metadata.anchors_idxs
-            if self.metadata.anchors_idxs is not None
-            else list(range(anchors_num)),
-            class_name=self.metadata.anchors_classes if self.metadata.anchors_classes is not None else non_elements,
-            target=self.metadata.anchors_targets.cpu() if self.metadata.anchors_targets is not None else non_elements,
-            latents=anchors_latents.cpu(),
-            epoch=[self.current_epoch] * anchors_num,
-            is_anchor=[True] * anchors_num,
-            anchor_index=list(range(anchors_num)),
-        )
-
-        latents = validation_aggregation["latents"]
-        self.fit_pca(latents)
-        add_2D_latents(validation_aggregation, latents=latents, pca=self.validation_pca)
-        del validation_aggregation["latents"]
-
         validation_epoch_end_viz(
             lightning_module=self,
             outputs=outputs,
-            validation_stats_df=pd.DataFrame(validation_aggregation),
+            validation_stats_df=None,
             anchors_reconstructed=None,
             anchors_latents=anchors_latents,
             fixed_images_out=self(self.fixed_images),

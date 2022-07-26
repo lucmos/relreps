@@ -12,6 +12,11 @@ replay:
   substitute_p: 0.5
   anchors_p: 0.5
 
+memory:
+  _target_: rae.modules.memory.StaticMemoryLoss
+  running_average_n: 3
+  start_epoch: 5
+
 defaults:
   - _self_
   - model: rcnn

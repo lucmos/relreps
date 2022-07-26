@@ -53,6 +53,7 @@ class Output(StrEnum):
     INV_LATENTS = auto()
     LOSS = auto()
     BATCH = auto()
+    ANCHORS_OUT = auto()
 
 
 class AttentionElement(StrEnum):

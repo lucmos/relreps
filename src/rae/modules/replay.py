@@ -32,6 +32,7 @@ class ReplayBuffer:
 
         self.batch_keys = batch_keys
 
+        # TODO: duplicated anchors storing, present both in model and module
         self.anchors = [
             {
                 "index": default_convert(metadata.anchors_idxs[i]),

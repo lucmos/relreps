@@ -265,6 +265,7 @@ class RelativeAttention(nn.Module):
         else:
             assert False
 
+        # TODO: This should also return the Anchors Targets tensor, because it could change depending on the parameters
         return {
             AttentionOutput.OUTPUT: output,
             AttentionOutput.SIMILARITIES: quantized_similarities,
