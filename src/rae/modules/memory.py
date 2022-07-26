@@ -51,7 +51,12 @@ class StaticMemoryLoss:
     def compute(
         self, image_latents: torch.Tensor, image_targets: torch.Tensor, targets_to_consider: torch.Tensor
     ) -> torch.Tensor:
-        if not targets_to_consider or self.targets is None or self.index2latent is None:
+        if (
+            targets_to_consider is None
+            or targets_to_consider.size() == 0
+            or self.targets is None
+            or self.index2latent is None
+        ):
             return torch.tensor(0)
         memorized_latents = torch.stack(
             [torch.stack(tuple(self.index2latent[i])).mean(0) for i in range(len(self.index2latent))]
