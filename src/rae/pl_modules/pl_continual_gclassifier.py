@@ -112,9 +112,9 @@ class LightningContinualClassifier(AbstractLightningModule):
             self.anchors_targets,
             targets_to_consider=self.learned_targets,
         )
-        anchors_classification_loss = self.loss(out_anchors[Output.LOGITS], self.anchors_targets)
+        # anchors_classification_loss = self.loss(out_anchors[Output.LOGITS], self.anchors_targets)
 
-        loss = classification_loss + mem_loss + anchors_classification_loss
+        loss = classification_loss + mem_loss  # + anchors_classification_loss
 
         probs = torch.softmax(out[Output.LOGITS], dim=-1)
         self.micro_accuracies[stage].update(probs, batch["target"])
@@ -125,7 +125,7 @@ class LightningContinualClassifier(AbstractLightningModule):
                 f"loss/{stage}": detach_tensors(loss),
                 f"loss/{stage}/mem_loss": detach_tensors(mem_loss),
                 f"loss/{stage}/classification_loss": detach_tensors(classification_loss),
-                f"loss/{stage}/anchors_classification_loss": detach_tensors(classification_loss),
+                # f"loss/{stage}/anchors_classification_loss": detach_tensors(classification_loss),
                 f"acc/{stage}": detach_tensors(self.micro_accuracies[stage].compute()),
             },
             on_step=stage == Stage.TRAIN,
