@@ -14,6 +14,7 @@ from nn_core.model_logging import NNLogger
 
 from rae.data.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
+from rae.modules.relative_classifier import RCNN
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
 from rae.utils.tensor_ops import detach_tensors
@@ -115,7 +116,9 @@ class LightningContinualClassifier(AbstractLightningModule):
         supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
         supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
 
-        supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
+        if isinstance(self.model, RCNN):
+            supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
+
         supported_viz.add(SupportedViz.LATENT_SPACE)
         supported_viz.add(SupportedViz.LATENT_SPACE_NORMALIZED)
         supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
