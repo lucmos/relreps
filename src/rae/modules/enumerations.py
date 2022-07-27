@@ -85,6 +85,6 @@ class SupportedViz(StrEnum):
 
 
 class Stage(StrEnum):
-    TRAIN = auto()
-    VAL = auto()
-    TEST = auto()
+    TRAIN_STAGE = auto()
+    VAL_STAGE = auto()
+    TEST_STAGE = auto()

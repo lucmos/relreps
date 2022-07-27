@@ -60,8 +60,8 @@ class LightningClassifier(AbstractLightningModule):
         self.validation_accuracy = metric.clone()
 
         self.accuracies = {
-            Stage.TRAIN: self.train_accuracy,
-            Stage.VAL: self.validation_accuracy,
+            Stage.TRAIN_STAGE: self.train_accuracy,
+            Stage.VAL_STAGE: self.validation_accuracy,
         }
 
         self.supported_viz = self.supported_viz()
@@ -102,7 +102,7 @@ class LightningClassifier(AbstractLightningModule):
 
         self.log_dict(
             {f"loss/{stage}": loss.cpu().detach()},
-            on_step=stage == Stage.TRAIN,
+            on_step=stage == Stage.TRAIN_STAGE,
             on_epoch=True,
             prog_bar=True,
             batch_size=batch["image"].shape[0],
@@ -132,10 +132,10 @@ class LightningClassifier(AbstractLightningModule):
         on_fit_end_viz(lightning_module=self, validation_stats_df=None)
 
     def training_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        return self.step(batch, batch_idx, stage=Stage.TRAIN)
+        return self.step(batch, batch_idx, stage=Stage.TRAIN_STAGE)
 
     def validation_step(self, batch: Any, batch_idx: int) -> Mapping[str, Any]:
-        return self.step(batch, batch_idx, stage=Stage.VAL)
+        return self.step(batch, batch_idx, stage=Stage.VAL_STAGE)
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
         if self.trainer.sanity_checking:
