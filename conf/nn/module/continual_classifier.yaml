@@ -15,9 +15,9 @@ replay:
 memory:
   _target_: rae.modules.memory.StaticMemoryLoss
   running_average_n: 3
-  start_epoch: 5
+  start_epoch: 9
   limit_target_representation: True
-  loss_weight: 100
+  loss_weight: 1e6
 
 defaults:
   - _self_

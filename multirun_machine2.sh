@@ -14,7 +14,8 @@ python src/rae/run.py \
   nn.module.model.dropout_p=0.5 \
   nn.module.replay.max_size=0 \
   nn.module.memory.limit_target_representation=True \
-  nn.module.memory.start_epoch=5
+  nn.module.memory.start_epoch=9 \
+  nn.module.memory.loss_weight=1e6
 
 python src/rae/run.py \
   core.tags='[complete-bootstrap, memory, continual, relative]' \
@@ -26,7 +27,8 @@ python src/rae/run.py \
   nn.module.model.dropout_p=0.5 \
   nn.module.replay.max_size=0 \
   nn.module.memory.limit_target_representation=False \
-  nn.module.memory.start_epoch=5
+  nn.module.memory.start_epoch=9 \
+  nn.module.memory.loss_weight=1e6
 
 #python src/rae/run.py \
 #  core.tags='[complete-bootstrap, continual, relative]' \
@@ -74,7 +76,8 @@ python src/rae/run.py \
   nn.module.model.dropout_p=0.5 \
   nn.module.replay.max_size=0 \
   nn.module.memory.limit_target_representation=False \
-  nn.module.memory.start_epoch=5
+  nn.module.memory.start_epoch=9 \
+  nn.module.memory.loss_weight=1e6
 
 #python src/rae/run.py \
 #  core.tags='[complete-bootstrap, continual, absolute]' \
