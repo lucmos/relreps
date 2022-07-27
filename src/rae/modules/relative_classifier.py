@@ -85,6 +85,7 @@ class RCNN(nn.Module):
         out_dimension = fake_out[0].nelement()
 
         self.fc1 = nn.Linear(out_dimension, hidden_features)
+        self.bn1 = nn.BatchNorm1d(num_features=hidden_features)
 
         self.relative_transformer = RelativeTransformerBlock(
             in_features=hidden_features,
@@ -111,6 +112,7 @@ class RCNN(nn.Module):
         x = self.sequential(x)
         x = x.view(x.shape[0], -1)
         x = self.fc1(x)
+        x = self.bn1(x)
         return x
 
     def set_finetune_mode(self):
