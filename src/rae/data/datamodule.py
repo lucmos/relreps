@@ -405,7 +405,7 @@ class MyDataModule(pl.LightningDataModule):
         return f"{self.__class__.__name__}(" f"{self.datasets=}, " f"{self.num_workers=}, " f"{self.batch_size=})"
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.2")
 def main(cfg: omegaconf.DictConfig) -> None:
     """Debug main to quickly develop the DataModule.
 

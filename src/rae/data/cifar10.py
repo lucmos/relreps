@@ -53,7 +53,7 @@ class CIFAR10Dataset(Dataset):
         return f"{self.__class__.__qualname__}({self.split=}, n_instances={len(self)})"
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.2")
 def main(cfg: omegaconf.DictConfig) -> None:
     """Debug main to quickly develop the Dataset.
 

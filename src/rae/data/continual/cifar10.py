@@ -1,4 +1,5 @@
 import logging
+import random
 from bisect import bisect
 from typing import Iterable
 
@@ -109,7 +110,7 @@ class ContinualCIFAR10Dataset(Dataset):
         return f"{self.__class__.__qualname__}({self.split=}, {self.tasks_epochs=}, {self.tasks_progression=}, n_instances={len(self)})"
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.2")
 def main(cfg: omegaconf.DictConfig) -> None:
     """Debug main to quickly develop the Dataset.
 
@@ -122,7 +123,8 @@ def main(cfg: omegaconf.DictConfig) -> None:
         pass
 
     datamodule = fake_datamodule
-    datamodule.current_epoch = 0
+    datamodule.trainer = lambda x: x
+    datamodule.trainer.current_epoch = 0
 
     dataset: Dataset = hydra.utils.instantiate(
         cfg.nn.data.datasets.train,
@@ -133,6 +135,16 @@ def main(cfg: omegaconf.DictConfig) -> None:
         _recursive_=False,
     )
     _ = dataset[0]
+
+    for epoch in range(110):
+        datamodule.trainer.current_epoch = epoch
+
+        print(f"TASK: {dataset.current_task}")
+        for step in range(3):
+            i = random.randint(0, len(dataset))
+            x = dataset[i]
+
+            print(x["target"])
 
 
 if __name__ == "__main__":
