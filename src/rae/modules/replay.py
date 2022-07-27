@@ -55,14 +55,15 @@ class ReplayBuffer:
                 self.buffer.append(element)
 
             if random.uniform(a=0, b=1) > self.substitute_p:
-                element["replay"] = True
                 if random.uniform(a=0, b=1) > self.anchors_p:
+                    element["replay"] = True
                     i = random.randint(0, len(self.anchors) - 1)
                     for key in self.batch_keys:
                         element[key] = self.anchors[i][key]
                         if isinstance(element[key], torch.Tensor):
                             element[key] = element[key].to(self.module.device)
                 elif len(self.buffer):
+                    element["replay"] = True
                     i = random.randint(0, len(self.buffer) - 1)
                     for key in self.batch_keys:
                         self.buffer[i][key], element[key] = element[key], self.buffer[i][key]
