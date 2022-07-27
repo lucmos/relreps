@@ -63,6 +63,8 @@ class AttentionElement(StrEnum):
 
 
 class AttentionOutput(StrEnum):
+    BATCH_LATENT = auto()
+    ANCHORS_LATENT = auto()
     OUTPUT = auto()
     SIMILARITIES = auto()
     UNTRASFORMED_ATTENDED = auto()

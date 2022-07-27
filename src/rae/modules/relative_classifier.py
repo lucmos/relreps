@@ -138,7 +138,7 @@ class RCNN(nn.Module):
         return {
             Output.LOGITS: output,
             Output.DEFAULT_LATENT: attention_output[AttentionOutput.SIMILARITIES],
-            Output.BATCH_LATENT: batch_latents,
-            Output.ANCHORS_LATENT: anchors_latents,
+            Output.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT],
+            Output.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT],
             Output.INV_LATENTS: attention_output[AttentionOutput.SIMILARITIES],
         }

@@ -204,8 +204,8 @@ class RelativeAttention(nn.Module):
             raise ValueError(f"Sampling mode not supported: {self.anchors_sampling_mode}")
 
         # Transform into keys and queries
-        x = self.pre_attention_transforms.get_queries(x)
-        anchors = self.pre_attention_transforms.get_keys(anchors)
+        x = x_latents = self.pre_attention_transforms.get_queries(x)
+        anchors = anchors_latents = self.pre_attention_transforms.get_keys(anchors)
 
         # Normalize latents
         if self.normalization_mode == NormalizationMode.OFF:
@@ -269,6 +269,8 @@ class RelativeAttention(nn.Module):
         return {
             AttentionOutput.OUTPUT: output,
             AttentionOutput.SIMILARITIES: quantized_similarities,
+            AttentionOutput.ANCHORS_LATENT: anchors_latents,
+            AttentionOutput.BATCH_LATENT: x_latents,
         }
 
 
@@ -361,8 +363,10 @@ class RelativeLinearBlock(nn.Module):
         output = self.linear(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
-            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
             AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.OUTPUT],
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT],
+            AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT],
         }
 
 
@@ -439,6 +443,8 @@ class RelativeTransformerBlock(nn.Module):
         output = self.block(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
-            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
             AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT],
+            AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT],
         }
