@@ -273,6 +273,22 @@ class RelativeAttention(nn.Module):
             AttentionOutput.BATCH_LATENT: x_latents,
         }
 
+    @property
+    def output_dim(self):
+        if self.values_mode == ValuesMethod.ANCHORS:
+            return self.in_features
+        elif self.values_mode == ValuesMethod.TRAINABLE:
+            return self.hidden_features
+        elif self.values_mode == ValuesMethod.SIMILARITIES:
+            if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
+                return self.n_classes * self.similarities_aggregation_n_groups
+            elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
+                return self.n_classes * self.n_anchors_sampling_per_class
+            else:
+                return self.n_anchors
+        else:
+            raise ValueError(f"Values mode not supported: {self.values_mode}")
+
 
 class RelativeLinearBlock(nn.Module):
     def __init__(
@@ -335,23 +351,7 @@ class RelativeLinearBlock(nn.Module):
             n_anchors_sampling_per_class=n_anchors_sampling_per_class,
         )
 
-        if values_mode == ValuesMethod.ANCHORS:
-            self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=False)
-        elif values_mode == ValuesMethod.TRAINABLE:
-            self.linear = nn.Linear(in_features=hidden_features, out_features=out_features, bias=False)
-        elif values_mode == ValuesMethod.SIMILARITIES:
-            if similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
-                self.linear = nn.Linear(
-                    in_features=n_classes * similarities_aggregation_n_groups, out_features=out_features, bias=False
-                )
-            elif anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
-                self.linear = nn.Linear(
-                    in_features=n_classes * n_anchors_sampling_per_class, out_features=out_features, bias=False
-                )
-            else:
-                self.linear = nn.Linear(in_features=n_anchors, out_features=out_features, bias=False)
-        else:
-            raise ValueError(f"Values mode not supported: {self.values_mode}")
+        self.linear = nn.Linear(in_features=self.attention.output_dim, out_features=out_features, bias=False)
 
     def forward(
         self,
