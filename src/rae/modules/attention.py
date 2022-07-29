@@ -25,7 +25,7 @@ pylogger = logging.getLogger(__name__)
 class PreTransforms(nn.Module):
     def __init__(
         self,
-        transform_elements: Iterable[AttentionElement],
+        transform_elements: Optional[Iterable[AttentionElement]],
         in_features: int,
         hidden_features: int,
         values_mode: ValuesMethod,
@@ -43,7 +43,7 @@ class PreTransforms(nn.Module):
         """
         super().__init__()
 
-        self.transform_elements = set(transform_elements)
+        self.transform_elements = set(transform_elements) if transform_elements is not None else set()
         pylogger.info(f"Transforming: {self.transform_elements}")
 
         self.module_dict = nn.ModuleDict(
