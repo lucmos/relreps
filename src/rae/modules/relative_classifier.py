@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from rae.modules.attention import RelativeTransformerBlock
+from rae.modules.attention import RelativeAttention
 from rae.modules.blocks import ResidualBlock
 from rae.modules.enumerations import (
     AnchorsSamplingMode,
@@ -29,11 +29,11 @@ class RCNN(nn.Module):
         metadata,
         input_channels: int,
         hidden_features: int,
-        dropout_p: float,
         transform_elements: Set[AttentionElement],
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        values_self_attention_nhead: int,
         similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
         similarities_bin_size: Optional[float] = None,
         similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
@@ -87,17 +87,17 @@ class RCNN(nn.Module):
         self.fc1 = nn.Linear(out_dimension, hidden_features)
         self.bn1 = nn.BatchNorm1d(num_features=hidden_features)
 
-        self.relative_transformer = RelativeTransformerBlock(
+        self.relative_transformer = RelativeAttention(
             in_features=hidden_features,
             hidden_features=hidden_features,
-            dropout_p=dropout_p,
-            out_features=hidden_features,
+            # out_features=hidden_features,
             n_anchors=metadata.anchors_images.shape[0],
             n_classes=len(self.metadata.class_to_idx),
             transform_elements=transform_elements,
             normalization_mode=normalization_mode,
             similarity_mode=similarity_mode,
             values_mode=values_mode,
+            values_self_attention_nhead=values_self_attention_nhead,
             similarities_quantization_mode=similarities_quantization_mode,
             similarities_bin_size=similarities_bin_size,
             similarities_aggregation_mode=similarities_aggregation_mode,
@@ -106,7 +106,7 @@ class RCNN(nn.Module):
             n_anchors_sampling_per_class=n_anchors_sampling_per_class,
         )
 
-        self.fc2 = nn.Linear(hidden_features, len(self.metadata.class_to_idx))
+        self.fc2 = nn.Linear(self.relative_transformer.output_dim, len(self.metadata.class_to_idx))
 
     def embed(self, x):
         x = self.sequential(x)

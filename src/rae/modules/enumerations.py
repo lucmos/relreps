@@ -36,6 +36,7 @@ class RelativeEmbeddingMethod(StrEnum):
 
 
 class ValuesMethod(StrEnum):
+    SELF_ATTENTION = auto()
     SIMILARITIES = auto()
     TRAINABLE = auto()
     ANCHORS = auto()

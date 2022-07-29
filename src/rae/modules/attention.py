@@ -87,6 +87,7 @@ class RelativeAttention(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        values_self_attention_nhead: int,
         similarities_quantization_mode: SimilaritiesQuantizationMode,
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
@@ -108,6 +109,7 @@ class RelativeAttention(nn.Module):
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
+            values_self_attention_nhead: number of head if the values mode is self attention
             similarities_quantization_mode: the quantization modality to quantize the similarities
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
@@ -151,7 +153,18 @@ class RelativeAttention(nn.Module):
                 )
             else:
                 self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
+        elif values_mode == ValuesMethod.SELF_ATTENTION:
+            self.sim_to_queries = nn.Linear(1, self.hidden_features, bias=False)
+            self.sim_to_keys = nn.Linear(1, self.hidden_features, bias=False)
+            self.sim_to_values = nn.Linear(1, self.hidden_features, bias=False)
 
+            self.self_attention = nn.MultiheadAttention(
+                embed_dim=self.hidden_features,
+                num_heads=values_self_attention_nhead,
+                batch_first=True,
+            )
+
+            self.self_attention_aggregation = nn.Linear(in_features=self.hidden_features, out_features=1, bias=False)
         elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
@@ -262,6 +275,17 @@ class RelativeAttention(nn.Module):
             )
         elif self.values_mode == ValuesMethod.SIMILARITIES:
             output = quantized_similarities
+        elif self.values_mode == ValuesMethod.SELF_ATTENTION:
+            relative_output = quantized_similarities.unsqueeze(-1)
+
+            queries = self.sim_to_queries(relative_output)
+            keys = self.sim_to_keys(relative_output)
+            values = self.sim_to_values(relative_output)
+
+            output, _ = self.self_attention(query=queries, key=keys, value=values)
+            output = self.self_attention_aggregation(output)
+
+            output = output.squeeze(-1)
         else:
             assert False
 
@@ -274,12 +298,12 @@ class RelativeAttention(nn.Module):
         }
 
     @property
-    def output_dim(self):
+    def output_dim(self) -> int:
         if self.values_mode == ValuesMethod.ANCHORS:
             return self.in_features
         elif self.values_mode == ValuesMethod.TRAINABLE:
             return self.hidden_features
-        elif self.values_mode == ValuesMethod.SIMILARITIES:
+        elif self.values_mode == ValuesMethod.SIMILARITIES or self.values_mode == ValuesMethod.SELF_ATTENTION:
             if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
                 return self.n_classes * self.similarities_aggregation_n_groups
             elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
