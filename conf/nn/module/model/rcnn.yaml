@@ -3,6 +3,7 @@ _target_: rae.modules.relative_classifier.RCNN
 # Relative params
 hidden_features: 64
 transform_elements: null
+dropout_p: 0.5
 normalization_mode: l2
 similarity_mode: inner
 num_subspaces: 4

@@ -25,11 +25,11 @@ monitor:
   mode: 'max'
 
 callbacks:
-#  - _target_: pytorch_lightning.callbacks.EarlyStopping
-#    patience: 200
-#    verbose: False
-#    monitor: ${train.monitor.metric}
-#    mode: ${train.monitor.mode}
+  - _target_: pytorch_lightning.callbacks.EarlyStopping
+    patience: 200
+    verbose: False
+    monitor: ${train.monitor.metric}
+    mode: ${train.monitor.mode}
 
   - _target_: pytorch_lightning.callbacks.ModelCheckpoint
     save_top_k: 1
