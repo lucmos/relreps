@@ -5,7 +5,8 @@ hidden_features: 64
 transform_elements: null
 normalization_mode: l2
 similarity_mode: inner
-values_mode: self_attention
+num_subspaces: 4
+values_mode: similarities
 values_self_attention_nhead: 8
 similarities_quantization_mode: null
 similarities_bin_size: null

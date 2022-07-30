@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional, Set
+from typing import Dict, Iterable, Optional, Set
 
 import torch
 import torch.nn.functional as F
@@ -31,6 +31,7 @@ class RCNN(nn.Module):
         hidden_features: int,
         transform_elements: Set[AttentionElement],
         normalization_mode: NormalizationMode,
+        num_subspaces: int,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
         values_self_attention_nhead: int,
@@ -60,6 +61,7 @@ class RCNN(nn.Module):
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
         self.register_buffer("anchors_targets", metadata.anchors_targets)
+        self.num_subspaces = num_subspaces
 
         self.sequential = nn.Sequential(
             nn.Conv2d(in_channels=input_channels, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
@@ -87,26 +89,33 @@ class RCNN(nn.Module):
         self.fc1 = nn.Linear(out_dimension, hidden_features)
         self.bn1 = nn.BatchNorm1d(num_features=hidden_features)
 
-        self.relative_transformer = RelativeAttention(
-            in_features=hidden_features,
-            hidden_features=hidden_features,
-            # out_features=hidden_features,
-            n_anchors=metadata.anchors_images.shape[0],
-            n_classes=len(self.metadata.class_to_idx),
-            transform_elements=transform_elements,
-            normalization_mode=normalization_mode,
-            similarity_mode=similarity_mode,
-            values_mode=values_mode,
-            values_self_attention_nhead=values_self_attention_nhead,
-            similarities_quantization_mode=similarities_quantization_mode,
-            similarities_bin_size=similarities_bin_size,
-            similarities_aggregation_mode=similarities_aggregation_mode,
-            similarities_aggregation_n_groups=similarities_aggregation_n_groups,
-            anchors_sampling_mode=anchors_sampling_mode,
-            n_anchors_sampling_per_class=n_anchors_sampling_per_class,
+        self.subspace_features = hidden_features // num_subspaces
+        assert (hidden_features / num_subspaces) == (hidden_features // num_subspaces)
+        self.relative_attentions: Iterable[RelativeAttention] = nn.ModuleList(
+            (
+                RelativeAttention(
+                    in_features=self.subspace_features,
+                    hidden_features=self.subspace_features,
+                    # out_features=hidden_features,
+                    n_anchors=metadata.anchors_images.shape[0],
+                    n_classes=len(self.metadata.class_to_idx),
+                    transform_elements=transform_elements,
+                    normalization_mode=normalization_mode,
+                    similarity_mode=similarity_mode,
+                    values_mode=values_mode,
+                    values_self_attention_nhead=values_self_attention_nhead,
+                    similarities_quantization_mode=similarities_quantization_mode,
+                    similarities_bin_size=similarities_bin_size,
+                    similarities_aggregation_mode=similarities_aggregation_mode,
+                    similarities_aggregation_n_groups=similarities_aggregation_n_groups,
+                    anchors_sampling_mode=anchors_sampling_mode,
+                    n_anchors_sampling_per_class=n_anchors_sampling_per_class,
+                )
+                for _ in range(num_subspaces)
+            )
         )
 
-        self.fc2 = nn.Linear(self.relative_transformer.output_dim, len(self.metadata.class_to_idx))
+        self.fc2 = nn.Linear(sum(x.output_dim for x in self.relative_attentions), len(self.metadata.class_to_idx))
 
     def embed(self, x):
         x = self.sequential(x)
@@ -126,14 +135,24 @@ class RCNN(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
             anchors_latents = self.embed(self.anchors_images if new_anchors_images is None else new_anchors_images)
-
+            anchors_targets = self.anchors_targets if new_anchors_targets is None else new_anchors_targets
         batch_latents = self.embed(x)
 
-        attention_output = self.relative_transformer(
-            x=batch_latents,
-            anchors=anchors_latents,
-            anchors_targets=self.anchors_targets if new_anchors_targets is None else new_anchors_targets,
-        )
+        subspace_outputs = []
+        for i, relative_attention in enumerate(self.relative_attentions):
+            x_i_subspace = batch_latents[:, i * self.subspace_features : (i + 1) * self.subspace_features]
+            anchors_i_subspace = anchors_latents[:, i * self.subspace_features : (i + 1) * self.subspace_features]
+            subspace_output = relative_attention(
+                x=x_i_subspace,
+                anchors=anchors_i_subspace,
+                anchors_targets=anchors_targets,
+            )
+            subspace_outputs.append(subspace_output)
+
+        attention_output = {key: [subspace[key] for subspace in subspace_outputs] for key in subspace_outputs[0].keys()}
+        for to_merge in (AttentionOutput.OUTPUT, AttentionOutput.SIMILARITIES):
+            attention_output[to_merge] = torch.cat(attention_output[to_merge], dim=-1)
+
         output = F.silu(attention_output[AttentionOutput.OUTPUT])
         output = self.fc2(output)
 
