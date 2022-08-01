@@ -19,4 +19,5 @@ python src/rae/run.py -m \
   nn.module.model.similarities_aggregation_mode=null \
   nn.module.model.similarities_aggregation_n_groups=null \
   nn.module.model.anchors_sampling_mode=null \
-  nn.module.model.n_anchors_sampling_per_class=null
+  nn.module.model.n_anchors_sampling_per_class=null \
+  nn.module.model.dropout_p=0.1
