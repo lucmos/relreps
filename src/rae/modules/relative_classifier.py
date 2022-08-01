@@ -1,8 +1,10 @@
 import logging
+from enum import auto
 from typing import Dict, Iterable, Optional, Set
 
 import torch
 import torch.nn.functional as F
+from backports.strenum import StrEnum
 from torch import nn
 
 from rae.modules.attention import RelativeAttention
@@ -21,6 +23,14 @@ from rae.modules.enumerations import (
 from rae.utils.tensor_ops import infer_dimension
 
 pylogger = logging.getLogger(__name__)
+
+
+class ReprPooling(StrEnum):
+    NONE = auto()
+    SUM = auto()
+    MEAN = auto()
+    LINEAR = auto()
+    MAX = auto()
 
 
 class RCNN(nn.Module):
@@ -42,6 +52,7 @@ class RCNN(nn.Module):
         similarities_aggregation_n_groups: int = 1,
         anchors_sampling_mode: Optional[AnchorsSamplingMode] = None,
         n_anchors_sampling_per_class: Optional[int] = None,
+        repr_pooling: ReprPooling = None,
         **kwargs,
     ) -> None:
         """Simple model that uses convolutions.
@@ -119,7 +130,25 @@ class RCNN(nn.Module):
             )
         )
 
-        self.fc2 = nn.Linear(sum(x.output_dim for x in self.relative_attentions), len(self.metadata.class_to_idx))
+        self.repr_pooling: ReprPooling = repr_pooling if repr_pooling is not None else ReprPooling.NONE
+
+        if self.repr_pooling not in set(ReprPooling):
+            raise ValueError(f"Representation Pooling method not supported: {repr_pooling}")
+
+        repr_dim: int = list(self.relative_attentions)[0].output_dim
+
+        if self.repr_pooling != ReprPooling.NONE:
+            self.classification_layer = nn.Linear(repr_dim, len(self.metadata.class_to_idx))
+        else:
+            self.classification_layer = nn.Linear(
+                sum(x.output_dim for x in self.relative_attentions), len(self.metadata.class_to_idx)
+            )
+
+        if self.repr_pooling == ReprPooling.LINEAR:
+            self.head_pooling = nn.Linear(
+                in_features=sum(x.output_dim for x in self.relative_attentions),
+                out_features=repr_dim,
+            )
 
     def embed(self, x):
         x = self.sequential(x)
@@ -155,10 +184,24 @@ class RCNN(nn.Module):
 
         attention_output = {key: [subspace[key] for subspace in subspace_outputs] for key in subspace_outputs[0].keys()}
         for to_merge in (AttentionOutput.OUTPUT, AttentionOutput.SIMILARITIES):
-            attention_output[to_merge] = torch.cat(attention_output[to_merge], dim=-1)
+            attention_output[to_merge] = torch.stack(attention_output[to_merge], dim=1)
+
+        if self.repr_pooling == ReprPooling.LINEAR:
+            attention_output[AttentionOutput.OUTPUT] = torch.flatten(attention_output[AttentionOutput.OUTPUT], 1, 2)
+            attention_output[AttentionOutput.OUTPUT] = self.head_pooling(attention_output[AttentionOutput.OUTPUT])
+        elif self.repr_pooling == ReprPooling.MAX:
+            attention_output[AttentionOutput.OUTPUT] = attention_output[AttentionOutput.OUTPUT].max(dim=1)[0]
+        elif self.repr_pooling == ReprPooling.SUM:
+            attention_output[AttentionOutput.OUTPUT] = attention_output[AttentionOutput.OUTPUT].sum(dim=1)
+        elif self.repr_pooling == ReprPooling.MEAN:
+            attention_output[AttentionOutput.OUTPUT] = attention_output[AttentionOutput.OUTPUT].mean(dim=1)
+        elif self.repr_pooling == ReprPooling.NONE:
+            attention_output[AttentionOutput.OUTPUT] = torch.flatten(attention_output[AttentionOutput.OUTPUT], 1, 2)
+        else:
+            raise NotImplementedError
 
         output = F.silu(attention_output[AttentionOutput.OUTPUT])
-        output = self.fc2(output)
+        output = self.classification_layer(output)
 
         return {
             Output.LOGITS: output,
