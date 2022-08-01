@@ -132,6 +132,11 @@ def stratified_mean(
     return torch.mm(sparse_avg_matrix, samples.T).T
 
 
+def contiguous_mean():
+    # TODO:
+    pass
+
+
 def detach_tensors(x: Any) -> Any:
     if isinstance(x, torch.Tensor):
         return x.detach()  # .cpu()
