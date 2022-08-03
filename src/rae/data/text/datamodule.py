@@ -3,7 +3,7 @@ from abc import abstractmethod
 from enum import auto
 from functools import cached_property, lru_cache, partial
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union, Mapping, MutableMapping
+from typing import Any, Dict, List, Optional, Sequence, Union, Mapping, MutableMapping, Set
 
 import fasttext
 import hydra
@@ -13,17 +13,21 @@ import pytorch_lightning as pl
 import spacy
 import spacy.cli as spacy_down
 import torch
+from hydra.utils import instantiate
 from nn_core.common import PROJECT_ROOT
 from nn_core.nn_types import Split
 from omegaconf import DictConfig
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+from spacy import Language
 from spacy.tokens import Doc, Span
 from spacy.tokens.token import Token
 from torch import nn
 from torch.types import Device
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoModel, AutoTokenizer, BatchEncoding, PreTrainedModel, PreTrainedTokenizer
+
+from rae.utils.tensor_ops import contiguous_mean
 
 try:
     # be ready for 3.10 when it drops
@@ -64,14 +68,14 @@ class SpacyManager:
     }
 
     @classmethod
-    def instantiate(cls, language: str):
+    def instantiate(cls, language: str) -> Language:
         model_name = SpacyManager._lang2model[language]
 
         try:
-            pipeline = spacy.load(model_name)
+            pipeline: Language = spacy.load(model_name)
         except Exception as e:  # noqa
             spacy_down.download(model_name)
-            pipeline = spacy.load(model_name)
+            pipeline: Language = spacy.load(model_name)
 
         return pipeline
 
@@ -92,9 +96,9 @@ class EncodingLevel(StrEnum):
 
 
 class TextEncoder(nn.Module):
-    def __init__(self, encoding_level: EncodingLevel):
-        super().__init__()
-        self.encoding_level = encoding_level
+    @abstractmethod
+    def add_stopwords(self, stopwords: Set[str]):
+        raise NotImplementedError
 
     @abstractmethod
     def encoding_dim(self) -> int:
@@ -116,8 +120,29 @@ class TextEncoder(nn.Module):
 
         return encoder_class(**data)
 
+    def reduce(
+        self,
+        encodings,
+        reduced_to_sentence: bool,
+        reduce_transformations: Set[EncodingLevel],
+        words_per_sentence: torch.Tensor = None,
+        sentences_per_text: torch.Tensor = None,
+        words_per_text: torch.Tensor = None,
+    ):
+        if EncodingLevel.SENTENCE in reduce_transformations:
+            encodings = contiguous_mean(x=encodings, sections=words_per_sentence)
+            reduced_to_sentence = True
+        if EncodingLevel.TEXT in reduce_transformations:
+            sections = sentences_per_text if reduced_to_sentence else words_per_text
+            encodings = contiguous_mean(x=encodings, sections=sections)
+
+        return encodings, reduced_to_sentence
+
 
 class FastTextEncoder(TextEncoder):
+    def add_stopwords(self, stopwords: Set[str]):
+        self.stopwords = set.union(self.stopwords, stopwords)
+
     def encoding_dim(self) -> int:
         return 300
 
@@ -129,18 +154,18 @@ class FastTextEncoder(TextEncoder):
                 encoder_class=FastTextEncoder,
                 language=self.language,
                 lemmatize=self.lemmatize,
-                encoding_level=self.encoding_level,
             ),
             dst_path,
         )
 
-    def __init__(self, language: str, lemmatize: bool, encoding_level: EncodingLevel):
-        super().__init__(encoding_level=encoding_level)
+    def __init__(self, language: str, lemmatize: bool):
+        super().__init__()
         self.language: str = language
         self.lemmatize: bool = lemmatize
 
-        self.model = fasttext.load_model(PROJECT_ROOT / "fasttext" / f"cc.{language}.300.bin")
+        self.model = fasttext.load_model(str(PROJECT_ROOT / "data" / "fasttext" / f"cc.{language}.300.bin"))
         self.pipeline = SpacyManager.instantiate(language)
+        self.stopwords = self.pipeline.Defaults.stop_words
 
     @lru_cache(maxsize=50_000)
     def _encode_token(self, token: str) -> torch.Tensor:
@@ -151,9 +176,17 @@ class FastTextEncoder(TextEncoder):
         document: Doc = self.pipeline(text=text)
         sentences: List[Span] = list(document.sents)
         sentences: List[List[Token]] = [list(sentence) for sentence in sentences]
+        # Go to string representation and lemmatize (if needed)
         encoding: Sequence[Sequence[str]] = [
             [token.lemma_ if self.lemmatize else token.text for token in sentence] for sentence in sentences
         ]
+        # Skip stopwords
+        encoding: Sequence[Sequence[str]] = [
+            [token for token in sentence if token.lower() not in self.stopwords] for sentence in encoding
+        ]
+        encoding = [sentence for sentence in encoding if len(sentence) > 0]
+        assert len(encoding) > 0
+
         encoding: Sequence[List[torch.Tensor]] = [
             [self._encode_token(token=token) for token in sentence] for sentence in encoding
         ]
@@ -165,6 +198,9 @@ class FastTextEncoder(TextEncoder):
 
 
 class TransformerEncoder(TextEncoder):
+    def add_stopwords(self, stopwords: Set[str]):
+        pass
+
     def encoding_dim(self) -> int:
         transformer_config = self.transformer.config.to_dict()
         transformer_encoding_dim = transformer_config["hidden_size" if "hidden_size" in transformer_config else "dim"]
@@ -183,13 +219,10 @@ class TransformerEncoder(TextEncoder):
             dst_path,
         )
 
-    def __init__(self, transformer_name: str, device: Device, encoding_level: EncodingLevel):
-        super().__init__(encoding_level=encoding_level)
+    def __init__(self, transformer_name: str, device: Device):
+        super().__init__()
         self.transformer_name: str = transformer_name
         self.device: Device = device
-
-        if encoding_level == EncodingLevel.SENTENCE:
-            raise NotImplementedError
 
         self.tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(transformer_name, use_fast=True)
         self.transformer: PreTrainedModel = (
@@ -200,13 +233,14 @@ class TransformerEncoder(TextEncoder):
 
     @torch.no_grad()
     def encode(self, text: str) -> Sequence[torch.Tensor]:
-        encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt").to(self.device)
-        encoding: torch.Tensor = self.transformer(**encoding)["hidden_states"]
+        encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt", truncation=True).to(self.device)
+        encoding: torch.Tensor = self.transformer(**encoding)["hidden_states"][-1]
         # encoding ~ (text, bpe, hidden)
-        encoding: torch.Tensor = encoding.squeeze(dim=0)
+        # TODO: remove special tokens here?
+        encoding: torch.Tensor = encoding.squeeze(dim=0)[1:-1, :]
         # encoding ~ (bpe, hidden)
 
-        # TODO: remove special tokens here?
+        # TODO: support sentence level
 
         return [encoding]
 
@@ -248,7 +282,7 @@ class MetaData:
         """
         self.class_to_idx: Dict[str, int] = class_to_idx
         self.idx_to_class: Dict[int, str] = idx_to_class
-        self.anchors_idxs: List[int] = anchor_idxs
+        self.anchor_idxs: List[int] = anchor_idxs
         self.anchor_samples: torch.Tensor = anchor_samples
         self.anchor_targets: torch.Tensor = anchor_targets
         self.anchor_classes: torch.Tensor = anchor_classes
@@ -263,7 +297,7 @@ class MetaData:
         self.text_encoder: TextEncoder = text_encoder
 
     def __repr__(self):
-        return f"MetaData({self.anchors_idxs=}, ...)"
+        return f"MetaData({self.anchor_idxs=}, ...)"
 
     def save(self, dst_path: Path) -> None:
         """Serialize the MetaData attributes into the zipped checkpoint in dst_path.
@@ -276,7 +310,7 @@ class MetaData:
         for field_name in (
             "class_to_idx",
             "idx_to_class",
-            "anchors_idxs",
+            "anchor_idxs",
             "anchor_samples",
             "anchor_targets",
             "anchor_classes",
@@ -308,7 +342,7 @@ class MetaData:
             for field_name in (
                 "class_to_idx",
                 "idx_to_class",
-                "anchors_idxs",
+                "anchor_idxs",
                 "anchor_samples",
                 "anchor_targets",
                 "anchor_classes",
@@ -354,6 +388,8 @@ def collate_fn(samples: Sequence[Dict[str, Any]], split: Split, text_encoder: Te
         A batch generated from the given samples
     """
     batch = {key: [sample[key] for sample in samples] for key in samples[0].keys()}
+    batch["index"] = torch.tensor(batch["index"])
+
     encodings: Sequence[Sequence[torch.Tensor]] = [text_encoder.encode(text=text) for text in batch["data"]]
     # encodings ~ (sample_index, sentence_index, word_index)
 
@@ -389,7 +425,6 @@ class MyDataModule(pl.LightningDataModule):
         anchors_num: int,
         anchors_idxs: List[int],
         latent_dim: int,
-        transforms: Sequence[Dict[str, str]],
         text_encoder: TextEncoder,
     ):
         super().__init__()
@@ -399,6 +434,7 @@ class MyDataModule(pl.LightningDataModule):
         # https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html#gpus
         self.pin_memory: bool = gpus is not None and str(gpus) != "0"
 
+        self.anchors_dataset: Optional[Dataset] = None
         self.train_dataset: Optional[Dataset] = None
         self.val_datasets: Optional[Sequence[Dataset]] = None
         self.test_datasets: Optional[Sequence[Dataset]] = None
@@ -417,14 +453,15 @@ class MyDataModule(pl.LightningDataModule):
 
         self.val_fixed_sample_idxs: List[int] = val_fixed_sample_idxs
         self.anchors: Dict[str, Any] = None
-        self.transforms = transforms
-        self.text_encoder = text_encoder
+        self.text_encoder = instantiate(text_encoder)
 
     def get_anchors(self, text_encoder: TextEncoder) -> Dict[str, torch.Tensor]:
+        dataset_to_consider = self.anchors_dataset
+
         if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
             shuffled_idxs, shuffled_targets = shuffle(
-                np.asarray(list(range(len(self.train_dataset)))),
-                np.asarray(self.train_dataset.targets),
+                np.asarray(list(range(len(dataset_to_consider)))),
+                np.asarray(dataset_to_consider.targets),
                 random_state=0,
             )
             all_targets = sorted(set(shuffled_targets))
@@ -440,11 +477,11 @@ class MyDataModule(pl.LightningDataModule):
                 i += 1
 
             anchors = collate_fn(
-                samples=[self.train_dataset[idx] for idx in anchor_indices], split="train", text_encoder=text_encoder
+                samples=[dataset_to_consider[idx] for idx in anchor_indices], split="train", text_encoder=text_encoder
             )
 
             return {
-                "anchors_idxs": anchor_indices,
+                "anchor_idxs": anchor_indices,
                 "anchor_samples": anchors["encodings"],
                 "anchor_targets": anchors["targets"],
                 "anchor_classes": anchors["classes"],
@@ -452,19 +489,19 @@ class MyDataModule(pl.LightningDataModule):
                 "anchor_latents": None,
             }
         elif self.anchors_mode == AnchorsMode.STRATIFIED:
-            if self.anchors_num >= len(self.train_dataset.classes):
+            if self.anchors_num >= len(dataset_to_consider.classes):
                 _, anchor_indices = train_test_split(
-                    list(range(len(self.train_dataset))),
+                    list(range(len(dataset_to_consider))),
                     test_size=self.anchors_num,
-                    stratify=self.train_dataset.targets
-                    if self.anchors_num >= len(self.train_dataset.classes)
+                    stratify=dataset_to_consider.targets
+                    if self.anchors_num >= len(dataset_to_consider.classes)
                     else None,
                     random_state=0,
                 )
             else:
                 anchor_indices = HARDCODED_ANCHORS[: self.anchors_num]
             anchors = collate_fn(
-                samples=[self.train_dataset[idx] for idx in anchor_indices], split="train", text_encoder=text_encoder
+                samples=[dataset_to_consider[idx] for idx in anchor_indices], split="train", text_encoder=text_encoder
             )
             return {
                 "anchor_idxs": anchor_indices,
@@ -476,7 +513,7 @@ class MyDataModule(pl.LightningDataModule):
             }
         elif self.anchors_mode == AnchorsMode.FIXED:
             anchors = collate_fn(
-                samples=[self.train_dataset[idx] for idx in self.anchor_idxs], split="train", text_encoder=text_encoder
+                samples=[dataset_to_consider[idx] for idx in self.anchor_idxs], split="train", text_encoder=text_encoder
             )
             return {
                 "anchor_idxs": self.anchor_idxs,
@@ -489,7 +526,7 @@ class MyDataModule(pl.LightningDataModule):
         elif self.anchors_mode == AnchorsMode.RANDOM_SAMPLES:
             random_samples = torch.rand_like(
                 collate_fn(
-                    samples=[self.train_dataset[idx] for idx in [0] * self.anchors_num],
+                    samples=[dataset_to_consider[idx] for idx in [0] * self.anchors_num],
                     split="train",
                     text_encoder=text_encoder,
                 )["samples"]
@@ -542,7 +579,7 @@ class MyDataModule(pl.LightningDataModule):
 
         return MetaData(
             fixed_sample_idxs=self.val_fixed_sample_idxs,
-            fixed_samples=fixed_samples["samples"],
+            fixed_samples=fixed_samples["encodings"],
             fixed_sample_targets=fixed_samples["targets"],
             fixed_sample_classes=fixed_samples["classes"],
             class_to_idx=class_to_idx,
@@ -557,27 +594,26 @@ class MyDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
         # transform = transforms.Compose([transforms.ToTensor()])  # , transforms.Normalize((0.1307,), (0.3081,))])
-        transform = hydra.utils.instantiate(self.transforms)
-
         # Here you should instantiate your datasets, you may also split the train into train and validation if needed.
         if (stage is None or stage == "fit") and (self.train_dataset is None and self.val_datasets is None):
-            # example
-            self.train_dataset = hydra.utils.instantiate(
-                self.datasets.train,
+            self.anchors_dataset = hydra.utils.instantiate(
+                self.datasets.anchors,
                 split="train",
-                transform=transform,
                 path=PROJECT_ROOT / "data",
+                datamodule=self,
+            )
+
+            self.train_dataset = hydra.utils.instantiate(
+                self.datasets.train, split="train", path=PROJECT_ROOT / "data", datamodule=self
             )
 
             self.val_datasets = [
-                hydra.utils.instantiate(
-                    self.datasets.train,
-                    split="test",
-                    transform=transform,
-                    path=PROJECT_ROOT / "data",
-                )
+                hydra.utils.instantiate(self.datasets.train, split="test", path=PROJECT_ROOT / "data", datamodule=self)
             ]
 
+            self.text_encoder.add_stopwords(
+                set.union(*(x.get_stopwords() for x in (self.train_dataset, *self.val_datasets)))
+            )
         if stage == "test":
             raise NotImplementedError()
 

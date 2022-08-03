@@ -1,10 +1,12 @@
 import dataclasses
 import logging
+import shutil
 from collections import Counter
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Mapping, Sequence, Set
 
 import hydra
+import numpy as np
 import omegaconf
 import torch
 from datasets import Dataset as HFDataset
@@ -21,31 +23,44 @@ pylogger = logging.getLogger(__name__)
 @dataclasses.dataclass
 class Resources:
     split2lang2class_dist: Mapping[Split, Mapping[str, Mapping[str, int]]]
+    split2lang2classes: Mapping[Split, Mapping[str, Sequence[str]]]
 
 
 class AmazonReviews(Dataset):
     @classmethod
     def build_resources(cls, use_cached: bool = True) -> Resources:
+        # TODO: calculate stopwords (maybe with IDF)
         target_dir: Path = PROJECT_ROOT / "data" / "amazon_reviews"
-        target_dir.mkdir(exist_ok=True, parents=True)
 
         split2lang2class_dist_path: Path = target_dir / "split2lang2class_dist"
-        if target_dir.exists() and use_cached:
-            return Resources(split2lang2class_dist=torch.load(split2lang2class_dist_path))
+        split2lang2classes_path: Path = target_dir / "split2lang2classes"
 
+        if target_dir.exists() and use_cached and len(list(target_dir.iterdir())) == 2:
+            return Resources(
+                split2lang2class_dist=torch.load(split2lang2class_dist_path),
+                split2lang2classes=torch.load(split2lang2classes_path),
+            )
+
+        shutil.rmtree(target_dir, ignore_errors=True)
+
+        target_dir.mkdir(exist_ok=True, parents=True)
         full_dataset = load_dataset("amazon_reviews_multi")
 
         split2lang2class_dist = {}
+        split2lang2classes = {}
         for split, dataset in full_dataset.items():
             dataset: HFDataset
             lang2classes = {}
             for sample in tqdm(dataset, desc=f"Iterating {split} data"):
                 lang2classes.setdefault(sample["language"], []).append(sample["product_category"])
+
             split2lang2class_dist[split] = {lang: Counter(classes) for lang, classes in lang2classes.items()}
+            split2lang2classes[split] = lang2classes
 
         torch.save(split2lang2class_dist, split2lang2class_dist_path)
+        torch.save(split2lang2classes, split2lang2classes_path)
 
-        return Resources(split2lang2class_dist=split2lang2class_dist)
+        return Resources(split2lang2class_dist=split2lang2class_dist, split2lang2classes=split2lang2classes)
 
     def __init__(self, split: Split, language: str, **kwargs):
         super().__init__()
@@ -56,8 +71,14 @@ class AmazonReviews(Dataset):
 
         self.data = load_dataset("amazon_reviews_multi", language, split=split)
         self.class_to_idx: Mapping[str, int] = {
-            clazz: idx for idx, clazz in enumerate(sorted(resources[split][language].keys()))
+            clazz: idx for idx, clazz in enumerate(sorted(resources.split2lang2class_dist[split][language].keys()))
         }
+        print(f"[{split}] Class distribution: {resources.split2lang2classes[split][language]}")
+
+        self._targets: Sequence[int] = [
+            self.class_to_idx[target] for target in resources.split2lang2classes[split][language]
+        ]
+        self.stopwords = set()  # resources.stopwords
 
     @property
     def classes(self) -> Sequence[str]:
@@ -65,16 +86,20 @@ class AmazonReviews(Dataset):
 
     @property
     def targets(self) -> Sequence[int]:
-        return list(self.class_to_idx.values())
+        return self._targets
 
     @property
     def class_vocab(self) -> Mapping[str, int]:
         return self.class_to_idx
 
+    def get_stopwords(self) -> Set[str]:
+        return self.stopwords
+
     def __len__(self) -> int:
         return len(self.data)
 
     def __getitem__(self, index: int):
+        index: int = int(index)
         sample = self.data[index]
         product_category: str = sample["product_category"]
         full_text: str = f'{sample["review_title"]} {sample["review_body"]}'

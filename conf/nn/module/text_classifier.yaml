@@ -1,0 +1,30 @@
+_target_: rae.pl_modules.pl_text_classifier.LightningTextClassifier
+
+loss:
+  _target_: torch.nn.modules.loss.CrossEntropyLoss
+
+model:
+  _target_: rae.modules.text.relative_classifier.TextClassifier
+  relative_projection:
+    _target_: rae.modules.attention.RelativeAttention
+    in_features: 300
+    hidden_features: null
+    n_anchors: ${nn.data.anchors_num}
+    transform_elements: null
+    normalization_mode: l2
+    similarity_mode: inner
+    values_mode: similarities
+    values_self_attention_nhead: null
+    similarities_quantization_mode: null
+    similarities_bin_size: null
+    similarities_aggregation_mode: null
+    similarities_aggregation_n_groups: null
+    anchors_sampling_mode: null
+    n_anchors_sampling_per_class: null
+
+  batch_pre_reduce: [ sentence, text ]
+  anchors_reduce: [ sentence, text ]
+  batch_post_reduce: null
+
+defaults:
+  - _self_

@@ -7,7 +7,7 @@ trainer:
   fast_dev_run: False # Enable this for debug purposes
   gpus: 1
   precision: 32
-  max_epochs: 50
+  max_epochs: 10
   max_steps: 1000000
   accumulate_grad_batches: 1
   num_sanity_val_steps: 2
@@ -21,7 +21,7 @@ restore:
   mode: null # null, finetune, hotstart, continue
 
 monitor:
-  metric: 'acc/val_stage'
+  metric: 'accuracy/val_stage/weighted'
   mode: 'max'
 
 callbacks:

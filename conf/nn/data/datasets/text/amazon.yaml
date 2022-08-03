@@ -1,0 +1,19 @@
+language: en
+
+anchors:
+  _target_: rae.data.text.AmazonReviews
+  language: ${nn.data.datasets.language}
+
+train:
+  _target_: rae.data.text.AmazonReviews
+  language: ${nn.data.datasets.language}
+
+val:
+  - _target_: rae.data.text.AmazonReviews
+    language: ${nn.data.datasets.language}
+#  - _target_: rae.data.text.AmazonReviews
+#    language: es
+
+#    test:
+#      - _target_: rae.data.text.AmazonReviews
+#       language: ${..language}
