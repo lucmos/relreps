@@ -7,6 +7,7 @@ import pandas as pd
 import pytorch_lightning as pl
 import torch
 import torchmetrics
+from torch import nn
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
@@ -55,14 +56,12 @@ class LightningClassifier(AbstractLightningModule):
         self.validation_stats_df: pd.DataFrame = pd.DataFrame(columns=self.df_columns)
 
         metric = torchmetrics.Accuracy()
-        # FIXME: workaround to avoid lightnign error of missing attribute
-        self.train_accuracy = metric.clone()
-        self.validation_accuracy = metric.clone()
-
-        self.accuracies = {
-            Stage.TRAIN_STAGE: self.train_accuracy,
-            Stage.VAL_STAGE: self.validation_accuracy,
-        }
+        self.accuracies = nn.ModuleDict(
+            {
+                Stage.TRAIN_STAGE: metric.clone(),
+                Stage.VAL_STAGE: metric.clone(),
+            }
+        )
 
         self.supported_viz = self.supported_viz()
         pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
@@ -70,16 +69,16 @@ class LightningClassifier(AbstractLightningModule):
     def supported_viz(self) -> Set[SupportedViz]:
         supported_viz = set()
 
-        if self.fixed_images is not None:
-            supported_viz.add(SupportedViz.VALIDATION_IMAGES_SOURCE)
-
-        if self.anchors_images is not None:
-            supported_viz.add(SupportedViz.ANCHORS_SOURCE)
-
-        supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
-        supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
-        supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
-        supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
+        # if self.fixed_images is not None:
+        #     supported_viz.add(SupportedViz.VALIDATION_IMAGES_SOURCE)
+        #
+        # if self.anchors_images is not None:
+        #     supported_viz.add(SupportedViz.ANCHORS_SOURCE)
+        #
+        # supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
+        # supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
+        # supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
+        # supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
         return supported_viz
 
     def forward(self, x: torch.Tensor, **kwargs) -> torch.Tensor:
@@ -141,56 +140,56 @@ class LightningClassifier(AbstractLightningModule):
         if self.trainer.sanity_checking:
             return
 
-        validation_aggregation = {}
-        for output in outputs:
-            aggregate(
-                validation_aggregation,
-                image_index=output["batch"]["index"].cpu().tolist(),
-                class_name=output["batch"]["class"],
-                target=output["batch"]["target"].cpu(),
-                latents=output[Output.DEFAULT_LATENT].cpu(),
-                epoch=[self.current_epoch] * len(output["batch"]["index"]),
-                is_anchor=[False] * len(output["batch"]["index"]),
-                anchor_index=[None] * len(output["batch"]["index"]),
-            )
-
-        if self.anchors_images is not None:
-            anchors_num = self.anchors_images.shape[0]
-            anchors_out = self(self.anchors_images)
-            if Output.ANCHORS_LATENT in anchors_out:
-                anchors_latents = anchors_out[Output.ANCHORS_LATENT]
-            else:
-                anchors_latents = anchors_out[Output.DEFAULT_LATENT]
-        else:
-            raise NotImplementedError()
-
-        non_elements = ["none"] * anchors_num
-        aggregate(
-            validation_aggregation,
-            image_index=self.metadata.anchors_idxs
-            if self.metadata.anchors_idxs is not None
-            else list(range(anchors_num)),
-            class_name=self.metadata.anchors_classes if self.metadata.anchors_classes is not None else non_elements,
-            target=self.metadata.anchors_targets.cpu() if self.metadata.anchors_targets is not None else non_elements,
-            latents=anchors_latents.cpu(),
-            epoch=[self.current_epoch] * anchors_num,
-            is_anchor=[True] * anchors_num,
-            anchor_index=list(range(anchors_num)),
-        )
-
-        latents = validation_aggregation["latents"]
-        self.fit_pca(latents)
-        add_2D_latents(validation_aggregation, latents=latents, pca=self.validation_pca)
-        del validation_aggregation["latents"]
-
-        validation_epoch_end_viz(
-            lightning_module=self,
-            outputs=outputs,
-            validation_stats_df=pd.DataFrame(validation_aggregation),
-            anchors_reconstructed=None,
-            anchors_latents=anchors_latents,
-            fixed_images_out=self(self.fixed_images),
-        )
+        # validation_aggregation = {}
+        # for output in outputs:
+        #     aggregate(
+        #         validation_aggregation,
+        #         image_index=output["batch"]["index"].cpu().tolist(),
+        #         class_name=output["batch"]["class"],
+        #         target=output["batch"]["target"].cpu(),
+        #         latents=output[Output.DEFAULT_LATENT].cpu(),
+        #         epoch=[self.current_epoch] * len(output["batch"]["index"]),
+        #         is_anchor=[False] * len(output["batch"]["index"]),
+        #         anchor_index=[None] * len(output["batch"]["index"]),
+        #     )
+        #
+        # if self.anchors_images is not None:
+        #     anchors_num = self.anchors_images.shape[0]
+        #     anchors_out = self(self.anchors_images)
+        #     if Output.ANCHORS_LATENT in anchors_out:
+        #         anchors_latents = anchors_out[Output.ANCHORS_LATENT]
+        #     else:
+        #         anchors_latents = anchors_out[Output.DEFAULT_LATENT]
+        # else:
+        #     raise NotImplementedError()
+        #
+        # non_elements = ["none"] * anchors_num
+        # aggregate(
+        #     validation_aggregation,
+        #     image_index=self.metadata.anchors_idxs
+        #     if self.metadata.anchors_idxs is not None
+        #     else list(range(anchors_num)),
+        #     class_name=self.metadata.anchors_classes if self.metadata.anchors_classes is not None else non_elements,
+        #     target=self.metadata.anchors_targets.cpu() if self.metadata.anchors_targets is not None else non_elements,
+        #     latents=anchors_latents.cpu(),
+        #     epoch=[self.current_epoch] * anchors_num,
+        #     is_anchor=[True] * anchors_num,
+        #     anchor_index=list(range(anchors_num)),
+        # )
+        #
+        # latents = validation_aggregation["latents"]
+        # self.fit_pca(latents)
+        # add_2D_latents(validation_aggregation, latents=latents, pca=self.validation_pca)
+        # del validation_aggregation["latents"]
+        #
+        # validation_epoch_end_viz(
+        #     lightning_module=self,
+        #     outputs=outputs,
+        #     validation_stats_df=pd.DataFrame(validation_aggregation),
+        #     anchors_reconstructed=None,
+        #     anchors_latents=anchors_latents,
+        #     fixed_images_out=self(self.fixed_images),
+        # )
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")

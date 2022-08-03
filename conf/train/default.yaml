@@ -7,7 +7,7 @@ trainer:
   fast_dev_run: False # Enable this for debug purposes
   gpus: 1
   precision: 32
-  max_epochs: 100
+  max_epochs: 50
   max_steps: 1000000
   accumulate_grad_batches: 1
   num_sanity_val_steps: 2
@@ -25,11 +25,11 @@ monitor:
   mode: 'max'
 
 callbacks:
-#  - _target_: pytorch_lightning.callbacks.EarlyStopping
-#    patience: 200
-#    verbose: False
-#    monitor: ${train.monitor.metric}
-#    mode: ${train.monitor.mode}
+  - _target_: pytorch_lightning.callbacks.EarlyStopping
+    patience: 200
+    verbose: False
+    monitor: ${train.monitor.metric}
+    mode: ${train.monitor.mode}
 
   - _target_: pytorch_lightning.callbacks.ModelCheckpoint
     save_top_k: 1

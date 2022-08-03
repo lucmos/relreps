@@ -20,12 +20,16 @@ def check_all_equal_size(elements: Iterable[Any]) -> bool:
 
 def aggregate(
     aggregation: Dict[str, Union[torch.Tensor, Sequence[Any], Any]],
+    dim: int = 0,
+    device: str = "cpu",
     **kwargs: Union[torch.Tensor, Sequence[Union[str, int, bool, Any]]],
 ) -> Dict[str, Union[torch.Tensor, Sequence[Any]]]:
     """Extend the elements in the aggregation dictionary with the kwargs.
 
     Args:
         aggregation: the aggregation dictionary, can contain tensors or sequences
+        dim: the dimension over which to aggregate
+        device: the device in which we should perform the aggregation
         **kwargs: named-arguments with matching keys in the aggregation dictionary
                   to extend the corresponding values
     Returns:
@@ -35,9 +39,10 @@ def aggregate(
 
     for key, value in kwargs.items():
         if isinstance(value, torch.Tensor):
+            value = value.to(device)
             if key not in aggregation:
                 aggregation[key] = torch.empty(0)
-            aggregation[key] = torch.cat((aggregation[key], value), dim=0)
+            aggregation[key] = torch.cat((aggregation[key], value), dim=dim)
         elif isinstance(value, Sequence):
             if key not in aggregation:
                 aggregation[key] = []
