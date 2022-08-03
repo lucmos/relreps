@@ -36,6 +36,7 @@ class RelativeEmbeddingMethod(StrEnum):
 
 
 class ValuesMethod(StrEnum):
+    SELF_ATTENTION = auto()
     SIMILARITIES = auto()
     TRAINABLE = auto()
     ANCHORS = auto()
@@ -53,6 +54,7 @@ class Output(StrEnum):
     INV_LATENTS = auto()
     LOSS = auto()
     BATCH = auto()
+    ANCHORS_OUT = auto()
 
 
 class AttentionElement(StrEnum):
@@ -62,6 +64,8 @@ class AttentionElement(StrEnum):
 
 
 class AttentionOutput(StrEnum):
+    BATCH_LATENT = auto()
+    ANCHORS_LATENT = auto()
     OUTPUT = auto()
     SIMILARITIES = auto()
     UNTRASFORMED_ATTENDED = auto()
@@ -84,6 +88,6 @@ class SupportedViz(StrEnum):
 
 
 class Stage(StrEnum):
-    TRAIN = auto()
-    VAL = auto()
-    TEST = auto()
+    TRAIN_STAGE = auto()
+    VAL_STAGE = auto()
+    TEST_STAGE = auto()

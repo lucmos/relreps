@@ -7,12 +7,13 @@ trainer:
   fast_dev_run: False # Enable this for debug purposes
   gpus: 1
   precision: 32
-  max_epochs: 1000
+  max_epochs: 100
   max_steps: 1000000
   accumulate_grad_batches: 1
   num_sanity_val_steps: 2
   gradient_clip_val: 10.0
   check_val_every_n_epoch: 1
+  reload_dataloaders_every_n_epochs: ${ifthenelse:1, ${oc.select:nn.data.datasets.tasks_progression, False}, 0}
   deterministic: ${train.deterministic}
 
 restore:
@@ -20,15 +21,15 @@ restore:
   mode: null # null, finetune, hotstart, continue
 
 monitor:
-  metric: 'acc/val'
+  metric: 'acc/val_stage'
   mode: 'max'
 
 callbacks:
-  - _target_: pytorch_lightning.callbacks.EarlyStopping
-    patience: 200
-    verbose: False
-    monitor: ${train.monitor.metric}
-    mode: ${train.monitor.mode}
+#  - _target_: pytorch_lightning.callbacks.EarlyStopping
+#    patience: 200
+#    verbose: False
+#    monitor: ${train.monitor.metric}
+#    mode: ${train.monitor.mode}
 
   - _target_: pytorch_lightning.callbacks.ModelCheckpoint
     save_top_k: 1

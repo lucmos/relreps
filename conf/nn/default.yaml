@@ -24,15 +24,7 @@ data:
                           9129, 1798, 6477, 9264, 476,
                           3007, 4992, 1428, 9901, 5388]
 
-  datasets:
-    train:
-      _target_: rae.data.cifar100.CIFAR100Dataset
-
-    val:
-      - _target_: rae.data.cifar100.CIFAR100Dataset
-
-#    test:
-#      - _target_: rae.data.cifar100.CIFAR100Dataset
+  datasets: ???
 
   gpus: ${train.trainer.gpus}
 
@@ -42,7 +34,7 @@ data:
     test: 0
 
   batch_size:
-    train: 512
+    train: 128
     val: 128
     test: 16
 
@@ -74,5 +66,5 @@ module:
 
 defaults:
   - _self_
-  - data: cifar100 # pick one of the yamls in nn/data/
-  - module: classifier # ae_variational # classifier #  ae_deterministic #
+  - data: default # pick one of the yamls in nn/data/
+  - module: continual_classifier # ae_variational # classifier #  ae_deterministic #

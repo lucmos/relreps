@@ -1,0 +1,11 @@
+anchors:
+  _target_: rae.data.mnist.MNISTDataset
+
+train:
+  _target_: rae.data.mnist.MNISTDataset
+
+val:
+  - _target_: rae.data.mnist.MNISTDataset
+
+#    test:
+#      - _target_: rae.data.mnist.MNISTDataset

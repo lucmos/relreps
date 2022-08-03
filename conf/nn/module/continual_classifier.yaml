@@ -1,0 +1,24 @@
+_target_: rae.pl_modules.pl_continual_gclassifier.LightningContinualClassifier
+
+loss:
+  _target_: torch.nn.modules.loss.CrossEntropyLoss
+
+model:
+  input_size: 32
+
+replay:
+  _target_: rae.modules.replay.ReplayBuffer
+  max_size: 0
+  substitute_p: 0.5
+  anchors_p: 0.5
+
+memory:
+  _target_: rae.modules.memory.StaticMemoryLoss
+  running_average_n: 3
+  start_epoch: 9
+  limit_target_representation: True
+  loss_weight: 1e6
+
+defaults:
+  - _self_
+  - model: rcnn

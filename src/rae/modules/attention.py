@@ -25,7 +25,7 @@ pylogger = logging.getLogger(__name__)
 class PreTransforms(nn.Module):
     def __init__(
         self,
-        transform_elements: Iterable[AttentionElement],
+        transform_elements: Optional[Iterable[AttentionElement]],
         in_features: int,
         hidden_features: int,
         values_mode: ValuesMethod,
@@ -43,7 +43,7 @@ class PreTransforms(nn.Module):
         """
         super().__init__()
 
-        self.transform_elements = set(transform_elements)
+        self.transform_elements = set(transform_elements) if transform_elements is not None else set()
         pylogger.info(f"Transforming: {self.transform_elements}")
 
         self.module_dict = nn.ModuleDict(
@@ -87,6 +87,7 @@ class RelativeAttention(nn.Module):
         normalization_mode: NormalizationMode,
         similarity_mode: RelativeEmbeddingMethod,
         values_mode: ValuesMethod,
+        values_self_attention_nhead: int,
         similarities_quantization_mode: SimilaritiesQuantizationMode,
         similarities_bin_size: float,
         similarities_aggregation_mode: SimilaritiesAggregationMode,
@@ -108,6 +109,7 @@ class RelativeAttention(nn.Module):
             normalization_mode: normalization to apply to the anchors and batch before computing the attention
             similarity_mode: how to compute similarities: inner, basis_change
             values_mode: if True use trainable parameters as queries otherwise use the anchors
+            values_self_attention_nhead: number of head if the values mode is self attention
             similarities_quantization_mode: the quantization modality to quantize the similarities
             similarities_bin_size: the size of the bins in the quantized similarities
             similarities_aggregation_mode: how the similarities should be aggregated
@@ -151,7 +153,18 @@ class RelativeAttention(nn.Module):
                 )
             else:
                 self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
+        elif values_mode == ValuesMethod.SELF_ATTENTION:
+            self.sim_to_queries = nn.Linear(1, self.hidden_features, bias=False)
+            self.sim_to_keys = nn.Linear(1, self.hidden_features, bias=False)
+            self.sim_to_values = nn.Linear(1, self.hidden_features, bias=False)
 
+            self.self_attention = nn.MultiheadAttention(
+                embed_dim=self.hidden_features,
+                num_heads=values_self_attention_nhead,
+                batch_first=True,
+            )
+
+            self.self_attention_aggregation = nn.Linear(in_features=self.hidden_features, out_features=1, bias=False)
         elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
@@ -204,8 +217,8 @@ class RelativeAttention(nn.Module):
             raise ValueError(f"Sampling mode not supported: {self.anchors_sampling_mode}")
 
         # Transform into keys and queries
-        x = self.pre_attention_transforms.get_queries(x)
-        anchors = self.pre_attention_transforms.get_keys(anchors)
+        x = x_latents = self.pre_attention_transforms.get_queries(x)
+        anchors = anchors_latents = self.pre_attention_transforms.get_keys(anchors)
 
         # Normalize latents
         if self.normalization_mode == NormalizationMode.OFF:
@@ -262,13 +275,43 @@ class RelativeAttention(nn.Module):
             )
         elif self.values_mode == ValuesMethod.SIMILARITIES:
             output = quantized_similarities
+        elif self.values_mode == ValuesMethod.SELF_ATTENTION:
+            relative_output = quantized_similarities.unsqueeze(-1)
+
+            queries = self.sim_to_queries(relative_output)
+            keys = self.sim_to_keys(relative_output)
+            values = self.sim_to_values(relative_output)
+
+            output, _ = self.self_attention(query=queries, key=keys, value=values)
+            output = self.self_attention_aggregation(output)
+
+            output = output.squeeze(-1)
         else:
             assert False
 
+        # TODO: This should also return the Anchors Targets tensor, because it could change depending on the parameters
         return {
             AttentionOutput.OUTPUT: output,
             AttentionOutput.SIMILARITIES: quantized_similarities,
+            AttentionOutput.ANCHORS_LATENT: anchors_latents,
+            AttentionOutput.BATCH_LATENT: x_latents,
         }
+
+    @property
+    def output_dim(self) -> int:
+        if self.values_mode == ValuesMethod.ANCHORS:
+            return self.in_features
+        elif self.values_mode == ValuesMethod.TRAINABLE:
+            return self.hidden_features
+        elif self.values_mode == ValuesMethod.SIMILARITIES or self.values_mode == ValuesMethod.SELF_ATTENTION:
+            if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
+                return self.n_classes * self.similarities_aggregation_n_groups
+            elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
+                return self.n_classes * self.n_anchors_sampling_per_class
+            else:
+                return self.n_anchors
+        else:
+            raise ValueError(f"Values mode not supported: {self.values_mode}")
 
 
 class RelativeLinearBlock(nn.Module):
@@ -332,23 +375,7 @@ class RelativeLinearBlock(nn.Module):
             n_anchors_sampling_per_class=n_anchors_sampling_per_class,
         )
 
-        if values_mode == ValuesMethod.ANCHORS:
-            self.linear = nn.Linear(in_features=in_features, out_features=out_features, bias=False)
-        elif values_mode == ValuesMethod.TRAINABLE:
-            self.linear = nn.Linear(in_features=hidden_features, out_features=out_features, bias=False)
-        elif values_mode == ValuesMethod.SIMILARITIES:
-            if similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
-                self.linear = nn.Linear(
-                    in_features=n_classes * similarities_aggregation_n_groups, out_features=out_features, bias=False
-                )
-            elif anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
-                self.linear = nn.Linear(
-                    in_features=n_classes * n_anchors_sampling_per_class, out_features=out_features, bias=False
-                )
-            else:
-                self.linear = nn.Linear(in_features=n_anchors, out_features=out_features, bias=False)
-        else:
-            raise ValueError(f"Values mode not supported: {self.values_mode}")
+        self.linear = nn.Linear(in_features=self.attention.output_dim, out_features=out_features, bias=False)
 
     def forward(
         self,
@@ -360,8 +387,10 @@ class RelativeLinearBlock(nn.Module):
         output = self.linear(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
-            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
             AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.OUTPUT],
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT],
+            AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT],
         }
 
 
@@ -438,6 +467,8 @@ class RelativeTransformerBlock(nn.Module):
         output = self.block(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
-            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
             AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT],
+            AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT],
         }

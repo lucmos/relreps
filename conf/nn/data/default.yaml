@@ -10,17 +10,7 @@ anchors_idxs: null #[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
 #   ALl anchors from class seven
 #  anchors_idx: [0, 17, 26, 34, 36, 41, 60, 64, 70, 75]
 
-
-
-datasets:
-  train:
-    _target_: rae.data.cifar100.CIFAR100Dataset
-
-  val:
-    - _target_: rae.data.cifar100.CIFAR100Dataset
-
-#    test:
-#      - _target_: rae.data.cifar100.CIFAR100Dataset
+datasets: ???
 
 transforms:
   _target_: torchvision.transforms.Compose
@@ -33,3 +23,8 @@ transforms:
     - _target_: torchvision.transforms.Normalize
       mean: [0.485, 0.456, 0.406]
       std: [0.229, 0.224, 0.225]
+
+
+defaults:
+  - _self_
+  - datasets: continual/cifar10 # pick one of the yamls in nn/data/

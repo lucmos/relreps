@@ -1,0 +1,37 @@
+tasks_epochs:
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+  - 10
+
+tasks_progression:
+  - [0, 1]
+  - [1, 2]
+  - [2, 3]
+  - [3, 4]
+  - [4, 5]
+  - [5, 6]
+  - [6, 7]
+  - [7, 8]
+  - [8, 9]
+
+anchors:
+  _target_: rae.data.cifar10.CIFAR10Dataset
+
+train:
+  _target_: rae.data.continual.cifar10.ContinualCIFAR10Dataset
+  tasks_epochs: ${nn.data.datasets.tasks_epochs}
+  tasks_progression: ${nn.data.datasets.tasks_progression}
+
+val:
+  - _target_: rae.data.continual.cifar10.ContinualCIFAR10Dataset
+    tasks_epochs: ${nn.data.datasets.tasks_epochs}
+    tasks_progression: ${nn.data.datasets.tasks_progression}
+
+#    test:
+#      - _target_: rae.data.continual.cifar10.ContinualCIFAR10Dataset

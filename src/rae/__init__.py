@@ -32,6 +32,9 @@ logging.basicConfig(
     ],
 )
 
+OmegaConf.register_new_resolver("ifthenelse", lambda positive, condition, negative: positive if condition else negative)
+
+
 try:
     OmegaConf.register_new_resolver("version", codebase_version)
 except ValueError:
