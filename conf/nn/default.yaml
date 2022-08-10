@@ -67,4 +67,4 @@ module:
 defaults:
   - _self_
   - data: default # pick one of the yamls in nn/data/
-  - module: vision/classifier # ae_variational # classifier #  ae_deterministic #
+  - module: classifier # ae_variational # classifier #  ae_deterministic #

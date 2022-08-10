@@ -1,4 +1,4 @@
-_target_: rae.pl_modules.pl_continual_gclassifier.LightningContinualClassifier
+_target_: rae.pl_modules.vision.pl_continual_gclassifier.LightningContinualClassifier
 
 loss:
   _target_: torch.nn.modules.loss.CrossEntropyLoss

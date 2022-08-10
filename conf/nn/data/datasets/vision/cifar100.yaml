@@ -1,11 +1,13 @@
+input_size: 32
+
 anchors:
-  _target_: rae.data.cifar100.CIFAR100Dataset
+  _target_: rae.data.vision.cifar100.CIFAR100Dataset
 
 train:
-  _target_: rae.data.cifar100.CIFAR100Dataset
+  _target_: rae.data.vision.cifar100.CIFAR100Dataset
 
 val:
-  - _target_: rae.data.cifar100.CIFAR100Dataset
+  - _target_: rae.data.vision.cifar100.CIFAR100Dataset
 
 #    test:
 #      - _target_: rae.data.cifar100.CIFAR100Dataset
