@@ -27,4 +27,4 @@ transforms:
 
 defaults:
   - _self_
-  - datasets: vision/cifar100 # pick one of the yamls in nn/data/
+  - datasets: vision/fmnist # pick one of the yamls in nn/data/
