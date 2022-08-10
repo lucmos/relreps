@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from rae.data.datamodule import MetaData
+from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod
 from rae.utils.tensor_ops import infer_dimension
 

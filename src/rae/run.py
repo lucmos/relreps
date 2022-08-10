@@ -15,7 +15,7 @@ from nn_core.serialization import NNCheckpointIO
 
 # Force the execution of __init__.py if this file is executed directly.
 import rae  # noqa
-from rae.data.datamodule import MetaData
+from rae.data.vision.datamodule import MetaData
 
 pylogger = logging.getLogger(__name__)
 

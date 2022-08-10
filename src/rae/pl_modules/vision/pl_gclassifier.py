@@ -12,7 +12,7 @@ from torch import nn
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
-from rae.data.datamodule import MetaData
+from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz

@@ -11,10 +11,10 @@ import torch.nn.functional as F
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
-from rae.data.datamodule import MetaData
-from rae.modules.ae import AE
+from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
-from rae.modules.rae_model import RAE, RaeDecoder
+from rae.modules.vision.ae import AE
+from rae.modules.vision.rae_model import RAE, RaeDecoder
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
 from rae.utils.tensor_ops import detach_tensors

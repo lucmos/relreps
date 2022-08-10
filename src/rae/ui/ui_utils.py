@@ -21,11 +21,11 @@ from torchmetrics import Accuracy
 from nn_core.common import PROJECT_ROOT
 from nn_core.serialization import NNCheckpointIO, load_model
 
-from rae.data.cifar100 import CIFAR100Dataset
-from rae.data.datamodule import MetaData
+from rae.data.vision.cifar100 import CIFAR100Dataset
+from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import Output
-from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
-from rae.pl_modules.pl_gclassifier import LightningClassifier
+from rae.pl_modules.vision.pl_gautoencoder import LightningAutoencoder
+from rae.pl_modules.vision.pl_gclassifier import LightningClassifier
 from rae.utils.plotting import plot_violin
 
 AVAILABLE_TRANSFORMS = {

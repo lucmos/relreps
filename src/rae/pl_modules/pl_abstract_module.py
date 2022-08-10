@@ -10,7 +10,7 @@ from torch.optim import Optimizer
 
 from nn_core.model_logging import NNLogger
 
-from rae.data.datamodule import MetaData
+from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import SupportedViz
 
 pylogger = logging.getLogger(__name__)
