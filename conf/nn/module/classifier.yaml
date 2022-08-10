@@ -8,4 +8,4 @@ model:
 
 defaults:
   - _self_
-  - model: vision/resnet
+  - model: vision/relresnet

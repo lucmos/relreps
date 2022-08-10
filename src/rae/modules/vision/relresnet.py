@@ -1,21 +1,12 @@
 import logging
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 
+import hydra.utils
 import torch
 from torch import nn
 
-from rae.data.datamodule import MetaData
-from rae.modules.attention import (
-    AnchorsSamplingMode,
-    AttentionElement,
-    AttentionOutput,
-    NormalizationMode,
-    RelativeEmbeddingMethod,
-    RelativeTransformerBlock,
-    SimilaritiesAggregationMode,
-    SimilaritiesQuantizationMode,
-    ValuesMethod,
-)
+from rae.data.vision.datamodule import MetaData
+from rae.modules.attention import AbstractRelativeAttention, AttentionOutput
 from rae.modules.enumerations import Output
 from rae.modules.passthrough import PassThrough
 from rae.utils.tensor_ops import freeze, get_resnet_model
@@ -27,29 +18,17 @@ class RelResNet(nn.Module):
     def __init__(
         self,
         metadata: MetaData,
+        resnet_size: int,
+        hidden_features: int,
         use_pretrained: bool,
         finetune: bool,
-        hidden_features: int,
-        dropout_p: float,
-        transform_elements: Set[AttentionElement],
-        normalization_mode: NormalizationMode,
-        similarity_mode: RelativeEmbeddingMethod,
-        values_mode: ValuesMethod,
-        similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
-        similarities_bin_size: Optional[float] = None,
-        resnet_size: int = 18,
-        transform_resnet_features: bool = False,
-        similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
-        similarities_aggregation_n_groups: int = 1,
-        anchors_sampling_mode: Optional[AnchorsSamplingMode] = None,
-        n_anchors_sampling_per_class: Optional[int] = None,
+        relative_attention: AbstractRelativeAttention,
         **kwargs,
     ) -> None:
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.metadata = metadata
-        self.transform_resnet_features = transform_resnet_features
 
         self.finetune = finetune
         self.resnet, self.resnet_features = get_resnet_model(resnet_size=resnet_size, use_pretrained=use_pretrained)
@@ -57,29 +36,27 @@ class RelResNet(nn.Module):
         if not finetune:
             freeze(self.resnet)
 
-        if self.transform_resnet_features:
-            self.resnet_post_fc = nn.Linear(in_features=self.resnet_features, out_features=self.resnet_features)
-
-        self.relative_attention_block = RelativeTransformerBlock(
-            in_features=self.resnet_features,
-            hidden_features=hidden_features,
-            dropout_p=dropout_p,
-            out_features=hidden_features,
-            n_anchors=metadata.anchors_images.shape[0],
-            n_classes=len(self.metadata.class_to_idx),
-            transform_elements=transform_elements,
-            normalization_mode=normalization_mode,
-            similarity_mode=similarity_mode,
-            values_mode=values_mode,
-            similarities_quantization_mode=similarities_quantization_mode,
-            similarities_bin_size=similarities_bin_size,
-            similarities_aggregation_mode=similarities_aggregation_mode,
-            similarities_aggregation_n_groups=similarities_aggregation_n_groups,
-            anchors_sampling_mode=anchors_sampling_mode,
-            n_anchors_sampling_per_class=n_anchors_sampling_per_class,
+        self.resnet_post_fc = nn.Sequential(
+            nn.Linear(in_features=self.resnet_features, out_features=self.resnet_features),
+            nn.BatchNorm1d(num_features=self.resnet_features),
+            nn.Tanh(),
+            nn.Linear(in_features=self.resnet_features, out_features=hidden_features),
+            nn.Tanh(),
         )
 
-        self.final_layer = nn.Linear(in_features=hidden_features, out_features=len(self.metadata.class_to_idx))
+        self.relative_attention = (
+            hydra.utils.instantiate(
+                relative_attention,
+                n_anchors=self.metadata.anchors_targets.shape[0],
+                n_classes=len(self.metadata.class_to_idx),
+            )
+            if not isinstance(relative_attention, AbstractRelativeAttention)
+            else relative_attention
+        )
+
+        self.final_layer = nn.Linear(
+            in_features=self.relative_attention.output_dim, out_features=len(self.metadata.class_to_idx)
+        )
 
         # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.
         self.register_buffer("anchors_images", metadata.anchors_images)
@@ -98,14 +75,12 @@ class RelResNet(nn.Module):
     ) -> Dict[str, torch.Tensor]:
         with torch.no_grad():
             anchors_latents = self.resnet(self.anchors_images if new_anchors_images is None else new_anchors_images)
-            if self.transform_resnet_features:
-                anchors_latents = self.resnet_post_fc(anchors_latents)
+            anchors_latents = self.resnet_post_fc(anchors_latents)
 
         batch_latents = self.resnet(x)
-        if self.transform_resnet_features:
-            batch_latents = self.resnet_post_fc(batch_latents)
+        batch_latents = self.resnet_post_fc(batch_latents)
 
-        attention_output = self.relative_attention_block(
+        attention_output = self.relative_attention(
             x=batch_latents,
             anchors=anchors_latents,
             anchors_targets=self.anchors_targets if new_anchors_targets is None else new_anchors_targets,

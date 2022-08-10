@@ -15,9 +15,8 @@ from nn_core.model_logging import NNLogger
 from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
-from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
+from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz
 from rae.utils.tensor_ops import detach_tensors
-from rae.utils.utils import add_2D_latents, aggregate
 
 pylogger = logging.getLogger(__name__)
 
@@ -33,6 +32,7 @@ class LightningClassifier(AbstractLightningModule):
             metadata=metadata,
             input_channels=metadata.anchors_images.shape[1],
             n_classes=len(metadata.class_to_idx),
+            _recursive_=False,
         )
         self.loss = hydra.utils.instantiate(self.hparams.loss)
 
