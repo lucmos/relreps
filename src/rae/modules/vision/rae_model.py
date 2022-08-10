@@ -7,7 +7,8 @@ import torch.nn.functional as F
 from torch import nn
 
 from rae.data.vision.datamodule import MetaData
-from rae.modules.enumerations import NormalizationMode, Output, RelativeEmbeddingMethod
+from rae.modules.attention import NormalizationMode, RelativeEmbeddingMethod
+from rae.modules.enumerations import Output
 from rae.utils.tensor_ops import infer_dimension
 
 pylogger = logging.getLogger(__name__)

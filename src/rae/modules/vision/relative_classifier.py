@@ -7,19 +7,19 @@ import torch.nn.functional as F
 from backports.strenum import StrEnum
 from torch import nn
 
-from rae.modules.attention import RelativeAttention
-from rae.modules.blocks import ResidualBlock
-from rae.modules.enumerations import (
+from rae.modules.attention import (
     AnchorsSamplingMode,
     AttentionElement,
     AttentionOutput,
     NormalizationMode,
-    Output,
+    RelativeAttention,
     RelativeEmbeddingMethod,
     SimilaritiesAggregationMode,
     SimilaritiesQuantizationMode,
     ValuesMethod,
 )
+from rae.modules.blocks import ResidualBlock
+from rae.modules.enumerations import Output
 from rae.utils.tensor_ops import infer_dimension
 
 pylogger = logging.getLogger(__name__)

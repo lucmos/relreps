@@ -5,18 +5,18 @@ import torch
 from torch import nn
 
 from rae.data.datamodule import MetaData
-from rae.modules.attention import RelativeTransformerBlock
-from rae.modules.enumerations import (
+from rae.modules.attention import (
     AnchorsSamplingMode,
     AttentionElement,
     AttentionOutput,
     NormalizationMode,
-    Output,
     RelativeEmbeddingMethod,
+    RelativeTransformerBlock,
     SimilaritiesAggregationMode,
     SimilaritiesQuantizationMode,
     ValuesMethod,
 )
+from rae.modules.enumerations import Output
 from rae.modules.passthrough import PassThrough
 from rae.utils.tensor_ops import freeze, get_resnet_model
 

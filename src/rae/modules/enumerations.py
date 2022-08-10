@@ -7,41 +7,6 @@ except ImportError:
     from backports.strenum import StrEnum
 
 
-class AnchorsSamplingMode(StrEnum):
-    STRATIFIED = auto()
-
-
-class SimilaritiesAggregationMode(StrEnum):
-    STRATIFIED_AVG = auto()
-
-
-class SimilaritiesQuantizationMode(StrEnum):
-    DIFFERENTIABLE_ROUND = auto()
-    # SMOOTH_STEPS = auto()
-
-
-class NormalizationMode(StrEnum):
-    L2 = auto()
-    OFF = auto()
-    # BATCHNORM = auto()
-    # INSTANCENORM = auto()
-    # LAYERNORM = auto()
-    # INSTANCENORM_NOAFFINE = auto()
-    # LAYERNORM_NOAFFINE = auto()
-
-
-class RelativeEmbeddingMethod(StrEnum):
-    BASIS_CHANGE = auto()
-    INNER = auto()
-
-
-class ValuesMethod(StrEnum):
-    SELF_ATTENTION = auto()
-    SIMILARITIES = auto()
-    TRAINABLE = auto()
-    ANCHORS = auto()
-
-
 class Output(StrEnum):
     LOGITS = auto()
     RECONSTRUCTION = auto()
@@ -55,20 +20,6 @@ class Output(StrEnum):
     LOSS = auto()
     BATCH = auto()
     ANCHORS_OUT = auto()
-
-
-class AttentionElement(StrEnum):
-    ATTENTION_KEYS = auto()
-    ATTENTION_QUERIES = auto()
-    ATTENTION_VALUES = auto()
-
-
-class AttentionOutput(StrEnum):
-    BATCH_LATENT = auto()
-    ANCHORS_LATENT = auto()
-    OUTPUT = auto()
-    SIMILARITIES = auto()
-    UNTRASFORMED_ATTENDED = auto()
 
 
 class SupportedViz(StrEnum):
