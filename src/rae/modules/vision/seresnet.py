@@ -1,3 +1,4 @@
+import logging
 from typing import Dict, List, Sequence, Type
 
 import torch
@@ -6,6 +7,8 @@ from torchvision.models.resnet import conv1x1, conv3x3
 
 from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import Output
+
+pylogger = logging.getLogger(__name__)
 
 
 class SE_Block(nn.Module):
@@ -63,7 +66,7 @@ class SEBasicBlock(nn.Module):
         return out
 
 
-class ResNet(nn.Module):
+class SEResNet(nn.Module):
     def __init__(
         self,
         metadata: MetaData,
@@ -73,6 +76,7 @@ class ResNet(nn.Module):
         layers: Sequence[int] = (2, 2, 2, 2),
     ) -> None:
         super().__init__()
+        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.inplanes = 16
 
