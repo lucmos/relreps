@@ -78,18 +78,18 @@ class SEResNet(nn.Module):
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
-        self.inplanes = 16
+        self.inplanes = 64
 
         self.conv1 = nn.Conv2d(input_channels, self.inplanes, kernel_size=7, stride=1, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)
-        self.layer1 = self._make_layer(SEBasicBlock, 16, layers[0])
-        self.layer2 = self._make_layer(SEBasicBlock, 32, layers[1], stride=1)
-        self.layer3 = self._make_layer(SEBasicBlock, 64, layers[2], stride=1)
-        self.layer4 = self._make_layer(SEBasicBlock, 128, layers[3], stride=1)
+        self.layer1 = self._make_layer(SEBasicBlock, 64, layers[0])
+        self.layer2 = self._make_layer(SEBasicBlock, 128, layers[1], stride=1)
+        self.layer3 = self._make_layer(SEBasicBlock, 256, layers[2], stride=1)
+        self.layer4 = self._make_layer(SEBasicBlock, 512, layers[3], stride=1)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(128 * SEBasicBlock.expansion, n_classes)
+        self.fc = nn.Linear(512 * SEBasicBlock.expansion, n_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
