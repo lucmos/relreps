@@ -29,8 +29,8 @@ data:
   gpus: ${train.trainer.gpus}
 
   num_workers:
-    train: 8
-    val: 4
+    train: 4
+    val: 2
     test: 0
 
   batch_size:
