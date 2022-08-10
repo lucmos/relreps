@@ -4,6 +4,7 @@ import hydra
 import omegaconf
 from torch.utils.data import Dataset
 from torchvision.datasets import MNIST
+from torchvision.transforms import transforms
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.nn_types import Split
@@ -23,7 +24,12 @@ class MNISTDataset(Dataset):
             kwargs["path"],
             train=split == "train",
             download=True,
-            transform=kwargs["transform"],
+            transform=transforms.Compose(
+                [
+                    transforms.Grayscale(num_output_channels=3),
+                    kwargs["transform"],
+                ]
+            ),
         )
 
     @property

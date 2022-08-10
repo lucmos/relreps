@@ -1,3 +1,5 @@
+input_size: 28
+
 anchors:
   _target_: rae.data.vision.mnist.MNISTDataset
 
