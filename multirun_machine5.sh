@@ -2,10 +2,23 @@
 
 python src/rae/run.py -m \
   core.tags='[classification, absolute]' \
-  nn.data.anchors_num=500 \
   nn/data/datasets=vision/cifar10 \
   nn/module=classifier \
-  nn/module/model=vision/seresnet
+  nn/module/model=vision/resnet \
+  nn.module.model.resnet_size=18 \
+  nn.module.model.input_size=224 \
+  nn.module.model.use_pretrained=True \
+  nn.module.model.finetune=False \
+  nn.module.model.hidden_features=512 \
+  train.trainer.fast_dev_run=True
+
+
+#python src/rae/run.py -m \
+#  core.tags='[classification, absolute]' \
+#  nn.data.anchors_num=500 \
+#  nn/data/datasets=vision/cifar10 \
+#  nn/module=classifier \
+#  nn/module/model=vision/seresnet
 
 #  nn.module.model.hidden_features=512 \
 #  nn.module.model.values_mode=similarities \
