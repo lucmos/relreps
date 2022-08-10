@@ -87,9 +87,9 @@ class SEResNet(nn.Module):
         self.layer1 = self._make_layer(SEBasicBlock, 64, layers[0])
         self.layer2 = self._make_layer(SEBasicBlock, 128, layers[1], stride=1)
         self.layer3 = self._make_layer(SEBasicBlock, 256, layers[2], stride=1)
-        self.layer4 = self._make_layer(SEBasicBlock, 512, layers[3], stride=1)
+        # self.layer4 = self._make_layer(SEBasicBlock, 512, layers[3], stride=1)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * SEBasicBlock.expansion, n_classes)
+        self.fc = nn.Linear(256 * SEBasicBlock.expansion, n_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -141,7 +141,7 @@ class SEResNet(nn.Module):
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
-        x = self.layer4(x)
+        # x = self.layer4(x)
 
         x = self.avgpool(x)
         latents = x = torch.flatten(x, 1)
