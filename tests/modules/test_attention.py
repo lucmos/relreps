@@ -48,6 +48,7 @@ def perform_computation(
     similarities_aggregation_n_groups: int,
     anchors_sampling_mode: AnchorsSamplingMode,
     n_anchors_sampling_per_class: int,
+    output_normalization_mode: OutputNormalization,
 ):
     if similarity_mode == RelativeEmbeddingMethod.BASIS_CHANGE and (
         n_anchors_sampling_per_class is not None and n_anchors_sampling_per_class > 1
@@ -66,6 +67,13 @@ def perform_computation(
     if values_mode == ValuesMethod.ANCHORS and similarities_aggregation_mode is not None:
         pytest.skip(f"Stratified aggregation mode {similarities_aggregation_mode} not compatible with {values_mode}")
 
+    if values_mode == ValuesMethod.ANCHORS and (
+        output_normalization_mode is not None or output_normalization_mode != OutputNormalization.NONE
+    ):
+        pytest.skip(
+            f"Output normalization {output_normalization_mode} break the equivariance property of {values_mode}"
+        )
+
     op = op(
         in_features=LATENT_DIM,
         hidden_features=hidden_features,
@@ -82,6 +90,7 @@ def perform_computation(
         similarities_aggregation_n_groups=similarities_aggregation_n_groups,
         anchors_sampling_mode=anchors_sampling_mode,
         n_anchors_sampling_per_class=n_anchors_sampling_per_class,
+        output_normalization_mode=output_normalization_mode,
         **op_kwargs,
     )
 
@@ -127,7 +136,7 @@ def perform_computation(
         # {AttentionElement.ATTENTION_KEYS, AttentionElement.ATTENTION_QUERIES, AttentionElement.ATTENTION_VALUES},
     ),
 )
-@pytest.mark.parametrize("normalization_mode", (NormalizationMode.OFF, NormalizationMode.L2))
+@pytest.mark.parametrize("normalization_mode", (NormalizationMode.NONE, NormalizationMode.L2))
 @pytest.mark.parametrize("similarity_mode", (RelativeEmbeddingMethod.BASIS_CHANGE, RelativeEmbeddingMethod.INNER))
 @pytest.mark.parametrize(
     "values_mode, values_self_attention_nhead",
@@ -154,7 +163,6 @@ def perform_computation(
         (SimilaritiesAggregationMode.STRATIFIED_AVG, 1),
         (SimilaritiesAggregationMode.STRATIFIED_AVG, 2),
         (SimilaritiesAggregationMode.STRATIFIED_AVG, 5),
-        (None, 1),
         (None, None),
     ),
 )
@@ -164,7 +172,18 @@ def perform_computation(
         (AnchorsSamplingMode.STRATIFIED, 1),
         (AnchorsSamplingMode.STRATIFIED, 2),
         (AnchorsSamplingMode.STRATIFIED, 5),
-        (None, 1),
+        (None, None),
+    ),
+)
+@pytest.mark.parametrize(
+    "output_normalization_mode",
+    (
+        None,
+        OutputNormalization.NONE,
+        OutputNormalization.L2,
+        OutputNormalization.BATCHNORM,
+        OutputNormalization.LAYERNORM,
+        OutputNormalization.INSTANCENORM,
     ),
 )
 def test_invariance_equivariance(
@@ -189,6 +208,7 @@ def test_invariance_equivariance(
     similarities_aggregation_n_groups: int,
     anchors_sampling_mode: AnchorsSamplingMode,
     n_anchors_sampling_per_class: int,
+    output_normalization_mode: OutputNormalization,
 ):
     res1, res2 = perform_computation(
         op=attention_op,
@@ -212,6 +232,7 @@ def test_invariance_equivariance(
         similarities_aggregation_n_groups=similarities_aggregation_n_groups,
         anchors_sampling_mode=anchors_sampling_mode,
         n_anchors_sampling_per_class=n_anchors_sampling_per_class,
+        output_normalization_mode=output_normalization_mode,
     )
 
     if values_mode != ValuesMethod.ANCHORS:

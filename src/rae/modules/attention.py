@@ -159,6 +159,7 @@ class RelativeAttention(AbstractRelativeAttention):
         similarities_aggregation_n_groups: Optional[int] = None,
         anchors_sampling_mode: Optional[AnchorsSamplingMode] = None,
         n_anchors_sampling_per_class: Optional[int] = None,
+        output_normalization_mode: Optional[OutputNormalization] = None,
     ):
         """Relative attention block.
 
@@ -277,7 +278,7 @@ class RelativeAttention(AbstractRelativeAttention):
         self.pre_attention_transforms = QKVTransforms(
             in_features=in_features,
             hidden_features=hidden_features,
-            transform_elements=transform_elements,
+            transform_elements=self.transform_elements,
             values_mode=values_mode,
         )
 
@@ -307,25 +308,12 @@ class RelativeAttention(AbstractRelativeAttention):
         elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
-        if (similarities_quantization_mode in set(SimilaritiesQuantizationMode)) != (similarities_bin_size is not None):
-            raise ValueError(
-                f"Quantization '{similarities_quantization_mode}' not supported with bin size '{similarities_bin_size}'"
-            )
-
-        if similarities_aggregation_mode is not None and similarities_aggregation_mode not in set(
-            SimilaritiesAggregationMode
-        ):
-            raise ValueError(f"Similarity aggregation mode not supported: {similarities_aggregation_mode}")
-
-        if anchors_sampling_mode is not None and anchors_sampling_mode not in set(AnchorsSamplingMode):
-            raise ValueError(f"Anchors sampling mode not supported: {anchors_sampling_mode}")
-        if anchors_sampling_mode is not None and n_anchors_sampling_per_class is None:
-            raise ValueError(
-                f"Impossible to sample with mode: {anchors_sampling_mode} without specifying the number of anchors per class"
-            )
-
-        if self.similarity_mode == RelativeEmbeddingMethod.BASIS_CHANGE and self.n_anchors_sampling_per_class > 1:
-            raise ValueError("The basis change is not deterministic with possibly repeated basis vectors")
+        if self.output_normalization_mode == OutputNormalization.BATCHNORM:
+            self.outnorm = nn.BatchNorm1d(num_features=self.output_dim)
+        elif self.output_normalization_mode == OutputNormalization.LAYERNORM:
+            self.outnorm = nn.LayerNorm(normalized_shape=self.output_dim)
+        elif self.output_normalization_mode == OutputNormalization.INSTANCENORM:
+            self.outnorm = nn.InstanceNorm1d(num_features=self.output_dim, affine=True)
 
     def forward(
         self,
@@ -425,6 +413,22 @@ class RelativeAttention(AbstractRelativeAttention):
             output = self.self_attention_aggregation(output)
 
             output = output.squeeze(-1)
+        else:
+            assert False
+
+        # Normalize the output
+        if self.output_normalization_mode == OutputNormalization.NONE:
+            pass
+        elif self.output_normalization_mode == OutputNormalization.L2:
+            output = F.normalize(output, p=2, dim=-1)
+        elif self.output_normalization_mode == OutputNormalization.BATCHNORM:
+            output = self.outnorm(output)
+        elif self.output_normalization_mode == OutputNormalization.LAYERNORM:
+            output = self.outnorm(output)
+        elif self.output_normalization_mode == OutputNormalization.INSTANCENORM:
+            output = torch.einsum("lc -> cl", output)
+            output = self.outnorm(output)
+            output = torch.einsum("cl -> lc", output)
         else:
             assert False
 
