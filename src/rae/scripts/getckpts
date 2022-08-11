@@ -1,0 +1,29 @@
+#!python
+
+import logging
+from pathlib import Path
+from typing import List
+
+import typer
+import wandb
+
+pylogger = logging.getLogger(__name__)
+
+
+def download(entity: str, project: str, run_ids: List[str]) -> None:
+    for run_id in run_ids:
+        api = wandb.Api()
+        # TODO: use api.runs
+        run = api.run(path=f"{entity}/{project}/{run_id}")
+        files = sorted((file for file in run.files() if "checkpoint" in file.name), reverse=True)
+        for file in files:
+            typer.secho(f"Downloading checkpoint: {entity}/{project}/{run_id}")
+            ckpt_path = Path(file.download(root=Path.cwd()).name)
+            ckpt_path.rename(Path.cwd() / f"{run_id}{''.join(ckpt_path.suffixes)}")
+
+        (Path.cwd() / "run_files" / "checkpoints").rmdir()
+        (Path.cwd() / "run_files").rmdir()
+
+
+if __name__ == "__main__":
+    typer.run(download)
