@@ -80,7 +80,7 @@ def compute_predictions(force: bool = False) -> pd.DataFrame:
     PREDICTIONS_CSV.unlink(missing_ok=True)
 
     predictions = {x: [] for x in ("run_id", "model_type", "dataset_name", "sample_idx", "pred", "target")}
-    for dataset_name in (dataset_tqdm := tqdm(DATASETS)):
+    for dataset_name in (dataset_tqdm := tqdm(DATASETS, leave=True)):
         dataset_tqdm.set_description(f"Dataset ({dataset_name})")
         _, data_cfg = parse_checkpoint(
             module_class=LightningClassifier,
@@ -96,16 +96,17 @@ def compute_predictions(force: bool = False) -> pd.DataFrame:
             batch_size=BATCH_SIZE,
             shuffle=False,
             num_workers=8,
+            persistent_workers=True,
         )
         assert (
             f"{val_dataset.__module__}.{val_dataset.__class__.__name__}" == DATASET_SANITY[dataset_name][0]
         ), f"{val_dataset.__module__}.{val_dataset.__class__.__name__}!={DATASET_SANITY[dataset_name][0]}"
         assert val_dataset.split == DATASET_SANITY[dataset_name][1]
 
-        for model_type in (model_type_tqdm := tqdm(MODELS, desc="model type", leave=True)):
+        for model_type in (model_type_tqdm := tqdm(MODELS, leave=True)):
             model_type_tqdm.set_description(f"Model type ({model_type})")
 
-            for ckpt in (ckpt_tqdm := tqdm(checkpoints[dataset_name][model_type], desc="ckpt", leave=True)):
+            for ckpt in (ckpt_tqdm := tqdm(checkpoints[dataset_name][model_type], leave=False)):
                 run_id = parse_checkpoint_id(ckpt)
                 ckpt_tqdm.set_description(f"Run id ({run_id})")
 
@@ -118,9 +119,9 @@ def compute_predictions(force: bool = False) -> pd.DataFrame:
                     f"{model.model.__module__}.{model.model.__class__.__name__}" == MODEL_SANITY[model_type]
                 ), f"{model.model.__module__}.{model.model.__class__.__name__}!={MODEL_SANITY[model_type]}"
                 model = model.to(DEVICE)
-                for batch, _ in tqdm(zip(val_dataloder, range(2)), desc="Batch", leave=False):
-                    model_out = model(batch["image"])
-                    pred = model_out[Output.LOGITS].argmax(-1)
+                for batch in tqdm(val_dataloder, desc="Batch", leave=False):
+                    model_out = model(batch["image"].to(DEVICE))
+                    pred = model_out[Output.LOGITS].argmax(-1).cpu()
 
                     batch_size = len(batch["index"].cpu().tolist())
                     predictions["run_id"].extend([run_id] * batch_size)
@@ -130,8 +131,10 @@ def compute_predictions(force: bool = False) -> pd.DataFrame:
                     predictions["pred"].extend(pred.cpu().tolist())
                     predictions["target"].extend(batch["target"].cpu().tolist())
                     del model_out
-                break
-        break
+                    del batch
+                model = model.cpu()
+                del model
+
     predictions_df = pd.DataFrame(predictions)
     predictions_df.to_csv(PREDICTIONS_CSV, sep="\t")
     return predictions_df
