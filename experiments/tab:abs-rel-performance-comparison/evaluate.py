@@ -10,6 +10,7 @@ import typer
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import LightningModule
 from torch.utils.data import DataLoader
+from torchmetrics import Accuracy, F1Score, MetricCollection
 from tqdm import tqdm
 
 from nn_core.serialization import NNCheckpointIO
@@ -23,9 +24,18 @@ logging.getLogger().setLevel(logging.ERROR)
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 32
+CONSIDERED_METRICS = {
+    "acc/weighted": lambda num_classes: Accuracy(average="weighted", num_classes=num_classes),
+    "acc/micro": lambda num_classes: Accuracy(average="macro", num_classes=num_classes),
+    "acc/macro": lambda num_classes: Accuracy(average="micro", num_classes=num_classes),
+    "f1/macro": lambda num_classes: F1Score(average="macro", num_classes=num_classes),
+    "f1/micro": lambda num_classes: F1Score(average="micro", num_classes=num_classes),
+}
+
 EXPERIMENT_ROOT = Path(__file__).parent
 EXPERIMENT_CHECKPOINTS = EXPERIMENT_ROOT / "checkpoints"
-PREDICTIONS_CSV = EXPERIMENT_ROOT / "predictions.tsv"
+PREDICTIONS_TSV = EXPERIMENT_ROOT / "predictions.tsv"
+PERFORMANCE_TSV = EXPERIMENT_ROOT / "performance.tsv"
 
 DATASET_SANITY = {
     "mnist": ("rae.data.vision.mnist.MNISTDataset", "test"),
@@ -38,24 +48,31 @@ MODEL_SANITY = {
     "rel": "rae.modules.vision.relresnet.RelResNet",
 }
 
-# Parse checkpoints tree
-checkpoints = defaultdict(dict)
-for dataset_abbrv in EXPERIMENT_CHECKPOINTS.iterdir():
-    checkpoints[dataset_abbrv.name] = defaultdict(list)
-    for model_abbrv in dataset_abbrv.iterdir():
-        for ckpt in model_abbrv.iterdir():
-            checkpoints[dataset_abbrv.name][model_abbrv.name].append(ckpt)
-
 
 def parse_checkpoint_id(ckpt: Path) -> str:
     return ckpt.with_suffix("").with_suffix("").name
 
 
+# Parse checkpoints tree
+checkpoints = defaultdict(dict)
+RUNS = defaultdict(dict)
+for dataset_abbrv in EXPERIMENT_CHECKPOINTS.iterdir():
+    checkpoints[dataset_abbrv.name] = defaultdict(list)
+    RUNS[dataset_abbrv.name] = defaultdict(list)
+    for model_abbrv in dataset_abbrv.iterdir():
+        for ckpt in model_abbrv.iterdir():
+            checkpoints[dataset_abbrv.name][model_abbrv.name].append(ckpt)
+            RUNS[dataset_abbrv.name][model_abbrv.name].append(parse_checkpoint_id(ckpt))
+
+
 DATASETS = sorted(checkpoints.keys())
+DATASET_NUM_CLASSES = {
+    "mnist": 10,
+    "fmnist": 10,
+    "cifar10": 10,
+    "cifar100": 100,
+}
 MODELS = sorted(checkpoints[DATASETS[0]].keys())
-RUN_IDS = sorted(
-    parse_checkpoint_id(ckpt) for dataset, model in checkpoints.items() for _, runs in model.items() for ckpt in runs
-)
 
 
 def parse_checkpoint(
@@ -74,10 +91,10 @@ def parse_checkpoint(
     raise ValueError(f"Wrong checkpoint: {checkpoint_path}")
 
 
-def compute_predictions(force: bool = False) -> pd.DataFrame:
-    if PREDICTIONS_CSV.exists() and not force:
-        return pd.read_csv(PREDICTIONS_CSV)
-    PREDICTIONS_CSV.unlink(missing_ok=True)
+def compute_predictions(force_predict: bool) -> pd.DataFrame:
+    if PREDICTIONS_TSV.exists() and not force_predict:
+        return pd.read_csv(PREDICTIONS_TSV, sep="\t", index_col=0)
+    PREDICTIONS_TSV.unlink(missing_ok=True)
 
     predictions = {x: [] for x in ("run_id", "model_type", "dataset_name", "sample_idx", "pred", "target")}
     for dataset_name in (dataset_tqdm := tqdm(DATASETS, leave=True)):
@@ -132,30 +149,50 @@ def compute_predictions(force: bool = False) -> pd.DataFrame:
                     predictions["target"].extend(batch["target"].cpu().tolist())
                     del model_out
                     del batch
-                model = model.cpu()
+                model.cpu()
                 del model
 
     predictions_df = pd.DataFrame(predictions)
-    predictions_df.to_csv(PREDICTIONS_CSV, sep="\t")
+    predictions_df.to_csv(PREDICTIONS_TSV, sep="\t")
     return predictions_df
 
 
-# print(compute_predictions())
-# exit()
-#
-#
-# metric_collection = MetricCollection(
-#     [
-#         Accuracy(average="weighted"),
-#         Accuracy(average="micro"),
-#         Accuracy(average="macro"),
-#         F1Score(average="macro"),
-#     ]
-# )
+def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd.DataFrame:
+    if PERFORMANCE_TSV.exists() and not force_measure:
+        return pd.read_csv(PERFORMANCE_TSV, sep="\t", index_col=0)
+    PERFORMANCE_TSV.unlink(missing_ok=True)
+
+    performance = {**{x: [] for x in ("model_type", "dataset_name")}, **{k: [] for k in CONSIDERED_METRICS.keys()}}
+
+    for dataset_name, dataset_pred in RUNS.items():
+        for model_type, run_ids in dataset_pred.items():
+            for run_id in run_ids:
+                metrics = MetricCollection(
+                    {
+                        key: metric(num_classes=DATASET_NUM_CLASSES[dataset_name])
+                        for key, metric in CONSIDERED_METRICS.items()
+                    }
+                )
+                run_df = predictions_df[predictions_df["run_id"] == run_id]
+                run_predictions = torch.as_tensor(run_df["pred"].values)
+                run_targets = torch.as_tensor(run_df["target"].values)
+
+                metrics.update(run_predictions, run_targets)
+
+                performance["dataset_name"].append(dataset_name)
+                performance["model_type"].append(model_type)
+                for metric_name, metric_value in metrics.compute().items():
+                    performance[metric_name].append(metric_value.item())
+
+    performance_df = pd.DataFrame(performance)
+    performance_df.to_csv(PERFORMANCE_TSV, sep="\t")
+    return performance_df
 
 
-def evaluate(force: bool = False):
-    compute_predictions(force=force)
+def evaluate(force_predict: bool = False, force_measure: bool = True):
+    predictions = compute_predictions(force_predict=force_predict)
+    performance_df = measure_predictions(predictions, force_measure=force_measure)
+    print(performance_df)
 
 
 if __name__ == "__main__":
