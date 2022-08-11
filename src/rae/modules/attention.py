@@ -510,6 +510,8 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
         in_features: int,
         relative_attentions: Sequence[AbstractRelativeAttention],
         subspace_pooling: SubspacePooling,
+        n_anchors: Optional[int] = None,
+        n_classes: Optional[int] = None,
     ):
         """MultiHead Relative Attention, apply the relative attention to embedding subspace.
 
@@ -534,6 +536,8 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
                     relative_attention,
                     in_features=self.subspace_in_features,
                     hidden_features=self.subspace_in_features,
+                    n_anchors=n_anchors,
+                    n_classes=n_classes,
                 )
                 if not isinstance(relative_attention, AbstractRelativeAttention)
                 else relative_attention
@@ -557,6 +561,7 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
                 out_features=self.subspace_output_dim,
             )
 
+    @property
     def output_dim(self) -> int:
         if self.subspace_pooling == SubspacePooling.NONE:
             return sum(x.output_dim for x in self.relative_attentions)
