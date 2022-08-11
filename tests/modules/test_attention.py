@@ -292,7 +292,19 @@ def test_multihead(
         ],
         subspace_pooling=subspace_pooling,
     ).double()
+
     output = multihead_attention(batch_latents, anchors_latents, anchors_targets)
+    if num_subspaces == 1 and subspace_pooling != SubspacePooling.LINEAR:
+        assert torch.equal(
+            output[AttentionOutput.OUTPUT],
+            RelativeAttention(
+                n_anchors=NUM_ANCHORS,
+                n_classes=N_CLASSES,
+                normalization_mode=NormalizationMode.L2,
+                similarity_mode=RelativeEmbeddingMethod.INNER,
+                values_mode=ValuesMethod.SIMILARITIES,
+            )(batch_latents, anchors_latents, anchors_targets)[AttentionOutput.OUTPUT],
+        )
 
     # Verify pooling dimensionality
     inner_attention_output_dim = multihead_attention.relative_attentions[0].output_dim

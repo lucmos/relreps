@@ -1,21 +1,62 @@
 #!/bin/bash
+# Reconstruction
 
+# Absolute
 python src/rae/run.py -m \
-  core.tags='[classification, relative, subspaces]' \
+  core.tags='[reconstruction, absolute, tab1]' \
+  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
+  nn/module=autoencoder \
+  nn/module/model=vae \
+  train=reconstruction \
+  nn.module.model.latent_dim=32,128,512,1024 \
+  "nn.module.model.hidden_dims=[32,64,128],[32,64,128,256]" \
   nn.data.anchors_num=500 \
-  nn/data/datasets=vision/cifar100 \
-  nn/module=classifier \
-  nn/module/model=rcnn \
-  nn.module.model.hidden_features=512 \
-  nn.module.model.values_mode=similarities \
-  nn.module.model.num_subspaces='2,4,8' \
-  nn.module.model.values_self_attention_nhead=null \
-  nn.module.model.transform_elements=null \
-  nn.module.model.normalization_mode=l2 \
-  nn.module.model.similarity_mode=inner \
-  nn.module.model.similarities_quantization_mode=null \
-  nn.module.model.similarities_bin_size=null \
-  nn.module.model.similarities_aggregation_mode=null \
-  nn.module.model.similarities_aggregation_n_groups=null \
-  nn.module.model.anchors_sampling_mode=null \
-  nn.module.model.n_anchors_sampling_per_class=null
+  train.trainer.max_epochs=50 \
+  'train.seed_index=0,1,2,3,4,5' \
+  nn.module.model.kld_weight=0.00025
+#  nn.module.model.kld_weight=0.0015,0.015,0.00015,0.00005,0.000005,0.0000005,0.0
+#
+#python src/rae/run.py -m \
+#  core.tags='[reconstruction, relative, tab1]' \
+#  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
+#  nn/module=autoencoder \
+#  nn/module/model=rel_vae \
+#  train=reconstruction \
+#  nn.module.model.latent_dim=32,128,512,1024 \
+#  "nn.module.model.hidden_dims=[32,64,128],[32,64,128,256]" \
+#  nn.data.anchors_num=500 \
+#  train.trainer.max_epochs=50 \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  nn.module.model.kld_weight=0.00025
+
+# Classifcation
+## Relative
+#python src/rae/run.py -m \
+#  core.tags='[classification, relative, tab1]' \
+#  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
+#  nn/module=classifier \
+#  nn/module/model=vision/relresnet \
+#  nn.module.model.resnet_size=18 \
+#  nn.module.model.input_size=224 \
+#  nn.module.model.use_pretrained=True \
+#  nn.module.model.finetune=False \
+#  nn.module.model.hidden_features=512 \
+#  nn.module.model.relative_attention.output_normalization_mode=layernorm \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  train.trainer.max_epochs=10
+#
+## Absolute
+#python src/rae/run.py -m \
+#  core.tags='[classification, absolute, tab1]' \
+#  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
+#  nn/module=classifier \
+#  nn/module/model=vision/resnet \
+#  nn.module.model.resnet_size=18 \
+#  nn.module.model.input_size=224 \
+#  nn.module.model.use_pretrained=True \
+#  nn.module.model.finetune=False \
+#  nn.module.model.hidden_features=512 \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  train.trainer.max_epochs=10
+
+
