@@ -67,7 +67,7 @@ def run(cfg: DictConfig) -> str:
     pylogger.info(f"Instantiating <{cfg.nn.data['_target_']}>")
     datamodule: pl.LightningDataModule = hydra.utils.instantiate(cfg.nn.data, _recursive_=False)
 
-    metadata: Optional[MetaData] = getattr(datamodule, "metadata", None)
+    metadata: Optional[MetaData] = datamodule.metadata
     if metadata is None:
         pylogger.warning(f"No 'metadata' attribute found in datamodule <{datamodule.__class__.__name__}>")
 

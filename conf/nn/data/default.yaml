@@ -10,19 +10,22 @@ anchors_idxs: null #[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
 #   ALl anchors from class seven
 #  anchors_idx: [0, 17, 26, 34, 36, 41, 60, 64, 70, 75]
 
-datasets: ???
-
-transforms:
-  _target_: torchvision.transforms.Compose
+datasets:
   transforms:
-    - _target_: torchvision.transforms.Resize
-      size: ${nn.module.model.input_size}
+    _target_: torchvision.transforms.Compose
+    transforms:
+      - _target_: rae.data.data_transforms.ChannelAdapt
+        in_channels: ${nn.data.datasets.in_channels}
+        out_channels: ${nn.module.model.in_channels}
 
-    - _target_: torchvision.transforms.ToTensor
+      - _target_: torchvision.transforms.Resize
+        size: ${nn.module.model.input_size}
 
-    - _target_: torchvision.transforms.Normalize
-      mean: [0.485, 0.456, 0.406]
-      std: [0.229, 0.224, 0.225]
+      - _target_: torchvision.transforms.ToTensor
+
+  #    - _target_: torchvision.transforms.Normalize
+  #      mean: [0.485, 0.456, 0.406]
+  #      std: [0.229, 0.224, 0.225]
 
 
 defaults:

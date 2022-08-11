@@ -179,7 +179,6 @@ class MyDataModule(pl.LightningDataModule):
         anchors_num: int,
         anchors_idxs: List[int],
         latent_dim: int,
-        transforms: Sequence[Dict[str, str]],
     ):
         super().__init__()
         self.datasets = datasets
@@ -207,7 +206,6 @@ class MyDataModule(pl.LightningDataModule):
 
         self.val_images_fixed_idxs: List[int] = val_images_fixed_idxs
         self.anchors: Dict[str, Any] = None
-        self.transforms = transforms
 
     def extract_batch(self, dataset: Dataset, indices: Sequence[int]) -> Dict[str, Any]:
         images = []
@@ -344,7 +342,7 @@ class MyDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
         # transform = transforms.Compose([transforms.ToTensor()])  # , transforms.Normalize((0.1307,), (0.3081,))])
-        transform = hydra.utils.instantiate(self.transforms)
+        transform = hydra.utils.instantiate(self.datasets.transforms)
 
         # Here you should instantiate your datasets, you may also split the train into train and validation if needed.
         if (stage is None or stage == "fit") and (self.train_dataset is None and self.val_datasets is None):
