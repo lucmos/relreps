@@ -178,7 +178,10 @@ def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd
 
     PERFORMANCE_TSV.unlink(missing_ok=True)
 
-    performance = {**{x: [] for x in ("model_type", "dataset_name")}, **{k: [] for k in CONSIDERED_METRICS.keys()}}
+    performance = {
+        **{x: [] for x in ("run_id", "model_type", "dataset_name")},
+        **{k: [] for k in CONSIDERED_METRICS.keys()},
+    }
 
     for dataset_name, dataset_pred in RUNS.items():
         for model_type, run_ids in dataset_pred.items():
@@ -195,6 +198,7 @@ def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd
 
                 metrics.update(run_predictions, run_targets)
 
+                performance["run_id"].append(run_id)
                 performance["dataset_name"].append(dataset_name)
                 performance["model_type"].append(model_type)
                 for metric_name, metric_value in metrics.compute().items():
@@ -211,7 +215,8 @@ class Display(StrEnum):
 
 
 def display_performance(performance_df, display: Display):
-    aggregated_perfomance = performance_df.groupby(
+    aggregated_performnace = performance_df.drop(columns=["run_id"])
+    aggregated_perfomance = aggregated_performnace.groupby(
         [
             "dataset_name",
             "model_type",
