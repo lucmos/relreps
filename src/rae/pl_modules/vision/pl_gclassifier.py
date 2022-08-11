@@ -192,7 +192,7 @@ class LightningClassifier(AbstractLightningModule):
         # )
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.1")
 def main(cfg: omegaconf.DictConfig) -> None:
     """Debug main to quickly develop the Lightning Module.
 
