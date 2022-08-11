@@ -1,36 +1,26 @@
 import logging
 from collections import defaultdict
+from enum import auto
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple, Type, Union
 
-import hydra
+import numpy as np
 import pandas as pd
+import rich
 import torch
 import typer
-from omegaconf import DictConfig, OmegaConf
-from pytorch_lightning import LightningModule
-from torch.utils.data import DataLoader
-from torchmetrics import Accuracy, F1Score, MetricCollection
-from tqdm import tqdm
 
-from nn_core.serialization import NNCheckpointIO
-
-from rae.data.vision.datamodule import MyDataModule
-from rae.modules.enumerations import Output
-from rae.pl_modules.vision.pl_gclassifier import LightningClassifier
+try:
+    # be ready for 3.10 when it drops
+    from enum import StrEnum
+except ImportError:
+    from backports.strenum import StrEnum
 
 logging.getLogger().setLevel(logging.ERROR)
 
 
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 32
-CONSIDERED_METRICS = {
-    "acc/weighted": lambda num_classes: Accuracy(average="weighted", num_classes=num_classes),
-    "acc/micro": lambda num_classes: Accuracy(average="macro", num_classes=num_classes),
-    "acc/macro": lambda num_classes: Accuracy(average="micro", num_classes=num_classes),
-    "f1/macro": lambda num_classes: F1Score(average="macro", num_classes=num_classes),
-    "f1/micro": lambda num_classes: F1Score(average="micro", num_classes=num_classes),
-}
+
 
 EXPERIMENT_ROOT = Path(__file__).parent
 EXPERIMENT_CHECKPOINTS = EXPERIMENT_ROOT / "checkpoints"
@@ -75,26 +65,40 @@ DATASET_NUM_CLASSES = {
 MODELS = sorted(checkpoints[DATASETS[0]].keys())
 
 
-def parse_checkpoint(
-    module_class: Type[LightningModule],
-    checkpoint_path: Path,
-    map_location: Optional[Union[Dict[str, str], str, torch.device, int, Callable]] = None,
-) -> Tuple[LightningModule, DictConfig]:
-    if checkpoint_path.name.endswith(".ckpt.zip"):
-        checkpoint = NNCheckpointIO.load(path=checkpoint_path, map_location=map_location)
-        model = module_class._load_model_state(checkpoint=checkpoint, metadata=checkpoint.get("metadata", None))
-        model.eval()
-        return (
-            model,
-            OmegaConf.create(checkpoint["cfg"]),
-        )
-    raise ValueError(f"Wrong checkpoint: {checkpoint_path}")
-
-
 def compute_predictions(force_predict: bool) -> pd.DataFrame:
     if PREDICTIONS_TSV.exists() and not force_predict:
         return pd.read_csv(PREDICTIONS_TSV, sep="\t", index_col=0)
+    rich.print("Computing the predictions")
     PREDICTIONS_TSV.unlink(missing_ok=True)
+
+    import hydra
+    from omegaconf import DictConfig, OmegaConf
+    from torch import nn
+    from torch.utils.data import DataLoader
+    from tqdm import tqdm
+
+    from nn_core.serialization import NNCheckpointIO
+
+    from rae.data.vision.datamodule import MyDataModule
+    from rae.modules.enumerations import Output
+    from rae.pl_modules.vision.pl_gclassifier import LightningClassifier
+
+    DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def parse_checkpoint(
+        module_class: Type[nn.Module],
+        checkpoint_path: Path,
+        map_location: Optional[Union[Dict[str, str], str, torch.device, int, Callable]] = None,
+    ) -> Tuple[nn.Module, DictConfig]:
+        if checkpoint_path.name.endswith(".ckpt.zip"):
+            checkpoint = NNCheckpointIO.load(path=checkpoint_path, map_location=map_location)
+            model = module_class._load_model_state(checkpoint=checkpoint, metadata=checkpoint.get("metadata", None))
+            model.eval()
+            return (
+                model,
+                OmegaConf.create(checkpoint["cfg"]),
+            )
+        raise ValueError(f"Wrong checkpoint: {checkpoint_path}")
 
     predictions = {x: [] for x in ("run_id", "model_type", "dataset_name", "sample_idx", "pred", "target")}
     for dataset_name in (dataset_tqdm := tqdm(DATASETS, leave=True)):
@@ -160,6 +164,18 @@ def compute_predictions(force_predict: bool) -> pd.DataFrame:
 def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd.DataFrame:
     if PERFORMANCE_TSV.exists() and not force_measure:
         return pd.read_csv(PERFORMANCE_TSV, sep="\t", index_col=0)
+    rich.print("Computing the performance")
+
+    from torchmetrics import Accuracy, F1Score, MetricCollection
+
+    CONSIDERED_METRICS = {
+        "acc/weighted": lambda num_classes: Accuracy(average="weighted", num_classes=num_classes),
+        "acc/micro": lambda num_classes: Accuracy(average="macro", num_classes=num_classes),
+        "acc/macro": lambda num_classes: Accuracy(average="micro", num_classes=num_classes),
+        "f1/macro": lambda num_classes: F1Score(average="macro", num_classes=num_classes),
+        "f1/micro": lambda num_classes: F1Score(average="micro", num_classes=num_classes),
+    }
+
     PERFORMANCE_TSV.unlink(missing_ok=True)
 
     performance = {**{x: [] for x in ("model_type", "dataset_name")}, **{k: [] for k in CONSIDERED_METRICS.keys()}}
@@ -189,10 +205,53 @@ def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd
     return performance_df
 
 
-def evaluate(force_predict: bool = False, force_measure: bool = True):
-    predictions = compute_predictions(force_predict=force_predict)
-    performance_df = measure_predictions(predictions, force_measure=force_measure)
-    print(performance_df)
+class Display(StrEnum):
+    DF = auto()
+    LATEX = auto()
+
+
+def display_performance(performance_df, display: Display):
+    aggregated_perfomance = performance_df.groupby(
+        [
+            "dataset_name",
+            "model_type",
+        ]
+    ).agg([np.mean, np.std])
+    aggregated_perfomance = (aggregated_perfomance * 100).round(2)
+
+    if display == Display.DF:
+        rich.print(aggregated_perfomance)
+
+    elif display == Display.LATEX:
+        COLUMN_ORDER = ["mnist", "cmnist", "fmnist", "cifar10", "cifar100", "shapenet", "faust", "coma", "amz"]
+        METRIC_CONSIDERED = "f1/macro"
+
+        df = aggregated_perfomance[METRIC_CONSIDERED]
+        classification_rel = r"Relative & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
+        classification_abs = r"Absolute & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
+
+        def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str) -> str:
+            try:
+                mean_std = df.loc[dataset_name, model_type]
+                return rf"${mean_std['mean']:.2f} \pm {mean_std['std']:.2f}$"
+            except (AttributeError, KeyError):
+                return "?"
+
+        classification_rel = classification_rel.format(
+            *[extract_mean_std(df, dataset_name, "rel") for dataset_name in COLUMN_ORDER]
+        )
+        classification_abs = classification_abs.format(
+            *[extract_mean_std(df, dataset_name, "abs") for dataset_name in COLUMN_ORDER]
+        )
+
+        print(classification_rel)
+        print(classification_abs)
+
+
+def evaluate(force_predict: bool = False, force_measure: bool = False, display: Display = Display.DF):
+    predictions_df = compute_predictions(force_predict=force_predict)
+    performance_df = measure_predictions(predictions_df, force_measure=force_measure)
+    display_performance(performance_df, display=display)
 
 
 if __name__ == "__main__":
