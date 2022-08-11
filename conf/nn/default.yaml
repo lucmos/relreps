@@ -39,12 +39,11 @@ data:
     test: 16
 
 module:
-  input_size: 32
+  model:
+    input_size: ${nn.data.datasets.input_size}
 
   plot_n_val_samples: 1000
   fit_pca_each_epoch: True
-
-  loss: ???
 
   optimizer:
     #  Adam-oriented deep learning
@@ -67,4 +66,4 @@ module:
 defaults:
   - _self_
   - data: default # pick one of the yamls in nn/data/
-  - module: classifier # ae_variational # classifier #  ae_deterministic #
+  - module: autoencoder # ae_variational # classifier #  ae_deterministic #

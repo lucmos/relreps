@@ -1,8 +1,41 @@
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 import torch
 from torch import nn
 from torchvision import models
+
+
+def build_transposed_convolution(
+    in_channels: int,
+    out_channels: int,
+    target_output_width,
+    target_output_height,
+    input_width,
+    input_height,
+    stride: Tuple[int, int] = (1, 1),
+    padding: Tuple[int, int] = (1, 1),
+    output_padding: Tuple[int, int] = (0, 0),
+    dilation: int = 1,
+) -> nn.ConvTranspose2d:
+    # kernel_w = (metadata.width - (fake_out.width −1)×stride[0] + 2×padding[0] - output_padding[0]  - 1)/dilation[0] + 1
+    # kernel_h = (metadata.height - (fake_out.height −1)×stride[1] + 2×padding[1] - output_padding[1]  - 1)/dilation[1] + 1
+    kernel_w = (
+        target_output_width - (input_width - 1) * stride[0] + 2 * padding[0] - output_padding[0] - 1
+    ) / dilation + 1
+    kernel_h = (
+        target_output_height - (input_height - 1) * stride[1] + 2 * padding[1] - output_padding[1] - 1
+    ) / dilation + 1
+    assert kernel_w > 0 and kernel_h > 0
+
+    return nn.ConvTranspose2d(
+        in_channels=in_channels,
+        out_channels=out_channels,
+        kernel_size=(int(kernel_w), int(kernel_h)),
+        stride=stride,
+        padding=padding,
+        output_padding=output_padding,
+        dilation=dilation,
+    )
 
 
 def stratified_sampling(targets: torch.Tensor, samples_per_class: int) -> torch.Tensor:
