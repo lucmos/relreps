@@ -25,7 +25,7 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 32
 EXPERIMENT_ROOT = Path(__file__).parent
 EXPERIMENT_CHECKPOINTS = EXPERIMENT_ROOT / "checkpoints"
-PREDICTIONS_CSV = EXPERIMENT_ROOT / "predictions.csv"
+PREDICTIONS_CSV = EXPERIMENT_ROOT / "predictions.tsv"
 
 DATASET_SANITY = {
     "mnist": ("rae.data.vision.mnist.MNISTDataset", "test"),
