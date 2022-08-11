@@ -14,7 +14,6 @@ class VanillaVAE(nn.Module):
         self,
         metadata,
         input_size,
-        in_channels: int,
         latent_dim: int,
         kld_weight: float,
         hidden_dims: List = None,
@@ -43,7 +42,7 @@ class VanillaVAE(nn.Module):
         self.encoder_shape_sequence = [
             [metadata.width, metadata.height],
         ]
-        running_channels = in_channels
+        running_channels = metadata.n_channels
         for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
@@ -63,7 +62,7 @@ class VanillaVAE(nn.Module):
 
         self.encoder = nn.Sequential(*modules)
         self.encoder_out_shape = infer_dimension(
-            metadata.width, metadata.height, n_channels=in_channels, model=self.encoder, batch_size=2
+            metadata.width, metadata.height, n_channels=metadata.n_channels, model=self.encoder, batch_size=2
         ).shape
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
         self.fc_mu = nn.Linear(encoder_out_numel, latent_dim)
@@ -103,7 +102,7 @@ class VanillaVAE(nn.Module):
         self.final_layer = nn.Sequential(
             nn.BatchNorm2d(hidden_dims[-1]),
             nn.LeakyReLU(),
-            nn.Conv2d(hidden_dims[-1], out_channels=3, kernel_size=3, padding=1),
+            nn.Conv2d(hidden_dims[-1], out_channels=metadata.n_channels, kernel_size=3, padding=1),
             nn.Tanh(),
         )
 
@@ -169,16 +168,17 @@ class VanillaVAE(nn.Module):
         :param kwargs:
         :return:
         """
+        kld_weight: float = kwargs.get("kld_weight", self.kld_weight)
         recons = model_out[Output.RECONSTRUCTION]
         input = batch["image"]
         mu = model_out[Output.LATENT_MU]
         log_var = model_out[Output.LATENT_LOGVAR]
 
-        recons_loss = F.mse_loss(recons, input)
+        recons_loss = F.mse_loss(recons, input, reduction="mean")
 
         kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp(), dim=1), dim=0)
 
-        loss = recons_loss + self.kld_weight * kld_loss
+        loss = recons_loss + kld_weight * kld_loss
         return {"loss": loss, "reconstruction": recons_loss.detach(), "kld": -kld_loss.detach()}
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:

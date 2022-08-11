@@ -30,7 +30,6 @@ class LightningAutoencoder(AbstractLightningModule):
         self.autoencoder = hydra.utils.instantiate(
             kwargs["model"] if "model" in kwargs else kwargs["autoencoder"],
             metadata=metadata,
-            in_channels=metadata.anchors_images.shape[1],
         )
 
         self.reconstruction_quality_metrics = {

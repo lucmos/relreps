@@ -1,4 +1,4 @@
 _target_: rae.modules.vae.VanillaVAE
 latent_dim: 500
 hidden_dims: null
-kld_weight: 1
+kld_weight: 0.00025
