@@ -1,16 +1,17 @@
 import itertools
 import logging
-from typing import Dict, Any, Mapping, Set, Collection, Sequence
+from typing import Dict, Any, Set, Collection
 
 import torch
 from hydra.utils import instantiate
 from omegaconf import DictConfig
 from torch import nn
+from torch.types import Device
 
 from rae.data.text.datamodule import MetaData, EncodingLevel
-from rae.modules.blocks import DeepProjection
 from rae.modules.enumerations import AttentionOutput, Output
-from rae.utils.tensor_ops import contiguous_mean
+from rae.modules.text.encoder import TextEncoder
+from rae.utils.utils import to_device
 
 pylogger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class TextClassifier(nn.Module):
         self,
         metadata: MetaData,
         relative_projection: DictConfig,
+        text_encoder: TextEncoder,
         batch_pre_reduce: Collection[EncodingLevel] = None,
         anchors_reduce: Collection[EncodingLevel] = None,
         batch_post_reduce: Collection[EncodingLevel] = None,
@@ -35,18 +37,11 @@ class TextClassifier(nn.Module):
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.metadata = metadata
-        self.register_buffer("anchor_samples", metadata.anchor_samples)
-        self.register_buffer("anchor_latents", metadata.anchor_latents)
+        self.text_encoder: TextEncoder = instantiate(text_encoder)
 
-        self.register_buffer("anchors_words_per_sentence", metadata.anchor_sections["words_per_sentence"])
-        self.register_buffer("anchors_sentences_per_text", metadata.anchor_sections["sentences_per_text"])
-        self.register_buffer("anchors_words_per_text", metadata.anchor_sections["words_per_text"])
+        self.text_encoder.add_stopwords(stopwords=metadata.stopwords)
 
         n_classes: int = len(self.metadata.class_to_idx)
-
-        self.relative_projection = instantiate(
-            relative_projection, n_anchors=len(metadata.anchor_idxs), n_classes=n_classes
-        )
 
         self.pre_reduce: Set[EncodingLevel] = (
             set(batch_pre_reduce) if batch_pre_reduce is not None and len(batch_pre_reduce) > 0 else {}
@@ -57,6 +52,21 @@ class TextClassifier(nn.Module):
         self.post_reduce: Set[EncodingLevel] = (
             set(batch_post_reduce) if batch_post_reduce is not None and len(batch_post_reduce) > 0 else {}
         )
+
+        self.anchor_batch = {
+            key: [sample[key] for sample in metadata.anchor_samples] for key in metadata.anchor_samples[0].keys()
+        }
+        anchor_encodings = self.text_encoder.collate_fn(batch=self.anchor_batch)
+        n_anchors = (
+            len(anchor_encodings["sections"]["words_per_text"])
+            if EncodingLevel.TEXT in self.anchors_reduce
+            else (
+                len(anchor_encodings["sections"]["words_per_sentence"])
+                if EncodingLevel.SENTENCE in self.anchors_reduce
+                else anchor_encodings["sections"]["words_per_sentence"].sum()
+            )
+        )
+        self.relative_projection = instantiate(relative_projection, n_anchors=n_anchors, n_classes=n_classes)
 
         # assert len(set.intersection(self.pre_reduce, self.post_reduce)) == 0
         assert all(x < y for x, y in itertools.product(self.pre_reduce, self.post_reduce))
@@ -69,25 +79,17 @@ class TextClassifier(nn.Module):
             #     dropout=0.2,
             #     activation=nn.SiLU(),
             # ),
-            # nn.Linear(
-            #     in_features=self.relative_projection.output_dim,
-            #     out_features=n_classes,
-            # ),
-            nn.ReLU(),
-        )
-        # TODO: remove sequential1, here just to test stuff
-        self.sequential1 = nn.Sequential(
             nn.Linear(
-                in_features=300,
+                in_features=self.relative_projection.output_dim,
                 out_features=n_classes,
             ),
-            nn.ReLU(),
+            nn.Tanh(),
         )
 
     def set_finetune_mode(self):
         pass
 
-    def forward(self, batch: Mapping[str, Any]) -> Dict[str, torch.Tensor]:
+    def forward(self, batch: Dict[str, Any], device: Device) -> Dict[str, torch.Tensor]:
         """Forward pass.
 
         Args:
@@ -96,18 +98,19 @@ class TextClassifier(nn.Module):
         Returns:
             predictions with size [batch, n_classes]
         """
+        batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
         x = batch["encodings"]
 
-        x, reduced_to_sentence = self.metadata.text_encoder.reduce(
+        x, reduced_to_sentence = EncodingLevel.reduce(
             encodings=x, **batch["sections"], reduced_to_sentence=False, reduce_transformations=self.pre_reduce
         )
 
         with torch.no_grad():
-            anchors, _ = self.metadata.text_encoder.reduce(
-                encodings=self.anchor_samples,
-                words_per_sentence=self.anchors_words_per_sentence,
-                sentences_per_text=self.anchors_sentences_per_text,
-                words_per_text=self.anchors_words_per_text,
+            anchor_batch = to_device(self.text_encoder.collate_fn(batch=self.anchor_batch), device=device)
+
+            anchors, _ = EncodingLevel.reduce(
+                encodings=anchor_batch["encodings"],
+                **anchor_batch["sections"],
                 reduced_to_sentence=False,
                 reduce_transformations=self.anchors_reduce,
             )
@@ -116,18 +119,16 @@ class TextClassifier(nn.Module):
         out = attention_output[AttentionOutput.OUTPUT]
         out = self.sequential(out)
 
-        out, _ = self.metadata.text_encoder.reduce(
+        out, _ = EncodingLevel.reduce(
             encodings=out,
             **batch["sections"],
             reduced_to_sentence=reduced_to_sentence,
             reduce_transformations=self.post_reduce,
         )
 
-        out = self.sequential1(x)
-
         return {
-            Output.LOGITS: out,  # ~ (num_texts, num_classes) == targets
-            Output.DEFAULT_LATENT: self.metadata.text_encoder.reduce(
+            Output.LOGITS: out,
+            Output.DEFAULT_LATENT: EncodingLevel.reduce(
                 encodings=x,
                 **batch["sections"],
                 reduced_to_sentence=reduced_to_sentence,

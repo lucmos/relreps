@@ -53,9 +53,9 @@ class LightningTextClassifier(AbstractLightningModule):
         self.model = hydra.utils.instantiate(kwargs["model"], metadata=metadata, _recursive_=False)
         self.loss = hydra.utils.instantiate(self.hparams.loss)
 
-        self.register_buffer("anchor_samples", self.metadata.anchor_samples)
-        self.register_buffer("anchor_latents", self.metadata.anchor_latents)
-        self.register_buffer("fixed_samples", self.metadata.fixed_samples)
+        # self.register_buffer("anchor_samples", self.metadata.anchor_samples)
+        # self.register_buffer("anchor_latents", self.metadata.anchor_latents)
+        # self.register_buffer("fixed_samples", self.metadata.fixed_samples)
 
         self.df_columns = [
             "sample_index",
@@ -103,7 +103,7 @@ class LightningTextClassifier(AbstractLightningModule):
         Returns:
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
-        return self.model(batch, *args, **kwargs)
+        return self.model(batch, device=self.device, *args, **kwargs)
 
     def step(self, batch, batch_index: int, stage: Stage) -> Mapping[str, Any]:
         out = self(batch)

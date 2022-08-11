@@ -1,8 +1,9 @@
-from typing import Any, Dict, Iterable, Sequence, Union
+from typing import Any, Dict, Iterable, Sequence, Union, MutableMapping, Mapping
 
 import torch
 import torch.nn.functional as F
 from sklearn.decomposition import PCA
+from torch.types import Device
 
 
 def check_all_equal_size(elements: Iterable[Any]) -> bool:
@@ -68,3 +69,13 @@ def add_2D_latents(
     aggregation["latent_1_pca"] = latents_pca[:, 1]
 
     return aggregation
+
+
+def to_device(mapping: MutableMapping, device: Device):
+    mapped = {
+        key: to_device(value, device=device)
+        if isinstance(value, Mapping)
+        else (value.to(device) if hasattr(value, "to") else value)
+        for key, value in mapping.items()
+    }
+    return mapped
