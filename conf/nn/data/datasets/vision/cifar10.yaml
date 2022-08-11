@@ -1,0 +1,13 @@
+input_size: 32
+
+anchors:
+  _target_: rae.data.vision.cifar10.CIFAR10Dataset
+
+train:
+  _target_: rae.data.vision.cifar10.CIFAR10Dataset
+
+val:
+  - _target_: rae.data.vision.cifar10.CIFAR10Dataset
+
+#    test:
+#      - _target_: rae.data.cifar10.CIFAR10Dataset

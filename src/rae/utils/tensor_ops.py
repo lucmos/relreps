@@ -132,6 +132,7 @@ def infer_dimension(width: int, height: int, n_channels: int, model: nn.Module, 
 def freeze(model: nn.Module) -> None:
     for param in model.parameters():
         param.requires_grad = False
+        param.grad = None
 
 
 def get_resnet_model(resnet_size: int, use_pretrained: bool) -> (nn.Module, int):

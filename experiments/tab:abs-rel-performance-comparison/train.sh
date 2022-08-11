@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# VISION
+
 # Relative
 python src/rae/run.py -m \
   core.tags='[classification, relative, tab1]' \
@@ -27,4 +30,3 @@ python src/rae/run.py -m \
   nn.module.model.hidden_features=512 \
   'train.seed_index=0,1,2,3,4,5' \
   train.trainer.max_epochs=10
-

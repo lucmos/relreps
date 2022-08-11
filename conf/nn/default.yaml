@@ -29,8 +29,8 @@ data:
   gpus: ${train.trainer.gpus}
 
   num_workers:
-    train: 8
-    val: 4
+    train: 4
+    val: 2
     test: 0
 
   batch_size:
@@ -67,4 +67,4 @@ module:
 defaults:
   - _self_
   - data: default # pick one of the yamls in nn/data/
-  - module: vision/classifier # ae_variational # classifier #  ae_deterministic #
+  - module: classifier # ae_variational # classifier #  ae_deterministic #

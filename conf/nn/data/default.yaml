@@ -1,4 +1,4 @@
-_target_: rae.data.datamodule.MyDataModule
+_target_: rae.data.vision.datamodule.MyDataModule
 
 anchors_mode: "stratified_subset" # "stratified", "stratified_subset", "fixed", "random_images", "random_latents"
 anchors_num: 500
@@ -27,4 +27,4 @@ transforms:
 
 defaults:
   - _self_
-  - datasets: vision/cifar100 # pick one of the yamls in nn/data/
+  - datasets: vision/fmnist # pick one of the yamls in nn/data/
