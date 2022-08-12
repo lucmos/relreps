@@ -8,6 +8,7 @@ import hydra.utils
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.nn import ModuleList
 
 from rae.utils.tensor_ops import stratified_mean, stratified_sampling
 
@@ -530,7 +531,7 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
         self.subspace_in_features = in_features // self.num_subspaces
         assert (self.in_features / self.num_subspaces) == (self.in_features // self.num_subspaces)
 
-        self.relative_attentions: Sequence[AbstractRelativeAttention] = [
+        self.relative_attentions: ModuleList = nn.ModuleList(
             (
                 hydra.utils.instantiate(
                     relative_attention,
@@ -543,7 +544,7 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
                 else relative_attention
             )
             for relative_attention in relative_attentions
-        ]
+        )
 
         assert len(set(x.output_dim for x in self.relative_attentions)) == 1
         self.subspace_output_dim: int = list(self.relative_attentions)[0].output_dim
