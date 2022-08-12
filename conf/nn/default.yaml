@@ -50,7 +50,7 @@ module:
     #  Adam-oriented deep learning
     _target_: torch.optim.Adam
     #  These are all default parameters for the Adam optimizer
-    lr: 2e-4
+    lr: 1e-3
     betas: [ 0.9, 0.999 ]
     eps: 1e-08
     weight_decay: 0
