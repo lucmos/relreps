@@ -22,7 +22,7 @@ restore:
 
 monitor:
   metric: 'val_stage/mse'
-  mode: 'max'
+  mode: 'min'
 
 callbacks:
   - _target_: pytorch_lightning.callbacks.EarlyStopping
