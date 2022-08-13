@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from rae.modules.attention import AttentionOutput, AbstractRelativeAttention
+from rae.modules.attention import AbstractRelativeAttention, AttentionOutput
 from rae.modules.enumerations import Output
 from rae.utils.tensor_ops import build_transposed_convolution, infer_dimension
 
@@ -68,8 +68,6 @@ class VanillaRAE(nn.Module):
             metadata.width, metadata.height, n_channels=metadata.n_channels, model=self.encoder, batch_size=2
         ).shape
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
-        self.fc_mu = nn.Linear(encoder_out_numel, latent_dim)
-        self.fc_var = nn.Linear(encoder_out_numel, latent_dim)
 
         self.relative_attention: AbstractRelativeAttention = (
             hydra.utils.instantiate(
@@ -81,8 +79,11 @@ class VanillaRAE(nn.Module):
             if not isinstance(relative_attention, AbstractRelativeAttention)
             else relative_attention
         )
+        self.fc_mu = nn.Linear(self.relative_attention.output_dim, latent_dim)
+        self.fc_var = nn.Linear(self.relative_attention.output_dim, latent_dim)
+
         # Build Decoder
-        self.decoder_input = nn.Linear(self.relative_attention.output_dim, encoder_out_numel)
+        self.decoder_input = nn.Linear(latent_dim, encoder_out_numel)
 
         hidden_dims.reverse()
         hidden_dims = hidden_dims + hidden_dims[-1:]
@@ -134,12 +135,7 @@ class VanillaRAE(nn.Module):
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
 
-        # Split the result into mu and var components
-        # of the latent Gaussian distribution
-        mu = self.fc_mu(result)
-        log_var = self.fc_var(result)
-
-        return [mu, log_var]
+        return result
 
     def decode(self, z: Tensor) -> Tensor:
         """
@@ -173,27 +169,33 @@ class VanillaRAE(nn.Module):
         new_anchors_targets: Optional[torch.Tensor] = None,
         **kwargs,
     ) -> Dict[Output, Tensor]:
-        x_mu, x_log_var = self.encode(x)
-        reparametrized_x = self.reparameterize(x_mu, x_log_var)
+        x_embedded = self.encode(x)
 
         with torch.no_grad():
-            anchor_mu, _ = self.encode(self.anchors_images if new_anchors_images is None else new_anchors_images)
+            anchors_embedded = self.encode(self.anchors_images if new_anchors_images is None else new_anchors_images)
 
         attention_output = self.relative_attention(
-            x=reparametrized_x,
-            anchors=anchor_mu,
+            x=x_embedded,
+            anchors=anchors_embedded,
             anchors_targets=self.anchors_targets if new_anchors_targets is None else new_anchors_targets,
         )
 
-        x_recon = self.decode(attention_output[AttentionOutput.OUTPUT])
+        # Split the result into mu and var components
+        # of the latent Gaussian distribution
+        relative_mu = self.fc_mu(attention_output[AttentionOutput.OUTPUT])
+        relative_log_var = self.fc_var(attention_output[AttentionOutput.OUTPUT])
+
+        reparametrized_relative = self.reparameterize(relative_mu, relative_log_var)
+
+        x_recon = self.decode(reparametrized_relative)
 
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: x_mu,
-            Output.BATCH_LATENT: reparametrized_x,
-            Output.ANCHORS_LATENT: anchor_mu,
-            Output.LATENT_MU: x_mu,
-            Output.LATENT_LOGVAR: x_log_var,
+            Output.DEFAULT_LATENT: x_embedded,
+            Output.BATCH_LATENT: x_embedded,
+            Output.ANCHORS_LATENT: anchors_embedded,
+            Output.LATENT_MU: relative_mu,
+            Output.LATENT_LOGVAR: relative_log_var,
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
         }
 
