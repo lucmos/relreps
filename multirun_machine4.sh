@@ -3,31 +3,18 @@
 
 # Absolute
 python src/rae/run.py -m \
-  core.tags='[reconstruction, absolute, tab1]' \
+  core.tags='[reconstruction, absolute, tab1, resweep]' \
+  'train.seed_index=0,1,2,3,4,5' \
   'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
   nn/module=autoencoder \
   nn/module/model=vae \
   train=reconstruction \
-  nn.module.model.latent_dim=32,128,512,1024 \
-  "nn.module.model.hidden_dims=[32,64,128],[32,64,128,256]" \
+  nn.module.model.latent_dim=256 \
+  "nn.module.model.hidden_dims=[32,64,128,256]" \
   nn.data.anchors_num=500 \
-  train.trainer.max_epochs=50 \
-  'train.seed_index=0,1,2,3,4,5' \
-  nn.module.model.kld_weight=0.00025
-#  nn.module.model.kld_weight=0.0015,0.015,0.00015,0.00005,0.000005,0.0000005,0.0
-#
-#python src/rae/run.py -m \
-#  core.tags='[reconstruction, relative, tab1]' \
-#  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
-#  nn/module=autoencoder \
-#  nn/module/model=rel_vae \
-#  train=reconstruction \
-#  nn.module.model.latent_dim=32,128,512,1024 \
-#  "nn.module.model.hidden_dims=[32,64,128],[32,64,128,256]" \
-#  nn.data.anchors_num=500 \
-#  train.trainer.max_epochs=50 \
-#  'train.seed_index=0,1,2,3,4,5' \
-#  nn.module.model.kld_weight=0.00025
+  train.trainer.max_epochs=100 \
+  nn.module.model.kld_weight=0.0002
+
 
 # Classifcation
 ## Relative
