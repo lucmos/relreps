@@ -317,6 +317,7 @@ class RelativeAttention(AbstractRelativeAttention):
                 in_features=self.self_attention_hidden_dim, out_features=1, bias=False
             )
         elif values_mode == ValuesMethod.RELATIVE_ANCHORS_ATTENTION:
+            self.sim_norm = nn.LayerNorm(normalized_shape=self.n_anchors)
             self.anchors_relative_attention = RelativeAttention(
                 n_anchors=n_anchors,
                 n_classes=n_classes,
@@ -447,8 +448,9 @@ class RelativeAttention(AbstractRelativeAttention):
 
             output = output.squeeze(-1)
         elif self.values_mode == ValuesMethod.RELATIVE_ANCHORS_ATTENTION:
+            weights = self.sim_norm(quantized_similarities)
             # weights = F.softmax(quantized_similarities, dim=-1)
-            weights = quantized_similarities
+            # weights = quantized_similarities
 
             relative_anchors = self.anchors_relative_attention(
                 x=original_anchors,
