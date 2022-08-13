@@ -1,11 +1,11 @@
 import logging
 import math
-from typing import Sequence, Tuple
+from typing import Optional, Sequence, Tuple
 
 import torch
 from torch import nn
 
-from rae.utils.tensor_ops import build_transposed_convolution, infer_dimension
+from rae.utils.tensor_ops import infer_dimension
 
 pylogger = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ def build_dynamic_encoder_decoder(
     width,
     height,
     n_channels,
-    hidden_dims: Sequence[int] = (32, 64, 128, 256),
+    hidden_dims: Optional[Sequence[int]],
 ) -> Tuple[nn.Module, Sequence[int], nn.Module]:
     """Builds a dynamic convolutional encoder-decoder pair with parametrized hidden dimensions number and size.
 
@@ -130,6 +130,9 @@ def build_dynamic_encoder_decoder(
         the encoder, the shape in the latent space, the decoder
     """
     modules = []
+
+    if hidden_dims is None:
+        hidden_dims = (32, 64, 128, 256)
 
     # Build Encoder
     encoder_shape_sequence = [
@@ -155,8 +158,7 @@ def build_dynamic_encoder_decoder(
 
     encoder = nn.Sequential(*modules)
 
-    encoder_out_shape = infer_dimension(width, height, n_channels=n_channels, model=encoder, batch_size=2).shape
-    encoder_out_numel = math.prod(encoder_out_shape[1:])
+    encoder_out_shape = infer_dimension(width, height, n_channels=n_channels, model=encoder, batch_size=1).shape
 
     # Build Decoder
     hidden_dims = list(reversed(hidden_dims))
