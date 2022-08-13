@@ -295,6 +295,7 @@ class RelativeAttention(AbstractRelativeAttention):
             else:
                 self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
         elif values_mode == ValuesMethod.SELF_ATTENTION:
+            self.sim_norm = nn.LayerNorm(normalized_shape=self.output_dim)
             self.sim_to_queries = nn.Linear(1, self.hidden_features, bias=False)
             self.sim_to_keys = nn.Linear(1, self.hidden_features, bias=False)
             self.sim_to_values = nn.Linear(1, self.hidden_features, bias=False)
@@ -404,7 +405,8 @@ class RelativeAttention(AbstractRelativeAttention):
         elif self.values_mode == ValuesMethod.SIMILARITIES:
             output = quantized_similarities
         elif self.values_mode == ValuesMethod.SELF_ATTENTION:
-            relative_output = quantized_similarities.unsqueeze(-1)
+            relative_output = self.sim_norm(quantized_similarities)
+            relative_output = relative_output.unsqueeze(-1)
 
             queries = self.sim_to_queries(relative_output)
             keys = self.sim_to_keys(relative_output)
