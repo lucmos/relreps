@@ -35,17 +35,7 @@ class VanillaAE(nn.Module):
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
             width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
         )
-        encoder_out_numel = math.prod(self.encoder_out_shape[1:])
-
-        self.fc = nn.Sequential(
-            nn.Linear(encoder_out_numel, latent_dim),
-            nn.Tanh(),
-        )
-
-        # Build Decoder
-        self.decoder_input = nn.Sequential(
-            nn.Linear(latent_dim, encoder_out_numel),
-        )
+        self.encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
     def encode(self, input: Tensor) -> Tensor:
         """
@@ -56,10 +46,6 @@ class VanillaAE(nn.Module):
         """
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
-
-        # Split the result into mu and var components
-        # of the latent Gaussian distribution
-        result = self.fc(result)
         return result
 
     def decode(self, z: Tensor) -> Tensor:
@@ -69,8 +55,7 @@ class VanillaAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_input(z)
-        result = result.view(-1, *self.encoder_out_shape[1:])
+        result = z.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
         return result
 

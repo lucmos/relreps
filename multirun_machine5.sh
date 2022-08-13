@@ -12,7 +12,7 @@ python src/rae/run.py -m \
   train=reconstruction \
   nn.module.model.latent_dim=256 \
   "nn.module.model.hidden_dims=null" \
-  nn.data.anchors_num=500 \
+  nn.data.anchors_num=1024 \
   train.trainer.max_epochs=20 \
   'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
   'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
