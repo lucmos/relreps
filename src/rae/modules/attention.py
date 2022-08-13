@@ -153,6 +153,7 @@ class RelativeAttention(AbstractRelativeAttention):
         in_features: Optional[int] = None,
         hidden_features: Optional[int] = None,
         transform_elements: Optional[Set[AttentionElement]] = None,
+        self_attention_hidden_dim: Optional[int] = None,
         values_self_attention_nhead: Optional[int] = None,
         similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
         similarities_bin_size: Optional[float] = None,
@@ -199,6 +200,7 @@ class RelativeAttention(AbstractRelativeAttention):
         self.normalization_mode = normalization_mode if normalization_mode is not None else NormalizationMode.NONE
 
         self.values_mode = values_mode
+        self.self_attention_hidden_dim = self_attention_hidden_dim
         self.values_self_attention_nhead = values_self_attention_nhead
         if self.values_self_attention_nhead and self.values_mode != ValuesMethod.SELF_ATTENTION:
             raise ValueError(
@@ -296,17 +298,23 @@ class RelativeAttention(AbstractRelativeAttention):
                 self.values = nn.Parameter(torch.randn(self.n_anchors, self.hidden_features))
         elif values_mode == ValuesMethod.SELF_ATTENTION:
             self.sim_norm = nn.LayerNorm(normalized_shape=self.output_dim)
-            self.sim_to_queries = nn.Linear(1, self.hidden_features, bias=False)
-            self.sim_to_keys = nn.Linear(1, self.hidden_features, bias=False)
-            self.sim_to_values = nn.Linear(1, self.hidden_features, bias=False)
+            # self.sim_to_queries = nn.Linear(1, self.self_attention_hidden_dim, bias=False)
+            # self.sim_to_keys = nn.Linear(1, self.self_attention_hidden_dim, bias=False)
+            # self.sim_to_values = nn.Linear(1, self.self_attention_hidden_dim, bias=False)
+
+            self.sim_to_queries = nn.Parameter(torch.randn(self.n_anchors, self.self_attention_hidden_dim))
+            self.sim_to_keys = nn.Parameter(torch.randn(self.n_anchors, self.self_attention_hidden_dim))
+            self.sim_to_values = nn.Parameter(torch.randn(self.n_anchors, self.self_attention_hidden_dim))
 
             self.self_attention = nn.MultiheadAttention(
-                embed_dim=self.hidden_features,
+                embed_dim=self.self_attention_hidden_dim,
                 num_heads=values_self_attention_nhead,
                 batch_first=True,
             )
 
-            self.self_attention_aggregation = nn.Linear(in_features=self.hidden_features, out_features=1, bias=False)
+            self.self_attention_aggregation = nn.Linear(
+                in_features=self.self_attention_hidden_dim, out_features=1, bias=False
+            )
         elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
@@ -406,11 +414,10 @@ class RelativeAttention(AbstractRelativeAttention):
             output = quantized_similarities
         elif self.values_mode == ValuesMethod.SELF_ATTENTION:
             relative_output = self.sim_norm(quantized_similarities)
-            relative_output = relative_output.unsqueeze(-1)
 
-            queries = self.sim_to_queries(relative_output)
-            keys = self.sim_to_keys(relative_output)
-            values = self.sim_to_values(relative_output)
+            queries = torch.einsum("ba, af -> baf", relative_output, self.sim_to_queries)
+            keys = torch.einsum("ba, af -> baf", relative_output, self.sim_to_keys)
+            values = torch.einsum("ba, af -> baf", relative_output, self.sim_to_values)
 
             output, _ = self.self_attention(query=queries, key=keys, value=values)
             output = self.self_attention_aggregation(output)
@@ -538,7 +545,6 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
                 hydra.utils.instantiate(
                     relative_attention,
                     in_features=self.subspace_in_features,
-                    hidden_features=self.subspace_in_features,
                     n_anchors=n_anchors,
                     n_classes=n_classes,
                 )
