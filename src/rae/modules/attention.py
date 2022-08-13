@@ -60,6 +60,7 @@ class SimilaritiesQuantizationMode(StrEnum):
 
 
 class ValuesMethod(StrEnum):
+    RELATIVE_ANCHORS_ATTENTION = auto()
     SELF_ATTENTION = auto()
     SIMILARITIES = auto()
     TRAINABLE = auto()
@@ -315,6 +316,26 @@ class RelativeAttention(AbstractRelativeAttention):
             self.self_attention_aggregation = nn.Linear(
                 in_features=self.self_attention_hidden_dim, out_features=1, bias=False
             )
+        elif values_mode == ValuesMethod.RELATIVE_ANCHORS_ATTENTION:
+            self.anchors_relative_attention = RelativeAttention(
+                n_anchors=n_anchors,
+                n_classes=n_classes,
+                similarity_mode=similarity_mode,
+                values_mode=ValuesMethod.SIMILARITIES,
+                normalization_mode=normalization_mode,
+                in_features=in_features,
+                hidden_features=hidden_features,
+                transform_elements=transform_elements,
+                self_attention_hidden_dim=self_attention_hidden_dim,
+                values_self_attention_nhead=values_self_attention_nhead,
+                similarities_quantization_mode=similarities_quantization_mode,
+                similarities_bin_size=similarities_bin_size,
+                similarities_aggregation_mode=similarities_aggregation_mode,
+                similarities_aggregation_n_groups=similarities_aggregation_n_groups,
+                anchors_sampling_mode=anchors_sampling_mode,
+                n_anchors_sampling_per_class=n_anchors_sampling_per_class,
+                output_normalization_mode=output_normalization_mode,
+            )
         elif values_mode not in set(ValuesMethod):
             raise ValueError(f"Values mode not supported: {self.values_mode}")
 
@@ -338,6 +359,8 @@ class RelativeAttention(AbstractRelativeAttention):
             anchors: [num_anchors, hidden_dim]
             anchors_targets: [num_anchors]
         """
+        original_anchors = anchors
+
         if x.shape[-1] != anchors.shape[-1]:
             raise ValueError(f"Inconsistent dimensions between batch and anchors: {x.shape}, {anchors.shape}")
 
@@ -423,6 +446,17 @@ class RelativeAttention(AbstractRelativeAttention):
             output = self.self_attention_aggregation(output)
 
             output = output.squeeze(-1)
+        elif self.values_mode == ValuesMethod.RELATIVE_ANCHORS_ATTENTION:
+            # weights = F.softmax(quantized_similarities, dim=-1)
+            weights = quantized_similarities
+
+            relative_anchors = self.anchors_relative_attention(
+                x=original_anchors,
+                anchors=original_anchors,
+                anchors_targets=anchors_targets,
+            )[AttentionOutput.OUTPUT]
+
+            output = torch.einsum("bw, wh -> bh", weights, relative_anchors)
         else:
             assert False
 
@@ -457,7 +491,11 @@ class RelativeAttention(AbstractRelativeAttention):
             return self.in_features
         elif self.values_mode == ValuesMethod.TRAINABLE:
             return self.hidden_features
-        elif self.values_mode == ValuesMethod.SIMILARITIES or self.values_mode == ValuesMethod.SELF_ATTENTION:
+        elif (
+            self.values_mode == ValuesMethod.SIMILARITIES
+            or self.values_mode == ValuesMethod.SELF_ATTENTION
+            or self.values_mode == ValuesMethod.RELATIVE_ANCHORS_ATTENTION
+        ):
             if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
                 return self.n_classes * self.similarities_aggregation_n_groups
             elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
