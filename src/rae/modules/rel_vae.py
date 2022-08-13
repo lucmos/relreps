@@ -7,11 +7,11 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from rae.modules.attention import AbstractRelativeAttention, AttentionOutput
+from rae.modules.blocks import build_dynamic_encoder_decoder
 from rae.modules.enumerations import Output
-from rae.utils.tensor_ops import build_transposed_convolution, infer_dimension
 
 
-class VanillaRAE(nn.Module):
+class VanillaRelVAE(nn.Module):
     def __init__(
         self,
         metadata,
@@ -37,36 +37,9 @@ class VanillaRAE(nn.Module):
         self.latent_dim = latent_dim
         self.kld_weight = kld_weight
 
-        modules = []
-        if hidden_dims is None:
-            hidden_dims = [32, 64, 128, 256]
-
-        # Build Encoder
-        self.encoder_shape_sequence = [
-            [metadata.width, metadata.height],
-        ]
-        running_channels = metadata.n_channels
-        for h_dim in hidden_dims:
-            modules.append(
-                nn.Sequential(
-                    (conv2d := nn.Conv2d(running_channels, out_channels=h_dim, kernel_size=3, stride=2, padding=1)),
-                    nn.BatchNorm2d(h_dim),
-                    nn.LeakyReLU(),
-                )
-            )
-            conv2d_out = infer_dimension(
-                self.encoder_shape_sequence[-1][0],
-                self.encoder_shape_sequence[-1][1],
-                running_channels,
-                conv2d,
-            )
-            self.encoder_shape_sequence.append([conv2d_out.shape[2], conv2d_out.shape[3]])
-            running_channels = h_dim
-
-        self.encoder = nn.Sequential(*modules)
-        self.encoder_out_shape = infer_dimension(
-            metadata.width, metadata.height, n_channels=metadata.n_channels, model=self.encoder, batch_size=2
-        ).shape
+        self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
+            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
+        )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
         self.relative_attention: AbstractRelativeAttention = (
@@ -85,41 +58,6 @@ class VanillaRAE(nn.Module):
         # Build Decoder
         self.decoder_input = nn.Linear(latent_dim, encoder_out_numel)
 
-        hidden_dims.reverse()
-        hidden_dims = hidden_dims + hidden_dims[-1:]
-
-        running_input_width = self.encoder_out_shape[2]
-        running_input_height = self.encoder_out_shape[3]
-        modules = []
-        for i, (target_output_width, target_output_height) in zip(
-            range(len(hidden_dims) - 1), reversed(self.encoder_shape_sequence[:-1])
-        ):
-            modules.append(
-                nn.Sequential(
-                    build_transposed_convolution(
-                        in_channels=hidden_dims[i],
-                        out_channels=hidden_dims[i + 1],
-                        target_output_width=target_output_width,
-                        target_output_height=target_output_height,
-                        input_width=running_input_width,
-                        input_height=running_input_height,
-                    ),
-                    nn.BatchNorm2d(hidden_dims[i + 1]),
-                    nn.LeakyReLU(),
-                )
-            )
-            running_input_width = target_output_width
-            running_input_height = target_output_height
-
-        self.decoder = nn.Sequential(*modules)
-
-        self.final_layer = nn.Sequential(
-            nn.BatchNorm2d(hidden_dims[-1]),
-            nn.LeakyReLU(),
-            nn.Conv2d(hidden_dims[-1], out_channels=metadata.n_channels, kernel_size=3, padding=1),
-            nn.Tanh(),
-        )
-
         # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.
         self.register_buffer("anchors_images", metadata.anchors_images)
         self.register_buffer("anchors_latents", metadata.anchors_latents)
@@ -134,7 +72,6 @@ class VanillaRAE(nn.Module):
         """
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
-
         return result
 
     def decode(self, z: Tensor) -> Tensor:
@@ -147,7 +84,6 @@ class VanillaRAE(nn.Module):
         result = self.decoder_input(z)
         result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
-        result = self.final_layer(result)
         return result
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
