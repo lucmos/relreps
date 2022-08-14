@@ -3,17 +3,16 @@
 
 # Absolute
 python src/rae/run.py -m \
-  core.tags='[reconstruction, absolute, tab1, resweep]' \
+  core.tags='[reconstruction, absolute, tab1-reconstruction]' \
   'train.seed_index=0,1,2,3,4,5' \
   'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
   nn/module=autoencoder \
-  nn/module/model=vae \
+  nn/module/model=vae,ae \
   train=reconstruction \
   nn.module.model.latent_dim=256 \
-  "nn.module.model.hidden_dims=[32,64,128,256]" \
+  "nn.module.model.hidden_dims=null" \
   nn.data.anchors_num=500 \
-  train.trainer.max_epochs=100 \
-  nn.module.model.kld_weight=0.0002
+  train.trainer.max_epochs=60
 
 
 # Classifcation
