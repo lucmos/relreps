@@ -5,7 +5,7 @@ core:
   version: ${version:}
   tags:
     - develop
-  name: "no-linear-before-att"
+  name: null
 
 defaults:
   - hydra: default
