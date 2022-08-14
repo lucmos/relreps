@@ -1,5 +1,5 @@
 _target_: rae.modules.rel_ae.VanillaRelAE
-latent_dim: 256
+latent_dim: 500
 hidden_dims: null
 
 # Relative params

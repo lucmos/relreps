@@ -40,7 +40,9 @@ class VanillaRelAE(nn.Module):
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
-        self.encoder_out = nn.Linear(encoder_out_numel, latent_dim)
+        # self.encoder_out = nn.Sequential(
+        #     nn.Linear(encoder_out_numel, latent_dim),
+        # )
 
         self.relative_attention: AbstractRelativeAttention = (
             hydra.utils.instantiate(
@@ -76,7 +78,7 @@ class VanillaRelAE(nn.Module):
         """
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
-        result = self.encoder_out(result)
+        # result = self.encoder_out(result)
         return result
 
     def decode(self, z: Tensor) -> Tensor:

@@ -1,19 +1,15 @@
 #!/bin/bash
 
-# Relative
+# Absolute
 python src/rae/run.py -m \
-  core.tags='[reconstruction, relative, gaussian]' \
-  'train.seed_index=0' \
-  'nn/data/datasets=vision/fmnist' \
+  core.tags='[reconstruction, absolute, tab1-definitive]' \
+  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+  'train.seed_index=0,1,2,3,4,5' \
   nn/module=autoencoder \
-  nn/module/model=rel_ae \
+  nn/module/model=ae,vae \
   train=reconstruction \
-  nn.module.model.latent_dim=256 \
-  "nn.module.model.hidden_dims=null" \
+  nn.module.model.latent_dim=500 \
   nn.data.anchors_num=500 \
-  train.trainer.max_epochs=60 \
-  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
-  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
-  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
-  'nn.module.model.relative_attention.relative_attentions.0.anchors_sampling_mode=gaussian' \
-  'nn.module.model.relative_attention.relative_attentions.0.n_anchors_sampling_per_class=50'
+  "nn.module.model.hidden_dims=null" \
+  "nn.module.optimizer.lr=5e-4" \
+  train.trainer.max_epochs=100

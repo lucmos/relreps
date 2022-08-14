@@ -52,6 +52,7 @@ logging:
   logger:
     _target_: pytorch_lightning.loggers.WandbLogger
 
+    name: ${core.name}
     project: ${core.project_name}
     entity: gladia
     log_model: ${..upload.run_files}

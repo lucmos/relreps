@@ -43,8 +43,13 @@ class VanillaVAE(nn.Module):
         self.fc_mu = nn.Linear(encoder_out_numel, latent_dim)
         self.fc_var = nn.Linear(encoder_out_numel, latent_dim)
 
-        # Build Decoder
-        self.decoder_input = nn.Linear(latent_dim, encoder_out_numel)
+        self.decoder_in = nn.Sequential(
+            nn.Linear(
+                self.latent_dim,
+                encoder_out_numel,
+            ),
+            nn.GELU(),
+        )
 
     def encode(self, input: Tensor) -> List[Tensor]:
         """
@@ -70,7 +75,7 @@ class VanillaVAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_input(z)
+        result = self.decoder_in(z)
         result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
         return result
