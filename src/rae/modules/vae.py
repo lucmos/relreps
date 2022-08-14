@@ -15,7 +15,6 @@ class VanillaVAE(nn.Module):
         metadata,
         input_size,
         latent_dim: int,
-        kld_weight: float,
         hidden_dims: List = None,
         **kwargs,
     ) -> None:
@@ -32,7 +31,6 @@ class VanillaVAE(nn.Module):
         self.metadata = metadata
         self.input_size = input_size
         self.latent_dim = latent_dim
-        self.kld_weight = kld_weight
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
             width=metadata.width,

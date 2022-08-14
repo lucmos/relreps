@@ -40,6 +40,8 @@ class VanillaRelAE(nn.Module):
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
+        self.encoder_out = nn.Linear(encoder_out_numel, latent_dim)
+
         self.relative_attention: AbstractRelativeAttention = (
             hydra.utils.instantiate(
                 relative_attention,
@@ -52,7 +54,13 @@ class VanillaRelAE(nn.Module):
         )
 
         # Build Decoder
-        self.decoder_input = nn.Linear(self.relative_attention.output_dim, encoder_out_numel)
+        self.decoder_in = nn.Sequential(
+            nn.Linear(
+                self.relative_attention.output_dim,
+                encoder_out_numel,
+            ),
+            nn.GELU(),
+        )
 
         # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.
         self.register_buffer("anchors_images", metadata.anchors_images)
@@ -68,6 +76,7 @@ class VanillaRelAE(nn.Module):
         """
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
+        result = self.encoder_out(result)
         return result
 
     def decode(self, z: Tensor) -> Tensor:
@@ -77,7 +86,7 @@ class VanillaRelAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_input(z)
+        result = self.decoder_in(z)
         result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
         return result

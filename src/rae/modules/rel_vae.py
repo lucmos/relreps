@@ -17,7 +17,6 @@ class VanillaRelVAE(nn.Module):
         metadata,
         input_size,
         latent_dim: int,
-        kld_weight: float,
         relative_attention: AbstractRelativeAttention,
         hidden_dims: List = None,
         **kwargs,
@@ -35,12 +34,13 @@ class VanillaRelVAE(nn.Module):
         self.metadata = metadata
         self.input_size = input_size
         self.latent_dim = latent_dim
-        self.kld_weight = kld_weight
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
             width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
+
+        self.encoder_out = nn.Linear(encoder_out_numel, latent_dim)
 
         self.relative_attention: AbstractRelativeAttention = (
             hydra.utils.instantiate(
@@ -52,11 +52,15 @@ class VanillaRelVAE(nn.Module):
             if not isinstance(relative_attention, AbstractRelativeAttention)
             else relative_attention
         )
-        self.fc_mu = nn.Linear(self.relative_attention.output_dim, latent_dim)
-        self.fc_var = nn.Linear(self.relative_attention.output_dim, latent_dim)
+        self.fc_mu = nn.Linear(self.relative_attention.output_dim, self.relative_attention.output_dim)
+        self.fc_var = nn.Linear(self.relative_attention.output_dim, self.relative_attention.output_dim)
 
-        # Build Decoder
-        self.decoder_input = nn.Linear(latent_dim, encoder_out_numel)
+        self.decoder_in = nn.Sequential(
+            nn.Linear(
+                self.relative_attention.output_dim,
+                encoder_out_numel,
+            ),
+        )
 
         # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.
         self.register_buffer("anchors_images", metadata.anchors_images)
@@ -72,6 +76,7 @@ class VanillaRelVAE(nn.Module):
         """
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
+        result = self.encoder_out(result)
         return result
 
     def decode(self, z: Tensor) -> Tensor:
@@ -81,7 +86,7 @@ class VanillaRelVAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_input(z)
+        result = self.decoder_in(z)
         result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
         return result

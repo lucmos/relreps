@@ -1,7 +1,6 @@
 _target_: rae.modules.rel_vae.VanillaRelVAE
 latent_dim: 256
 hidden_dims: null
-kld_weight: 0.0002
 
 # Relative params
 relative_attention:

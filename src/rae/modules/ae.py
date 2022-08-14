@@ -37,6 +37,17 @@ class VanillaAE(nn.Module):
         )
         self.encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
+        self.encode_out = nn.Sequential(
+            nn.Linear(self.encoder_out_numel, self.latent_dim),
+        )
+        self.decoder_in = nn.Sequential(
+            nn.GELU(),
+            nn.Linear(
+                self.latent_dim,
+                self.encoder_out_numel,
+            ),
+        )
+
     def encode(self, input: Tensor) -> Tensor:
         """
         Encodes the input by passing through the encoder network
@@ -46,6 +57,7 @@ class VanillaAE(nn.Module):
         """
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
+        result = self.encode_out(result)
         return result
 
     def decode(self, z: Tensor) -> Tensor:
@@ -55,7 +67,8 @@ class VanillaAE(nn.Module):
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = z.view(-1, *self.encoder_out_shape[1:])
+        result = self.decoder_in(z)
+        result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
         return result
 
