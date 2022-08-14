@@ -33,6 +33,8 @@ def build_dynamic_encoder_decoder2(
     if hidden_dims is None:
         hidden_dims = (32, 64, 128, 256)
 
+    STRIDE = (2, 2)
+    PADDING = (1, 1)
     # Build Encoder
     encoder_shape_sequence = [
         [width, height],
@@ -41,7 +43,11 @@ def build_dynamic_encoder_decoder2(
     for h_dim in hidden_dims:
         modules.append(
             nn.Sequential(
-                (conv2d := nn.Conv2d(running_channels, out_channels=h_dim, kernel_size=3, stride=2, padding=1)),
+                (
+                    conv2d := nn.Conv2d(
+                        running_channels, out_channels=h_dim, kernel_size=3, stride=STRIDE, padding=PADDING
+                    )
+                ),
                 nn.BatchNorm2d(h_dim),
                 nn.LeakyReLU(),
             )
@@ -78,6 +84,8 @@ def build_dynamic_encoder_decoder2(
                     target_output_height=target_output_height,
                     input_width=running_input_width,
                     input_height=running_input_height,
+                    stride=STRIDE,
+                    padding=PADDING,
                 ),
                 nn.BatchNorm2d(hidden_dims[i + 1]),
                 nn.LeakyReLU(),

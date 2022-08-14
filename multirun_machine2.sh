@@ -9,8 +9,8 @@ python src/rae/run.py -m \
   nn/module=autoencoder \
   nn/module/model=vae2 \
   train=reconstruction \
-  nn.module.model.latent_dim=64 \
-  "nn.module.model.hidden_dims=[32, 64, 128]" \
+  nn.module.model.latent_dim=256 \
+  "nn.module.model.hidden_dims=null" \
   "nn.module.model.last_activation=sigmoid" \
   "nn.module.optimizer.lr=5e-4" \
   nn.data.anchors_num=500 \
