@@ -56,9 +56,10 @@ module:
     weight_decay: 0
 
   lr_scheduler:
-    _target_: torch.optim.lr_scheduler.MultiStepLR
-    milestones: [45]
-    gamma: 0.1
+    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+    T_0: 20
+    T_mult: 1
+    eta_min: 0
     last_epoch: -1
     verbose: False
 
