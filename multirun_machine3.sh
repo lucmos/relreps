@@ -6,7 +6,7 @@ python src/rae/run.py -m \
   'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
   'train.seed_index=0,1,2,3,4,5' \
   nn/module=autoencoder \
-  nn/module/model=ae,vae \
+  nn/module/model=vae,ae \
   train=reconstruction \
   nn.module.model.latent_dim=500 \
   nn.data.anchors_num=500 \
