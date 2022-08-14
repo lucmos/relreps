@@ -1,0 +1,5 @@
+_target_: rae.modules.vae2.VanillaVAE
+latent_dim: 256
+hidden_dims: null
+kld_weight: 0.0002
+last_activation: sigmoid

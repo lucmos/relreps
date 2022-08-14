@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import torch
 from torch import Tensor, nn
@@ -17,6 +17,7 @@ class VanillaVAE(nn.Module):
         latent_dim: int,
         kld_weight: float,
         hidden_dims: List = None,
+        last_activation: str = "tanh",
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -35,7 +36,11 @@ class VanillaVAE(nn.Module):
         self.kld_weight = kld_weight
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
-            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
+            width=metadata.width,
+            height=metadata.height,
+            n_channels=metadata.n_channels,
+            hidden_dims=hidden_dims,
+            last_activation=last_activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 

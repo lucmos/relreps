@@ -117,6 +117,7 @@ def build_dynamic_encoder_decoder(
     height,
     n_channels,
     hidden_dims: Optional[Sequence[int]],
+    last_activation: str = "tanh",
 ) -> Tuple[nn.Module, Sequence[int], nn.Module]:
     """Builds a dynamic convolutional encoder-decoder pair with parametrized hidden dimensions number and size.
 
@@ -193,7 +194,7 @@ def build_dynamic_encoder_decoder(
             nn.BatchNorm2d(hidden_dims[-1]),
             nn.LeakyReLU(),
             nn.Conv2d(hidden_dims[-1], out_channels=n_channels, kernel_size=3, padding=1),
-            nn.Tanh(),
+            (nn.Tanh() if last_activation == "tanh" else nn.Sigmoid()),
         ),
     )
     return encoder, encoder_out_shape, decoder
