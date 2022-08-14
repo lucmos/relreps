@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn import ModuleList
 
-from rae.utils.tensor_ops import stratified_mean, stratified_sampling
+from rae.utils.tensor_ops import stratified_gaussian_sampling, stratified_mean, stratified_sampling
 
 try:
     # be ready for 3.10 when it drops
@@ -24,6 +24,7 @@ pylogger = logging.getLogger(__name__)
 class AnchorsSamplingMode(StrEnum):
     NONE = auto()
     STRATIFIED = auto()
+    GAUSSIAN = auto()
 
 
 class AttentionElement(StrEnum):
@@ -374,6 +375,10 @@ class RelativeAttention(AbstractRelativeAttention):
             )
             anchors_targets = anchors_targets[sampling_idxs]
             anchors = anchors[sampling_idxs, :]
+        elif self.anchors_sampling_mode == AnchorsSamplingMode.GAUSSIAN:
+            anchors = stratified_gaussian_sampling(
+                values=anchors, targets=anchors_targets, samples_per_class=self.n_anchors_sampling_per_class
+            )
         else:
             raise ValueError(f"Sampling mode not supported: {self.anchors_sampling_mode}")
 
@@ -500,7 +505,10 @@ class RelativeAttention(AbstractRelativeAttention):
         ):
             if self.similarities_aggregation_mode == SimilaritiesAggregationMode.STRATIFIED_AVG:
                 return self.n_classes * self.similarities_aggregation_n_groups
-            elif self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED:
+            elif (
+                self.anchors_sampling_mode == AnchorsSamplingMode.STRATIFIED
+                or self.anchors_sampling_mode == AnchorsSamplingMode.GAUSSIAN
+            ):
                 return self.n_classes * self.n_anchors_sampling_per_class
             else:
                 return self.n_anchors

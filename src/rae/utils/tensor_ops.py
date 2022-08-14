@@ -5,6 +5,35 @@ from torch import nn
 from torchvision import models
 
 
+def stratified_gaussian_sampling(values: torch.Tensor, targets: torch.Tensor, samples_per_class: int) -> torch.Tensor:
+    """Stratified sampling from the targets tensor.
+
+    Returns the indices of the desired elements, the sampled targets are sorted
+
+    NOTE: the targets should contain all the possible values at least once, otherwise the targets ordering is not
+    guaranteed to be consistent across different executions
+
+    Args:
+        targets: the tensor to sample from, with shape [num_samples]
+        samples_per_class: the number of sampling to perform for each class
+
+    Returns:
+        the indices to use to sample from the targets tensor
+    """
+    uniques = targets.unique()
+    sampled_anchors = []
+    for class_label in uniques:
+        class_idxs = torch.nonzero(targets == class_label).squeeze(1)
+        class_anchors = values[class_idxs]
+        class_mean = class_anchors.mean(0)
+        class_std = class_anchors.std(0)
+        sampled_anchors.append(
+            torch.stack([torch.normal(class_mean, class_std) for i in range(samples_per_class)], dim=0)
+        )
+    sampled_anchors = torch.cat(sampled_anchors, dim=0)
+    return sampled_anchors
+
+
 def stratified_sampling(targets: torch.Tensor, samples_per_class: int) -> torch.Tensor:
     """Stratified sampling from the targets tensor.
 
