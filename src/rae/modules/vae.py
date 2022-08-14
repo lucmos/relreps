@@ -17,7 +17,6 @@ class VanillaVAE(nn.Module):
         latent_dim: int,
         kld_weight: float,
         hidden_dims: List = None,
-        last_activation: str = "tanh",
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -40,7 +39,6 @@ class VanillaVAE(nn.Module):
             height=metadata.height,
             n_channels=metadata.n_channels,
             hidden_dims=hidden_dims,
-            last_activation=last_activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
@@ -103,26 +101,33 @@ class VanillaVAE(nn.Module):
             Output.LATENT_LOGVAR: log_var,
         }
 
+    def _compute_kl_loss(self, mean, log_variance):
+        return -0.5 * torch.sum(1 + log_variance - mean.pow(2) - log_variance.exp())
+
     def loss_function(self, model_out, batch, *args, **kwargs) -> dict:
-        """
+        """https://stackoverflow.com/questions/64909658/what-could-cause-a-vaevariational-autoencoder-to-output-random-noise-even-afte
+
         Computes the VAE loss function.
         KL(N(\mu, \sigma), N(0, 1)) = \log \frac{1}{\sigma} + \frac{\sigma^2 + \mu^2}{2} - \frac{1}{2}
         :param args:
         :param kwargs:
         :return:
         """
-        kld_weight: float = kwargs.get("kld_weight", self.kld_weight)
-        recons = model_out[Output.RECONSTRUCTION]
-        input = batch["image"]
-        mu = model_out[Output.LATENT_MU]
-        log_var = model_out[Output.LATENT_LOGVAR]
-
-        recons_loss = F.mse_loss(recons, input, reduction="mean")
-
-        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu**2 - log_var.exp(), dim=1), dim=0)
-
-        loss = recons_loss + kld_weight * kld_loss
-        return {"loss": loss, "reconstruction": recons_loss.detach(), "kld": -kld_loss.detach()}
+        predictions = model_out[Output.RECONSTRUCTION]
+        targets = batch["image"]
+        mean = model_out[Output.LATENT_MU]
+        log_variance = model_out[Output.LATENT_LOGVAR]
+        mse = F.mse_loss(predictions, targets, reduction="mean")
+        log_sigma_opt = 0.5 * mse.log()
+        r_loss = 0.5 * torch.pow((targets - predictions) / log_sigma_opt.exp(), 2) + log_sigma_opt
+        r_loss = r_loss.sum()
+        kl_loss = self._compute_kl_loss(mean, log_variance)
+        loss = r_loss + kl_loss
+        return {
+            "loss": loss,
+            "reconstruction": r_loss.detach() / targets.shape[0],
+            "kld": kl_loss.detach() / targets.shape[0],
+        }
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
         """

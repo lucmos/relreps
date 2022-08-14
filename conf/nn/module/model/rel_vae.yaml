@@ -10,13 +10,13 @@ relative_attention:
   relative_attentions:
     - _target_: rae.modules.attention.RelativeAttention
       similarity_mode: inner
-      values_mode: self_attention
+      values_mode: similarities
       normalization_mode: l2
       in_features: ${nn.module.model.latent_dim}
       hidden_features: null
       transform_elements: null
       self_attention_hidden_dim: null
-      values_self_attention_nhead: 1
+      values_self_attention_nhead: null
       similarities_quantization_mode: null
       similarities_bin_size: null
       similarities_aggregation_mode: null

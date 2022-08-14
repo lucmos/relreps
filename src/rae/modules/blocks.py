@@ -117,7 +117,6 @@ def build_dynamic_encoder_decoder(
     height,
     n_channels,
     hidden_dims: Optional[Sequence[int]],
-    last_activation: str = "tanh",
 ) -> Tuple[nn.Module, Sequence[int], nn.Module]:
     """Builds a dynamic convolutional encoder-decoder pair with parametrized hidden dimensions number and size.
 
@@ -135,6 +134,9 @@ def build_dynamic_encoder_decoder(
     if hidden_dims is None:
         hidden_dims = (32, 64, 128, 256)
 
+    STRIDE = (2, 2)
+    PADDING = (1, 1)
+
     # Build Encoder
     encoder_shape_sequence = [
         [width, height],
@@ -143,9 +145,13 @@ def build_dynamic_encoder_decoder(
     for h_dim in hidden_dims:
         modules.append(
             nn.Sequential(
-                (conv2d := nn.Conv2d(running_channels, out_channels=h_dim, kernel_size=3, stride=2, padding=1)),
+                (
+                    conv2d := nn.Conv2d(
+                        running_channels, out_channels=h_dim, kernel_size=3, stride=STRIDE, padding=PADDING
+                    )
+                ),
                 nn.BatchNorm2d(h_dim),
-                nn.LeakyReLU(),
+                nn.GELU(),
             )
         )
         conv2d_out = infer_dimension(
@@ -180,9 +186,11 @@ def build_dynamic_encoder_decoder(
                     target_output_height=target_output_height,
                     input_width=running_input_width,
                     input_height=running_input_height,
+                    stride=STRIDE,
+                    padding=PADDING,
                 ),
                 nn.BatchNorm2d(hidden_dims[i + 1]),
-                nn.LeakyReLU(),
+                nn.GELU(),
             )
         )
         running_input_width = target_output_width
@@ -191,10 +199,8 @@ def build_dynamic_encoder_decoder(
     decoder = nn.Sequential(
         *modules,
         nn.Sequential(
-            nn.BatchNorm2d(hidden_dims[-1]),
-            nn.LeakyReLU(),
             nn.Conv2d(hidden_dims[-1], out_channels=n_channels, kernel_size=3, padding=1),
-            (nn.Tanh() if last_activation == "tanh" else nn.Sigmoid()),
+            nn.Sigmoid(),
         ),
     )
     return encoder, encoder_out_shape, decoder
