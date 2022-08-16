@@ -1,7 +1,6 @@
 import logging
 from enum import auto
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
@@ -9,7 +8,7 @@ import rich
 import torch
 import typer
 
-from rae.ui.evaluation import parse_checkpoint_id, parse_checkpoints_tree
+from rae.utils.evaluation import parse_checkpoint_id, parse_checkpoints_tree
 
 try:
     # be ready for 3.10 when it drops
@@ -60,33 +59,15 @@ def compute_predictions(force_predict: bool) -> pd.DataFrame:
     PREDICTIONS_TSV.unlink(missing_ok=True)
 
     import hydra
-    from omegaconf import DictConfig, OmegaConf
-    from torch import nn
     from torch.utils.data import DataLoader
     from tqdm import tqdm
-
-    from nn_core.serialization import NNCheckpointIO
 
     from rae.data.vision.datamodule import MyDataModule
     from rae.modules.enumerations import Output
     from rae.pl_modules.vision.pl_gclassifier import LightningClassifier
+    from rae.utils.evaluation import parse_checkpoint
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-
-    def parse_checkpoint(
-        module_class: Type[nn.Module],
-        checkpoint_path: Path,
-        map_location: Optional[Union[Dict[str, str], str, torch.device, int, Callable]] = None,
-    ) -> Tuple[nn.Module, DictConfig]:
-        if checkpoint_path.name.endswith(".ckpt.zip"):
-            checkpoint = NNCheckpointIO.load(path=checkpoint_path, map_location=map_location)
-            model = module_class._load_model_state(checkpoint=checkpoint, metadata=checkpoint.get("metadata", None))
-            model.eval()
-            return (
-                model,
-                OmegaConf.create(checkpoint["cfg"]),
-            )
-        raise ValueError(f"Wrong checkpoint: {checkpoint_path}")
 
     predictions = {x: [] for x in ("run_id", "model_type", "dataset_name", "sample_idx", "pred", "target")}
     for dataset_name in (dataset_tqdm := tqdm(DATASETS, leave=True)):
