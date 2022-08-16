@@ -164,7 +164,7 @@ def compute_predictions(force_predict: bool) -> pd.DataFrame:
                     # COMPUTE ERRORS FOR EACH SAMPLE
                     for idx in range(batch["image"].shape[0]):
                         metrics = CONSIDERED_METRICS.clone()
-                        metrics.update(model_out[Output.RECONSTRUCTION][[idx]], batch["image"][[idx]])
+                        metrics.update(model_out[Output.RECONSTRUCTION][[idx]].cpu(), batch["image"][[idx]].cpu())
                         for metric_name, metric_value in metrics.compute().items():
                             predictions[metric_name].append(metric_value.item())
 
