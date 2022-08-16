@@ -1,5 +1,4 @@
 import logging
-from collections import defaultdict
 from enum import auto
 from pathlib import Path
 from typing import Callable, Dict, Optional, Tuple, Type, Union
@@ -9,6 +8,8 @@ import pandas as pd
 import rich
 import torch
 import typer
+
+from rae.ui.evaluation import parse_checkpoint_id, parse_checkpoints_tree
 
 try:
     # be ready for 3.10 when it drops
@@ -39,20 +40,7 @@ MODEL_SANITY = {
 }
 
 
-def parse_checkpoint_id(ckpt: Path) -> str:
-    return ckpt.with_suffix("").with_suffix("").name
-
-
-# Parse checkpoints tree
-checkpoints = defaultdict(dict)
-RUNS = defaultdict(dict)
-for dataset_abbrv in EXPERIMENT_CHECKPOINTS.iterdir():
-    checkpoints[dataset_abbrv.name] = defaultdict(list)
-    RUNS[dataset_abbrv.name] = defaultdict(list)
-    for model_abbrv in dataset_abbrv.iterdir():
-        for ckpt in model_abbrv.iterdir():
-            checkpoints[dataset_abbrv.name][model_abbrv.name].append(ckpt)
-            RUNS[dataset_abbrv.name][model_abbrv.name].append(parse_checkpoint_id(ckpt))
+checkpoints, RUNS = parse_checkpoints_tree(EXPERIMENT_CHECKPOINTS)
 
 
 DATASETS = sorted(checkpoints.keys())
