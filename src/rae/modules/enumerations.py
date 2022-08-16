@@ -8,6 +8,7 @@ except ImportError:
 
 
 class Output(StrEnum):
+    SIMILARITIES = auto()
     LOGITS = auto()
     RECONSTRUCTION = auto()
     DEFAULT_LATENT = auto()

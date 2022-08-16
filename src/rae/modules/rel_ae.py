@@ -128,6 +128,7 @@ class VanillaRelAE(nn.Module):
             Output.BATCH_LATENT: x_embedded,
             Output.ANCHORS_LATENT: anchors_embedded,
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
+            Output.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
         }
 
     def loss_function(self, model_out, batch, *args, **kwargs) -> dict:
