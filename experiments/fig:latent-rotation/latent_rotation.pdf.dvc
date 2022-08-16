@@ -1,0 +1,4 @@
+outs:
+- md5: 250e0ac47659ab7327ad0e0fd7109ba5
+  size: 3225127
+  path: latent_rotation.pdf
