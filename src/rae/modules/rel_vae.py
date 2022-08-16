@@ -135,7 +135,7 @@ class VanillaRelVAE(nn.Module):
 
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: x_embedded,
+            Output.DEFAULT_LATENT: attention_output[AttentionOutput.OUTPUT],
             Output.BATCH_LATENT: x_embedded,
             Output.ANCHORS_LATENT: anchors_embedded,
             Output.LATENT_MU: relative_mu,
@@ -150,7 +150,7 @@ class VanillaRelVAE(nn.Module):
         """https://stackoverflow.com/questions/64909658/what-could-cause-a-vaevariational-autoencoder-to-output-random-noise-even-afte
 
         Computes the VAE loss function.
-        KL(N(\mu, \sigma), N(0, 1)) = \log \frac{1}{\sigma} + \frac{\sigma^2 + \mu^2}{2} - \frac{1}{2}
+        KL(N(mu, sigma), N(0, 1)) = log frac{1}{sigma} + frac{sigma^2 + mu^2}{2} - frac{1}{2}
         :param args:
         :param kwargs:
         :return:
