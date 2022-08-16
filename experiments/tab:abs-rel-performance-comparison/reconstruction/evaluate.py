@@ -29,7 +29,7 @@ except ImportError:
 logging.getLogger().setLevel(logging.ERROR)
 
 
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 
 
 EXPERIMENT_ROOT = Path(__file__).parent
