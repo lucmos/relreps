@@ -18,8 +18,9 @@ class VanillaRelAE(nn.Module):
         input_size,
         latent_dim: int,
         relative_attention: AbstractRelativeAttention,
-        activation: str = "torch.nn.GELU",
         hidden_dims: List = None,
+        activation: str = "torch.nn.GELU",
+        remove_encoder_last_activation: bool = False,
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -42,6 +43,7 @@ class VanillaRelAE(nn.Module):
             n_channels=metadata.n_channels,
             hidden_dims=hidden_dims,
             activation=activation,
+            remove_encoder_last_activation=remove_encoder_last_activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 

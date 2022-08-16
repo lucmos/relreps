@@ -17,7 +17,7 @@ python src/rae/run.py -m \
   'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
   'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
   'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
-  nn.module.model.activation=torch.nn.Tanh
+  nn.module.model.remove_encoder_last_activation=True
 
 
 ## Absolute
