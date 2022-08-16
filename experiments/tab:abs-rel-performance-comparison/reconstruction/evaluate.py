@@ -189,7 +189,7 @@ class Display(StrEnum):
 
 
 def display_performance(performance_df, display: Display):
-    aggregated_performnace = performance_df.reset_index().drop(columns=["run_id", "index"])
+    aggregated_performnace = performance_df.reset_index().drop(columns=["run_id"])
     aggregated_perfomance = aggregated_performnace.groupby(
         [
             "dataset_name",
@@ -197,6 +197,11 @@ def display_performance(performance_df, display: Display):
         ]
     ).agg([np.mean, np.std])
     aggregated_perfomance = aggregated_perfomance.round(4)
+    aggregated_perfomance = (
+        aggregated_perfomance[["mse", "ergas", "psnr", "ssim"]]
+        .reindex(["ae", "rel_ae", "vae", "rel_vae"], level="model_type")
+        .reindex(["mnist", "fmnist", "cifar10", "cifar100"], level="dataset_name")
+    )
 
     if display == Display.DF:
         rich.print(aggregated_perfomance)
