@@ -88,9 +88,12 @@ class VanillaVAE(nn.Module):
         :param logvar: (Tensor) Standard deviation of the latent Gaussian [B x D]
         :return: (Tensor) [B x D]
         """
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return eps * std + mu
+        if self.training:
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std)
+            return eps * std + mu
+        else:
+            return mu
 
     def forward(self, x: Tensor, **kwargs) -> Dict[Output, Tensor]:
         mu, log_var = self.encode(x)
