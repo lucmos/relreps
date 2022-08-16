@@ -39,15 +39,15 @@ PERFORMANCE_TSV = EXPERIMENT_ROOT / "performance.tsv"
 
 DATASET_SANITY = {
     "mnist": ("rae.data.vision.fmnist.FashionMNISTDataset", "test"),
-    "fmnist": ("rae.data.vision.fmnist.FashionMNISTDataset", "test"),
-    "cifar10": ("rae.data.vision.fmnist.FashionMNISTDataset", "test"),
-    "cifar100": ("rae.data.vision.fmnist.FashionMNISTDataset", "test"),
+    "fmnist": ("rae.data.vision.mnist.NISTDataset", "test"),
+    "cifar10": ("rae.data.vision.cifar10.CIFAR10Dataset", "test"),
+    "cifar100": ("rae.data.vision.cifar100.CIFAR100Dataset", "test"),
 }
 MODEL_SANITY = {
-    "vae": "rae.modules.ae.VanillaAE",
+    "vae": "rae.modules.vae.VanillaVAE",
     "ae": "rae.modules.ae.VanillaAE",
-    "relvae": "rae.modules.ae.VanillaAE",
-    "relae": "rae.modules.ae.VanillaAE",
+    "rel_vae": "rae.modules.rel_vae.VanillaRelVAE",
+    "rel_ae": "rae.modules.rel_ae.VanillaRelAE",
 }
 
 
