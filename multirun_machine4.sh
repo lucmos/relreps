@@ -3,11 +3,11 @@
 
 # Relative Quantization
 python src/rae/run.py -m \
-  core.tags='[reconstruction, relative, tab1-definitive, quantized]' \
+  core.tags='[reconstruction, relative, quantized, no-activation-after-encoder]' \
+  nn/module/model=rel_ae,rel_vae \
   'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
   'train.seed_index=0,1,2,3,4,5' \
   nn/module=autoencoder \
-  nn/module/model=rel_vae,rel_ae \
   train=reconstruction \
   nn.module.model.latent_dim=500 \
   nn.data.anchors_num=500 \
@@ -17,8 +17,9 @@ python src/rae/run.py -m \
   'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
   'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
   'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
+  nn.module.model.remove_encoder_last_activation=True \
   'nn.module.model.relative_attention.relative_attentions.0.similarities_quantization_mode=differentiable_round'  \
-  'nn.module.model.relative_attention.relative_attentions.0.similarities_bin_size=0.1,0.2,0.3,0.5'
+  'nn.module.model.relative_attention.similarities_bin_size=0.1,0.2,0.3,0.5'
 
 
 # Classifcation

@@ -135,12 +135,13 @@ class VanillaRelVAE(nn.Module):
 
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: attention_output[AttentionOutput.OUTPUT],
+            Output.DEFAULT_LATENT: x_embedded,
             Output.BATCH_LATENT: x_embedded,
             Output.ANCHORS_LATENT: anchors_embedded,
             Output.LATENT_MU: relative_mu,
             Output.LATENT_LOGVAR: relative_log_var,
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
+            Output.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
         }
 
     def _compute_kl_loss(self, mean, log_variance):

@@ -570,6 +570,7 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
         subspace_pooling: SubspacePooling,
         n_anchors: Optional[int] = None,
         n_classes: Optional[int] = None,
+        **kwargs,
     ):
         """MultiHead Relative Attention, apply the relative attention to embedding subspace.
 
