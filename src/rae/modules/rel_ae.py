@@ -122,7 +122,7 @@ class VanillaRelAE(nn.Module):
 
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: attention_output[AttentionOutput.SIMILARITIES],
+            Output.DEFAULT_LATENT: x_embedded,
             Output.BATCH_LATENT: x_embedded,
             Output.ANCHORS_LATENT: anchors_embedded,
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
