@@ -196,7 +196,7 @@ def display_performance(performance_df, display: Display):
             "model_type",
         ]
     ).agg([np.mean, np.std])
-    aggregated_perfomance = aggregated_perfomance.round(4)
+    aggregated_perfomance = aggregated_perfomance.round(6)
     aggregated_perfomance = (
         aggregated_perfomance[["mse", "ergas", "psnr", "ssim"]]
         .reindex(["ae", "rel_ae", "vae", "rel_vae"], level="model_type")
@@ -213,15 +213,23 @@ def display_performance(performance_df, display: Display):
         df = aggregated_perfomance[METRIC_CONSIDERED]
         reconstruction_str = r"{} & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
 
+        def latex_float(f):
+            float_str = "{0:.2e}".format(f)
+            if "e" in float_str:
+                base, exponent = float_str.split("e")
+                return r"{0} \times 10^{{{1}}}".format(base, int(exponent))
+            else:
+                return float_str
+
         def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str) -> str:
             try:
                 mean_std = df.loc[dataset_name, model_type]
-                return rf"${mean_std['mean']:.2f} \pm {mean_std['std']:.2f}$"
+                return rf"${latex_float(mean_std['mean'])} \pm {latex_float(mean_std['std'])}$"
             except (AttributeError, KeyError):
                 return "?"
 
         for available_model_type, available_model_name in zip(
-            ("ae", "vae", "relae", "relvae"), ("AE", "VAE", "RelAE", "RelVAE")
+            ("ae", "rel_ae", "vae", "rel_vae"), ("AE", "Relative AE", "VAE", "Relative VAE")
         ):
             s = reconstruction_str.format(
                 available_model_name,
