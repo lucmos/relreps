@@ -38,8 +38,8 @@ PREDICTIONS_TSV = EXPERIMENT_ROOT / "predictions.tsv"
 PERFORMANCE_TSV = EXPERIMENT_ROOT / "performance.tsv"
 
 DATASET_SANITY = {
-    "mnist": ("rae.data.vision.fmnist.FashionMNISTDataset", "test"),
-    "fmnist": ("rae.data.vision.mnist.NISTDataset", "test"),
+    "mnist": ("rae.data.vision.mnist.MNISTDataset", "test"),
+    "fmnist": ("rae.data.vision.fmnist.FashionMNISTDataset", "test"),
     "cifar10": ("rae.data.vision.cifar10.CIFAR10Dataset", "test"),
     "cifar100": ("rae.data.vision.cifar100.CIFAR100Dataset", "test"),
 }
