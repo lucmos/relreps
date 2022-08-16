@@ -10,6 +10,7 @@ python src/rae/run.py -m \
   train=reconstruction \
   nn.module.model.latent_dim=2 \
   nn.data.anchors_num=500 \
-  "nn.module.model.hidden_dims=null" \
+  "nn.module.model.hidden_dims=[2, 3, 4, 8]" \
   "nn.module.optimizer.lr=5e-4" \
-  train.trainer.max_epochs=40
+  train.trainer.max_epochs=40 \
+  "+nn.module.model.latent_activation=null"

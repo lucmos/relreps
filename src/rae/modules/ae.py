@@ -1,6 +1,7 @@
 import math
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
+import hydra.utils
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
@@ -16,6 +17,7 @@ class VanillaAE(nn.Module):
         input_size,
         latent_dim: int,
         hidden_dims: List = None,
+        latent_activation: str = "torch.nn.GELU",
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -39,7 +41,9 @@ class VanillaAE(nn.Module):
 
         self.encoder_out = nn.Sequential(
             nn.Linear(encoder_out_numel, latent_dim),
-            nn.GELU(),
+            hydra.utils.instantiate({"_target_": latent_activation})
+            if latent_activation is not None
+            else nn.Identity(),
         )
 
         self.decoder_in = nn.Sequential(
@@ -47,7 +51,9 @@ class VanillaAE(nn.Module):
                 self.latent_dim,
                 encoder_out_numel,
             ),
-            nn.GELU(),
+            hydra.utils.instantiate({"_target_": latent_activation})
+            if latent_activation is not None
+            else nn.Identity(),
         )
 
     def encode(self, input: Tensor) -> Tensor:
