@@ -18,6 +18,7 @@ class VanillaRelAE(nn.Module):
         input_size,
         latent_dim: int,
         relative_attention: AbstractRelativeAttention,
+        activation: str = "torch.nn.GELU",
         hidden_dims: List = None,
         **kwargs,
     ) -> None:
@@ -36,7 +37,11 @@ class VanillaRelAE(nn.Module):
         self.latent_dim = latent_dim
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
-            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
+            width=metadata.width,
+            height=metadata.height,
+            n_channels=metadata.n_channels,
+            hidden_dims=hidden_dims,
+            activation=activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
@@ -61,7 +66,7 @@ class VanillaRelAE(nn.Module):
                 self.relative_attention.output_dim,
                 encoder_out_numel,
             ),
-            nn.GELU(),
+            hydra.utils.instantiate({"_target_": activation}),
         )
 
         # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.
@@ -117,7 +122,7 @@ class VanillaRelAE(nn.Module):
 
         return {
             Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: attention_output[AttentionOutput.OUTPUT],
+            Output.DEFAULT_LATENT: attention_output[AttentionOutput.SIMILARITIES],
             Output.BATCH_LATENT: x_embedded,
             Output.ANCHORS_LATENT: anchors_embedded,
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],

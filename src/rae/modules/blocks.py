@@ -1,7 +1,7 @@
 import logging
-import math
 from typing import Optional, Sequence, Tuple
 
+import hydra.utils
 import torch
 from torch import nn
 
@@ -113,10 +113,7 @@ def build_transposed_convolution(
 
 
 def build_dynamic_encoder_decoder(
-    width,
-    height,
-    n_channels,
-    hidden_dims: Optional[Sequence[int]],
+    width, height, n_channels, hidden_dims: Optional[Sequence[int]], activation: str = "torch.nn.GELU"
 ) -> Tuple[nn.Module, Sequence[int], nn.Module]:
     """Builds a dynamic convolutional encoder-decoder pair with parametrized hidden dimensions number and size.
 
@@ -151,7 +148,7 @@ def build_dynamic_encoder_decoder(
                     )
                 ),
                 nn.BatchNorm2d(h_dim),
-                nn.GELU(),
+                hydra.utils.instantiate({"_target_": activation}),
             )
         )
         conv2d_out = infer_dimension(
@@ -190,7 +187,7 @@ def build_dynamic_encoder_decoder(
                     padding=PADDING,
                 ),
                 nn.BatchNorm2d(hidden_dims[i + 1]),
-                nn.GELU(),
+                hydra.utils.instantiate({"_target_": activation}),
             )
         )
         running_input_width = target_output_width

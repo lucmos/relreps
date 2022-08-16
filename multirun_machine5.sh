@@ -1,6 +1,24 @@
 #!/bin/bash
 # Reconstruction
 
+# Relative
+python src/rae/run.py -m \
+  core.tags='[reconstruction, relative, tanh-encoder-decoder]' \
+  'nn/data/datasets=vision/mnist' \
+  'train.seed_index=0,1,2,3,4,5' \
+  nn/module=autoencoder \
+  nn/module/model=rel_ae \
+  train=reconstruction \
+  nn.module.model.latent_dim=500 \
+  nn.data.anchors_num=500 \
+  "nn.module.model.hidden_dims=null" \
+  "nn.module.optimizer.lr=5e-4" \
+  train.trainer.max_epochs=40 \
+  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
+  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
+  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
+  nn.module.model.activation=torch.nn.Tanh
+
 
 ## Absolute
 #python src/rae/run.py -m \
@@ -16,22 +34,22 @@
 #  "nn.module.optimizer.lr=5e-4" \
 #  train.trainer.max_epochs=100
 
-# Relative
-python src/rae/run.py -m \
-  core.tags='[reconstruction, relative, tab1-definitive]' \
-  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
-  'train.seed_index=0,1,2,3,4,5' \
-  nn/module=autoencoder \
-  nn/module/model=rel_vae,rel_ae \
-  train=reconstruction \
-  nn.module.model.latent_dim=500 \
-  nn.data.anchors_num=500 \
-  "nn.module.model.hidden_dims=null" \
-  "nn.module.optimizer.lr=5e-4" \
-  train.trainer.max_epochs=100 \
-  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
-  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
-  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null'
+## Relative
+#python src/rae/run.py -m \
+#  core.tags='[reconstruction, relative, tab1-definitive]' \
+#  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  nn/module=autoencoder \
+#  nn/module/model=rel_vae,rel_ae \
+#  train=reconstruction \
+#  nn.module.model.latent_dim=500 \
+#  nn.data.anchors_num=500 \
+#  "nn.module.model.hidden_dims=null" \
+#  "nn.module.optimizer.lr=5e-4" \
+#  train.trainer.max_epochs=100 \
+#  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
+#  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
+#  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null'
 
 ## Relative Quantization
 #python src/rae/run.py -m \
