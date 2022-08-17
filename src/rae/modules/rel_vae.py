@@ -19,6 +19,8 @@ class VanillaRelVAE(nn.Module):
         latent_dim: int,
         relative_attention: AbstractRelativeAttention,
         hidden_dims: List = None,
+        activation: str = "torch.nn.GELU",
+        remove_encoder_last_activation: bool = False,
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -36,7 +38,12 @@ class VanillaRelVAE(nn.Module):
         self.latent_dim = latent_dim
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
-            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
+            width=metadata.width,
+            height=metadata.height,
+            n_channels=metadata.n_channels,
+            hidden_dims=hidden_dims,
+            activation=activation,
+            remove_encoder_last_activation=remove_encoder_last_activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
@@ -62,7 +69,7 @@ class VanillaRelVAE(nn.Module):
                 self.relative_attention.output_dim,
                 encoder_out_numel,
             ),
-            nn.GELU(),
+            hydra.utils.instantiate({"_target_": activation}),
         )
 
         # TODO: these buffers are duplicated in the pl_gclassifier. Remove one of the two.

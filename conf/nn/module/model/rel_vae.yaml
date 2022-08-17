@@ -1,11 +1,14 @@
 _target_: rae.modules.rel_vae.VanillaRelVAE
 latent_dim: 500
 hidden_dims: null
+activation: torch.nn.GELU
+remove_encoder_last_activation: True
 
 # Relative params
 relative_attention:
   _target_: rae.modules.attention.MultiheadRelativeAttention
   in_features: ${nn.module.model.latent_dim}
+  similarities_bin_size: null
   relative_attentions:
     - _target_: rae.modules.attention.RelativeAttention
       similarity_mode: inner
@@ -17,7 +20,7 @@ relative_attention:
       self_attention_hidden_dim: null
       values_self_attention_nhead: null
       similarities_quantization_mode: null
-      similarities_bin_size: null
+      similarities_bin_size: ${nn.module.model.relative_attention.similarities_bin_size}
       similarities_aggregation_mode: null
       similarities_aggregation_n_groups: null
       anchors_sampling_mode: null
