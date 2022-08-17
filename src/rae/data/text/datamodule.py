@@ -1,8 +1,8 @@
 import logging
 from enum import auto
-from functools import cached_property, partial
+from functools import cached_property
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union, Mapping, MutableMapping, Set, Collection
+from typing import Any, Dict, List, Optional, Sequence, Union, Mapping, Set, Collection
 
 import hydra
 import numpy as np
@@ -11,14 +11,11 @@ import pytorch_lightning as pl
 import spacy
 import spacy.cli as spacy_down
 import torch
-from hydra.utils import instantiate
 from nn_core.common import PROJECT_ROOT
-from nn_core.nn_types import Split
 from omegaconf import DictConfig
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from spacy import Language
-from torch.types import Device
 from torch.utils.data import DataLoader, Dataset
 
 from rae.utils.tensor_ops import contiguous_mean
@@ -162,7 +159,21 @@ class MetaData:
         """
         pylogger.debug(f"Saving MetaData to '{dst_path}'")
 
-        torch.save(self.data, f=dst_path / "data.pt")
+        for field_name in (
+            "stopwords",
+            "class_to_idx",
+            "idx_to_class",
+            "anchor_idxs",
+            "anchor_samples",
+            "anchor_targets",
+            "anchor_classes",
+            "anchor_latents",
+            "fixed_sample_idxs",
+            "fixed_samples",
+            "fixed_sample_targets",
+            "fixed_sample_classes",
+        ):
+            torch.save(getattr(self, field_name), f=dst_path / f"{field_name}.pt")
 
     @staticmethod
     def load(src_path: Path) -> "MetaData":
@@ -176,9 +187,24 @@ class MetaData:
         """
         pylogger.debug(f"Loading MetaData from '{src_path}'")
 
-        data = torch.load(f=src_path / "data.pt")
+        field_name2data = {}
+        for field_name in (
+            "stopwords",
+            "class_to_idx",
+            "idx_to_class",
+            "anchor_idxs",
+            "anchor_samples",
+            "anchor_targets",
+            "anchor_classes",
+            "anchor_latents",
+            "fixed_sample_idxs",
+            "fixed_samples",
+            "fixed_sample_targets",
+            "fixed_sample_classes",
+        ):
+            field_name2data[field_name] = torch.load(f=src_path / f"{field_name}.pt")
 
-        return MetaData(**data)
+        return MetaData(**field_name2data)
 
 
 class MyDataModule(pl.LightningDataModule):

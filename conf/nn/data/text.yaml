@@ -3,6 +3,8 @@ _target_: rae.data.text.datamodule.MyDataModule
 anchors_mode: "stratified_subset" # "stratified", "stratified_subset", "fixed", "random_images", "random_latents"
 anchors_num: 500
 
+val_fixed_sample_idxs: ${nn.data.datasets.val_fixed_sample_idxs}
+
 # Different classes for anchors
 anchors_idxs: null #[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
 
@@ -14,4 +16,4 @@ datasets: ???
 
 defaults:
   - _self_
-  - datasets: text/amazon # pick one of the yamls in nn/data/datasets/text
+  - datasets: text/trec # pick one of the yamls in nn/data/datasets/text

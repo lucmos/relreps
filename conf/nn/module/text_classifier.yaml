@@ -7,9 +7,10 @@ model:
   _target_: rae.modules.text.classifier.TextClassifier
 
   text_encoder:
-    _target_: rae.modules.text.encoder.FastTextEncoder
+    _target_: rae.modules.text.encoder.GensimEncoder
     language: en
-    lemmatize: true
+    lemmatize: false
+    model_name: "fasttext-wiki-news-subwords-300"
 
   #text_encoder:
   #  _target_: rae.data.text.datamodule.TransformerEncoder

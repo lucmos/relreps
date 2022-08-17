@@ -33,7 +33,7 @@ class TextEncoder(nn.Module):
         raise NotImplementedError
 
     @abstractmethod
-    def encode(self, text: str) -> Sequence[torch.Tensor]:
+    def encode(self, text: str) -> Optional[Sequence[torch.Tensor]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -58,8 +58,16 @@ class TextEncoder(nn.Module):
         Returns:
             A batch generated from the given samples
         """
+        text_encodings: Sequence[Sequence[torch.Tensor]] = [self.encode(text=sample["data"]) for sample in batch]
+        start_len: int = len(batch)
+        batch = [sample for sample, text_encoding in zip(batch, text_encodings) if text_encoding is not None]
+        end_len: int = len(batch)
+        if start_len != end_len:
+            print(f"Skipping {start_len - end_len} samples")
+        text_encodings = [text_encoding for text_encoding in text_encodings if text_encoding is not None]
+
         batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}
-        text_encodings: Sequence[Sequence[torch.Tensor]] = [self.encode(text=text) for text in batch["data"]]
+
         # encodings ~ (sample_index, sentence_index, word_index)
 
         encodings = torch.cat(
@@ -70,7 +78,7 @@ class TextEncoder(nn.Module):
         words_per_text = torch.tensor([sum(sentence.size(0) for sentence in text) for text in text_encodings])
         sentences_per_text = torch.tensor([len(text) for text in text_encodings])
 
-        classes = torch.as_tensor(batch["class"])
+        classes = batch["class"]
         targets = torch.as_tensor(batch["target"])
 
         sections = dict(
@@ -121,7 +129,7 @@ class FastTextEncoder(TextEncoder):
     def _encode_token(self, token: str) -> torch.Tensor:
         return torch.tensor(self.model[token])
 
-    def encode(self, text: str) -> Sequence[torch.Tensor]:
+    def encode(self, text: str) -> Optional[Sequence[torch.Tensor]]:
         document: Doc = self.pipeline(text=text)
         sentences: List[Span] = list(document.sents)
         sentences: List[List[Token]] = [list(sentence) for sentence in sentences]
@@ -214,12 +222,13 @@ class GensimEncoder(TextEncoder):
             dst_path,
         )
 
-    def __init__(self, language: str, model_name: str):
+    def __init__(self, language: str, lemmatize: bool, model_name: str):
         super().__init__(trainable=False)
         self.language: str = language
+        self.lemmatize: bool = lemmatize
 
         self.model = KeyedVectors.load_word2vec_format(
-            fname=str((Path(gensim.downloader.BASE_DIR) / "restricted") / f"{model_name},txt")
+            fname=str((Path(gensim.downloader.BASE_DIR) / "restricted") / f"{model_name}.txt")
         )
         self.pipeline = SpacyManager.instantiate(language)
         self.stopwords = self.pipeline.Defaults.stop_words
@@ -234,7 +243,7 @@ class GensimEncoder(TextEncoder):
         return torch.tensor(self.model[token])
 
     @torch.no_grad()
-    def encode(self, text: str) -> Sequence[torch.Tensor]:
+    def encode(self, text: str) -> Optional[Sequence[torch.Tensor]]:
         document: Doc = self.pipeline(text=text)
         sentences: List[Span] = list(document.sents)
         sentences: List[List[Token]] = [list(sentence) for sentence in sentences]
@@ -255,7 +264,8 @@ class GensimEncoder(TextEncoder):
         ]
 
         encoding: Sequence[List[torch.Tensor]] = [sentence for sentence in encoding if len(sentence) > 0]
-        assert len(encoding) > 0
+        if len(encoding) == 0:
+            return None
 
         # Now we can stack sentence representations
         encoding: Sequence[torch.Tensor] = [torch.stack(sentence_encoding, dim=0) for sentence_encoding in encoding]
@@ -295,7 +305,7 @@ class TransformerEncoder(TextEncoder):
         ).eval()
 
     @torch.no_grad()
-    def encode(self, text: str) -> Sequence[torch.Tensor]:
+    def encode(self, text: str) -> Optional[Sequence[torch.Tensor]]:
         encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt", truncation=True)
         encoding: torch.Tensor = self.transformer(**encoding)["hidden_states"][-1]
         # encoding ~ (text, bpe, hidden)
