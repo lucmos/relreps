@@ -352,30 +352,6 @@ class RelativeAttention(AbstractRelativeAttention):
         elif self.output_normalization_mode == OutputNormalization.INSTANCENORM:
             self.outnorm = nn.InstanceNorm1d(num_features=self.output_dim, affine=True)
 
-    def forward(
-        self,
-        x: torch.Tensor,
-        anchors: torch.Tensor,
-        anchors_targets: Optional[torch.Tensor] = None,
-    ) -> Dict[AttentionOutput, torch.Tensor]:
-        """Forward pass.
-
-        Args:
-            x: [batch_size, hidden_dim]
-            anchors: [num_anchors, hidden_dim]
-            anchors_targets: [num_anchors]
-        """
-        encoding = self.encode(x=x, anchors=anchors, anchors_targets=anchors_targets)
-        attention_output = self.decode(**encoding)
-        # TODO: This should also return the Anchors Targets tensor, because it could change depending on the parameters
-        return {
-            AttentionOutput.OUTPUT: attention_output[AttentionOutput.OUTPUT],
-            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
-            AttentionOutput.SIMILARITIES: encoding[AttentionOutput.SIMILARITIES],
-            AttentionOutput.ANCHORS_LATENT: encoding[AttentionOutput.ANCHORS_LATENT],
-            AttentionOutput.BATCH_LATENT: encoding[AttentionOutput.BATCH_LATENT],
-        }
-
     def encode(
         self,
         x: torch.Tensor,
@@ -520,10 +496,30 @@ class RelativeAttention(AbstractRelativeAttention):
         else:
             assert False
 
+        # TODO: This should also return the Anchors Targets tensor, because it could change depending on the parameters
         return {
             AttentionOutput.OUTPUT: output,
             AttentionOutput.UNTRASFORMED_ATTENDED: output,
+            AttentionOutput.SIMILARITIES: similarities,
+            AttentionOutput.ANCHORS_LATENT: kwargs[AttentionOutput.ANCHORS_LATENT],
+            AttentionOutput.BATCH_LATENT: kwargs[AttentionOutput.BATCH_LATENT],
         }
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        anchors: torch.Tensor,
+        anchors_targets: Optional[torch.Tensor] = None,
+    ) -> Dict[AttentionOutput, torch.Tensor]:
+        """Forward pass.
+
+        Args:
+            x: [batch_size, hidden_dim]
+            anchors: [num_anchors, hidden_dim]
+            anchors_targets: [num_anchors]
+        """
+        encoding = self.encode(x=x, anchors=anchors, anchors_targets=anchors_targets)
+        return self.decode(**encoding)
 
     @property
     def output_dim(self) -> int:
@@ -586,24 +582,15 @@ class RelativeTransformerBlock(AbstractRelativeAttention):
     ) -> Dict[AttentionOutput, torch.Tensor]:
         return self.relative_attention.encode(x=x, anchors=anchors, anchors_targets=anchors_targets)
 
-    def decode(
-        self,
-        similarities,
-        anchors: torch.Tensor,
-        anchors_targets: Optional[torch.Tensor] = None,
-        original_anchors: Optional[torch.Tensor] = None,
-        **kwargs,
-    ):
-        attention_output = self.relative_attention.decode(
-            similarities=similarities,
-            anchors=anchors,
-            anchors_targets=anchors_targets,
-            original_anchors=original_anchors,
-        )
+    def decode(self, **kwargs):
+        attention_output = self.relative_attention.decode(**kwargs)
         output = self.block(attention_output[AttentionOutput.OUTPUT])
         return {
             AttentionOutput.OUTPUT: output,
-            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.OUTPUT],
+            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
+            AttentionOutput.SIMILARITIES: kwargs[AttentionOutput.SIMILARITIES],
+            AttentionOutput.ANCHORS_LATENT: kwargs[AttentionOutput.ANCHORS_LATENT],
+            AttentionOutput.BATCH_LATENT: kwargs[AttentionOutput.BATCH_LATENT],
         }
 
     def forward(
@@ -613,14 +600,7 @@ class RelativeTransformerBlock(AbstractRelativeAttention):
         anchors_targets: Optional[torch.Tensor] = None,
     ) -> Dict[AttentionOutput, torch.Tensor]:
         encoding = self.encode(x=x, anchors=anchors, anchors_targets=anchors_targets)
-        output = self.decode(**encoding)
-        return {
-            AttentionOutput.OUTPUT: output[AttentionOutput.OUTPUT],
-            AttentionOutput.UNTRASFORMED_ATTENDED: output[AttentionOutput.UNTRASFORMED_ATTENDED],
-            AttentionOutput.SIMILARITIES: encoding[AttentionOutput.SIMILARITIES],
-            AttentionOutput.ANCHORS_LATENT: encoding[AttentionOutput.ANCHORS_LATENT],
-            AttentionOutput.BATCH_LATENT: encoding[AttentionOutput.BATCH_LATENT],
-        }
+        return self.decode(**encoding)
 
 
 class MultiheadRelativeAttention(AbstractRelativeAttention):
@@ -744,7 +724,13 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
         else:
             raise NotImplementedError
 
-        return attention_output
+        return {
+            AttentionOutput.OUTPUT: attention_output[AttentionOutput.OUTPUT],
+            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
+            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT].squeeze(1),
+            AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT].squeeze(1),
+        }
 
     def forward(
         self,
@@ -753,12 +739,4 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
         anchors_targets: Optional[torch.Tensor] = None,
     ) -> Dict[AttentionOutput, torch.Tensor]:
         encoding = self.encode(x=x, anchors=anchors, anchors_targets=anchors_targets)
-        attention_output = self.decode(**encoding)
-
-        return {
-            AttentionOutput.OUTPUT: attention_output[AttentionOutput.OUTPUT],
-            AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
-            AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
-            AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT],
-            AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT],
-        }
+        return self.decode(**encoding)
