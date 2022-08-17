@@ -34,6 +34,7 @@ def perform_computation(
     similarity_mode: RelativeEmbeddingMethod,
     values_mode: ValuesMethod,
     values_self_attention_nhead: int,
+    self_attention_hidden_dim: int,
     hidden_features: int,
     out_features: int,
     transform_elements: Set[AttentionElement],
@@ -74,6 +75,12 @@ def perform_computation(
             f"Output normalization {output_normalization_mode} break the equivariance property of {values_mode}"
         )
 
+    if values_mode == ValuesMethod.SELF_ATTENTION and (
+        similarities_aggregation_mode != SimilaritiesAggregationMode.NONE
+        or anchors_sampling_mode != AnchorsSamplingMode.NONE
+    ):
+        pytest.skip("Self attention currently does not support an output_dim != num_anchors!")
+
     op = op(
         in_features=LATENT_DIM,
         hidden_features=hidden_features,
@@ -83,6 +90,7 @@ def perform_computation(
         similarity_mode=similarity_mode,
         values_mode=values_mode,
         values_self_attention_nhead=values_self_attention_nhead,
+        self_attention_hidden_dim=self_attention_hidden_dim,
         n_classes=N_CLASSES,
         similarities_quantization_mode=similarities_quantization_mode,
         similarities_bin_size=similarities_bin_size,
@@ -139,14 +147,14 @@ def perform_computation(
 @pytest.mark.parametrize("normalization_mode", (NormalizationMode.NONE, NormalizationMode.L2))
 @pytest.mark.parametrize("similarity_mode", (RelativeEmbeddingMethod.BASIS_CHANGE, RelativeEmbeddingMethod.INNER))
 @pytest.mark.parametrize(
-    "values_mode, values_self_attention_nhead",
+    "values_mode, values_self_attention_nhead, self_attention_hidden_dim",
     (
-        (ValuesMethod.SIMILARITIES, None),  # Yields invariance
-        (ValuesMethod.TRAINABLE, None),  # Yields invariance
-        (ValuesMethod.SELF_ATTENTION, 1),  # Yields invariance
-        (ValuesMethod.SELF_ATTENTION, 2),  # Yields invariance
-        (ValuesMethod.SELF_ATTENTION, 5),  # Yields invariance
-        (ValuesMethod.ANCHORS, None),  # Yields equivariance
+        (ValuesMethod.SIMILARITIES, None, None),  # Yields invariance
+        (ValuesMethod.TRAINABLE, None, None),  # Yields invariance
+        (ValuesMethod.SELF_ATTENTION, 1, 8),  # Yields invariance
+        (ValuesMethod.SELF_ATTENTION, 2, 8),  # Yields invariance
+        (ValuesMethod.SELF_ATTENTION, 5, 10),  # Yields invariance
+        (ValuesMethod.ANCHORS, None, None),  # Yields equivariance
     ),
 )
 @pytest.mark.parametrize(
@@ -194,6 +202,7 @@ def test_invariance_equivariance(
     similarity_mode: RelativeEmbeddingMethod,
     values_mode: ValuesMethod,
     values_self_attention_nhead: int,
+    self_attention_hidden_dim: int,
     hidden_features: int,
     out_features: int,
     transform_elements: Set[AttentionElement],
@@ -218,6 +227,7 @@ def test_invariance_equivariance(
         similarity_mode=similarity_mode,
         values_mode=values_mode,
         values_self_attention_nhead=values_self_attention_nhead,
+        self_attention_hidden_dim=self_attention_hidden_dim,
         hidden_features=hidden_features,
         out_features=out_features,
         transform_elements=transform_elements,
