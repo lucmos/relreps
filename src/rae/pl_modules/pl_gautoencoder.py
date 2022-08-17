@@ -78,8 +78,22 @@ class LightningAutoencoder(AbstractLightningModule):
         Returns:
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
-        # example
-        return self.autoencoder(x)
+        encoding = self.encode(x)
+        return self.decode(**encoding)
+
+    def encode(self, *args, **kwargs):
+        return self.autoencoder.encode(*args, **kwargs)
+
+    # @property
+    # def encode_output(self) -> Set[str]:
+    #     raise NotImplementedError
+    #
+    # @property
+    # def decode_input(self) -> Set[str]:
+    #     raise NotImplementedError
+
+    def decode(self, *args, **kwargs):
+        return self.autoencoder.decode(*args, **kwargs)
 
     def step(self, batch, batch_index: int, stage: Stage) -> Mapping[str, Any]:
         image_batch = batch["image"]

@@ -56,7 +56,7 @@ class VanillaAE(nn.Module):
             else nn.Identity(),
         )
 
-    def encode(self, input: Tensor) -> Tensor:
+    def encode(self, input: Tensor) -> Dict[str, Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -66,34 +66,31 @@ class VanillaAE(nn.Module):
         result = self.encoder(input)
         result = torch.flatten(result, start_dim=1)
         result = self.encoder_out(result)
-        return result
+        return {
+            Output.BATCH_LATENT: result,
+        }
 
-    def decode(self, z: Tensor) -> Tensor:
+    def decode(self, batch_latent: Tensor) -> Dict[Output, Tensor]:
         """
         Maps the given latent codes
         onto the image space.
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_in(z)
+        result = self.decoder_in(batch_latent)
         result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
-        return result
-
-    def forward(self, x: Tensor, **kwargs) -> Dict[Output, Tensor]:
-        latent = self.encode(x)
-        x_recon = self.decode(latent)
         return {
-            Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: latent,
-            Output.BATCH_LATENT: latent,
+            Output.RECONSTRUCTION: result,
+            Output.DEFAULT_LATENT: batch_latent,
+            Output.BATCH_LATENT: batch_latent,
         }
 
     def loss_function(self, model_out, batch, *args, **kwargs) -> dict:
         """https://stackoverflow.com/questions/64909658/what-could-cause-a-vaevariational-autoencoder-to-output-random-noise-even-afte
 
         Computes the VAE loss function.
-        KL(N(\mu, \sigma), N(0, 1)) = \log \frac{1}{\sigma} + \frac{\sigma^2 + \mu^2}{2} - \frac{1}{2}
+        KL(N(mu, sigma), N(0, 1)) = log frac{1}{sigma} + frac{sigma^2 + mu^2}{2} - frac{1}{2}
         :param args:
         :param kwargs:
         :return:

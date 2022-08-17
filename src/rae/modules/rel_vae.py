@@ -77,7 +77,7 @@ class VanillaRelVAE(nn.Module):
         self.register_buffer("anchors_latents", metadata.anchors_latents)
         self.register_buffer("anchors_targets", metadata.anchors_targets)
 
-    def encode(self, input: Tensor) -> List[Tensor]:
+    def embed(self, input: Tensor) -> List[Tensor]:
         """
         Encodes the input by passing through the encoder network
         and returns the latent codes.
@@ -89,17 +89,35 @@ class VanillaRelVAE(nn.Module):
         # result = self.encoder_out(result)
         return result
 
-    def decode(self, z: Tensor) -> Tensor:
+    def decode(self, **kwargs) -> Dict[str, Tensor]:
         """
         Maps the given latent codes
         onto the image space.
         :param z: (Tensor) [B x D]
         :return: (Tensor) [B x C x H x W]
         """
-        result = self.decoder_in(z)
+        attention_output = self.relative_attention.decode(**kwargs)
+
+        # Split the result into mu and var components
+        # of the latent Gaussian distribution
+        relative_mu = self.fc_mu(attention_output[AttentionOutput.OUTPUT])
+        relative_log_var = self.fc_var(attention_output[AttentionOutput.OUTPUT])
+
+        reparametrized_relative = self.reparameterize(relative_mu, relative_log_var)
+
+        result = self.decoder_in(reparametrized_relative)
         result = result.view(-1, *self.encoder_out_shape[1:])
         result = self.decoder(result)
-        return result
+        return {
+            Output.RECONSTRUCTION: result,
+            Output.DEFAULT_LATENT: attention_output[Output.BATCH_LATENT],
+            Output.BATCH_LATENT: attention_output[Output.BATCH_LATENT],
+            Output.ANCHORS_LATENT: attention_output[Output.ANCHORS_LATENT],
+            Output.LATENT_MU: relative_mu,
+            Output.LATENT_LOGVAR: relative_log_var,
+            Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
+            Output.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+        }
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:
         """
@@ -113,42 +131,27 @@ class VanillaRelVAE(nn.Module):
         eps = torch.randn_like(std)
         return eps * std + mu
 
-    def forward(
+    def encode(
         self,
         x: Tensor,
         new_anchors_images: Optional[torch.Tensor] = None,
         new_anchors_targets: Optional[torch.Tensor] = None,
         **kwargs,
-    ) -> Dict[Output, Tensor]:
-        x_embedded = self.encode(x)
+    ):
+        x_embedded = self.embed(x)
 
         with torch.no_grad():
-            anchors_embedded = self.encode(self.anchors_images if new_anchors_images is None else new_anchors_images)
+            anchors_embedded = self.embed(self.anchors_images if new_anchors_images is None else new_anchors_images)
 
-        attention_output = self.relative_attention(
+        attention_encoding = self.relative_attention.encode(
             x=x_embedded,
             anchors=anchors_embedded,
             anchors_targets=self.anchors_targets if new_anchors_targets is None else new_anchors_targets,
         )
-
-        # Split the result into mu and var components
-        # of the latent Gaussian distribution
-        relative_mu = self.fc_mu(attention_output[AttentionOutput.OUTPUT])
-        relative_log_var = self.fc_var(attention_output[AttentionOutput.OUTPUT])
-
-        reparametrized_relative = self.reparameterize(relative_mu, relative_log_var)
-
-        x_recon = self.decode(reparametrized_relative)
-
         return {
-            Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: x_embedded,
+            **attention_encoding,
             Output.BATCH_LATENT: x_embedded,
             Output.ANCHORS_LATENT: anchors_embedded,
-            Output.LATENT_MU: relative_mu,
-            Output.LATENT_LOGVAR: relative_log_var,
-            Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
-            Output.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
         }
 
     def _compute_kl_loss(self, mean, log_variance):
