@@ -55,6 +55,13 @@ class SimilaritiesAggregationMode(StrEnum):
 
 
 class SimilaritiesQuantizationMode(StrEnum):
+    CUSTOM_ROUND = auto()
+    NONE = auto()
+    DIFFERENTIABLE_ROUND = auto()
+    SMOOTH_STEPS = auto()
+
+
+class AbsoluteQuantizationMode(StrEnum):
     NONE = auto()
     DIFFERENTIABLE_ROUND = auto()
     # SMOOTH_STEPS = auto()
@@ -95,6 +102,38 @@ class AttentionOutput(StrEnum):
     OUTPUT = auto()
     SIMILARITIES = auto()
     UNTRASFORMED_ATTENDED = auto()
+
+
+class CustomRound(torch.autograd.Function):
+    """
+    We can implement our own custom autograd Functions by subclassing
+    torch.autograd.Function and implementing the forward and backward passes
+    which operate on Tensors.
+    """
+
+    @staticmethod
+    def forward(ctx, input, similarities_bin_size):
+        """
+        In the forward pass we receive a Tensor containing the input and return
+        a Tensor containing the output. ctx is a context object that can be used
+        to stash information for backward computation. You can cache arbitrary
+        objects for use in the backward pass using the ctx.save_for_backward method.
+        """
+        ctx.save_for_backward(input, torch.as_tensor(similarities_bin_size))
+        return torch.round(input / similarities_bin_size) * similarities_bin_size
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        In the backward pass we receive a Tensor containing the gradient of the loss
+        with respect to the output, and we need to compute the gradient of the loss
+        with respect to the input.
+        """
+        (input, similarities_bin_size) = ctx.saved_tensors
+        return torch.round(grad_output / similarities_bin_size) * similarities_bin_size
+
+
+cround = CustomRound.apply
 
 
 class QKVTransforms(nn.Module):
@@ -162,6 +201,8 @@ class RelativeAttention(AbstractRelativeAttention):
         transform_elements: Optional[Set[AttentionElement]] = None,
         self_attention_hidden_dim: Optional[int] = None,
         values_self_attention_nhead: Optional[int] = None,
+        absolute_quantization_mode: Optional[AbsoluteQuantizationMode] = None,
+        absolute_bin_size: Optional[float] = None,
         similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
         similarities_bin_size: Optional[float] = None,
         similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
@@ -213,6 +254,16 @@ class RelativeAttention(AbstractRelativeAttention):
             raise ValueError(
                 f"values_self_attention_nhead={self.values_self_attention_nhead} "
                 f"provided but unused if values_mode={self.values_mode}"
+            )
+
+        self.absolute_quantization_mode = (
+            absolute_quantization_mode if absolute_quantization_mode is not None else AbsoluteQuantizationMode.NONE
+        )
+        self.absolute_bin_size = absolute_bin_size
+        if self.absolute_bin_size and self.absolute_quantization_mode == AbsoluteQuantizationMode.NONE:
+            raise ValueError(
+                f"absolute_bin_size={self.absolute_bin_size} "
+                f"provided but unused if similarities_quantization_mode={self.absolute_quantization_mode}"
             )
 
         self.similarities_quantization_mode = (
@@ -392,6 +443,18 @@ class RelativeAttention(AbstractRelativeAttention):
         else:
             raise ValueError(f"Normalization mode not supported: {self.normalization_mode}")
 
+        # Quantize absolute
+        if self.absolute_quantization_mode == AbsoluteQuantizationMode.NONE:
+            pass
+        elif self.absolute_quantization_mode == AbsoluteQuantizationMode.DIFFERENTIABLE_ROUND:
+            anchors = torch.round(anchors / self.absolute_bin_size) * self.absolute_bin_size
+            anchors = anchors + (anchors - anchors).detach()
+
+            x = torch.round(x / self.absolute_bin_size) * self.absolute_bin_size
+            x = x + (x - x).detach()
+        elif self.absolute_quantization_mode == AbsoluteQuantizationMode.SMOOTH_STEPS:
+            raise NotImplementedError()
+
         # Compute queries-keys similarities
         if self.similarity_mode == RelativeEmbeddingMethod.INNER:
             similarities = torch.einsum("bm, am -> ba", x, anchors)
@@ -423,6 +486,12 @@ class RelativeAttention(AbstractRelativeAttention):
             quantized_similarities = torch.round(similarities / self.similarities_bin_size) * self.similarities_bin_size
             quantized_similarities = similarities + (quantized_similarities - similarities).detach()
         elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.SMOOTH_STEPS:
+            quantized_similarities = quantized_similarities - torch.sin(2 * torch.pi * quantized_similarities) / (
+                2 * torch.pi
+            )
+        elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.CUSTOM_ROUND:
+            quantized_similarities = cround(quantized_similarities, self.similarities_bin_size)
+        else:
             raise NotImplementedError()
 
         return {
