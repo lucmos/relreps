@@ -117,6 +117,7 @@ class VanillaRelVAE(nn.Module):
             Output.LATENT_LOGVAR: relative_log_var,
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
             Output.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            Output.NON_QUANTIZED_SIMILARITIES: attention_output[AttentionOutput.NON_QUANTIZED_SIMILARITIES],
         }
 
     def reparameterize(self, mu: Tensor, logvar: Tensor) -> Tensor:

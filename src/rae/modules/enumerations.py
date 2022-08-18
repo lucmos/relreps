@@ -8,6 +8,7 @@ except ImportError:
 
 
 class Output(StrEnum):
+    NON_QUANTIZED_SIMILARITIES = auto()
     SIMILARITIES = auto()
     LOGITS = auto()
     RECONSTRUCTION = auto()

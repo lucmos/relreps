@@ -85,6 +85,7 @@ class SubspacePooling(StrEnum):
 
 
 class AttentionOutput(StrEnum):
+    NON_QUANTIZED_SIMILARITIES = auto()
     SUBSPACE_OUTPUTS = auto()
     ANCHORS_TARGETS = auto()
     ORIGINAL_ANCHORS = auto()
@@ -426,6 +427,7 @@ class RelativeAttention(AbstractRelativeAttention):
 
         return {
             AttentionOutput.SIMILARITIES: quantized_similarities,
+            AttentionOutput.NON_QUANTIZED_SIMILARITIES: similarities,
             AttentionOutput.ANCHORS: anchors,
             AttentionOutput.ORIGINAL_ANCHORS: original_anchors,
             AttentionOutput.ANCHORS_TARGETS: anchors_targets,
@@ -501,6 +503,7 @@ class RelativeAttention(AbstractRelativeAttention):
             AttentionOutput.OUTPUT: output,
             AttentionOutput.UNTRASFORMED_ATTENDED: output,
             AttentionOutput.SIMILARITIES: similarities,
+            AttentionOutput.NON_QUANTIZED_SIMILARITIES: kwargs[AttentionOutput.NON_QUANTIZED_SIMILARITIES],
             AttentionOutput.ANCHORS_LATENT: kwargs[AttentionOutput.ANCHORS_LATENT],
             AttentionOutput.BATCH_LATENT: kwargs[AttentionOutput.BATCH_LATENT],
         }
@@ -589,6 +592,7 @@ class RelativeTransformerBlock(AbstractRelativeAttention):
             AttentionOutput.OUTPUT: output,
             AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
             AttentionOutput.SIMILARITIES: kwargs[AttentionOutput.SIMILARITIES],
+            AttentionOutput.NON_QUANTIZED_SIMILARITIES: kwargs[AttentionOutput.NON_QUANTIZED_SIMILARITIES],
             AttentionOutput.ANCHORS_LATENT: kwargs[AttentionOutput.ANCHORS_LATENT],
             AttentionOutput.BATCH_LATENT: kwargs[AttentionOutput.BATCH_LATENT],
         }
@@ -707,7 +711,12 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
         for to_merge in [AttentionOutput.OUTPUT]:
             attention_output[to_merge] = torch.stack(attention_output[to_merge], dim=1)
 
-        for to_merge in [AttentionOutput.SIMILARITIES, AttentionOutput.ANCHORS_LATENT, AttentionOutput.BATCH_LATENT]:
+        for to_merge in [
+            AttentionOutput.SIMILARITIES,
+            AttentionOutput.NON_QUANTIZED_SIMILARITIES,
+            AttentionOutput.ANCHORS_LATENT,
+            AttentionOutput.BATCH_LATENT,
+        ]:
             attention_output[to_merge] = torch.stack(attention_encodings[to_merge], dim=1)
 
         if self.subspace_pooling == SubspacePooling.LINEAR:
@@ -728,6 +737,7 @@ class MultiheadRelativeAttention(AbstractRelativeAttention):
             AttentionOutput.OUTPUT: attention_output[AttentionOutput.OUTPUT],
             AttentionOutput.UNTRASFORMED_ATTENDED: attention_output[AttentionOutput.UNTRASFORMED_ATTENDED],
             AttentionOutput.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            AttentionOutput.NON_QUANTIZED_SIMILARITIES: attention_output[AttentionOutput.NON_QUANTIZED_SIMILARITIES],
             AttentionOutput.ANCHORS_LATENT: attention_output[AttentionOutput.ANCHORS_LATENT].squeeze(1),
             AttentionOutput.BATCH_LATENT: attention_output[AttentionOutput.BATCH_LATENT].squeeze(1),
         }

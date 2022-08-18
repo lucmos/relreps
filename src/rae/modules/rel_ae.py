@@ -108,6 +108,7 @@ class VanillaRelAE(nn.Module):
             Output.ANCHORS_LATENT: attention_output[Output.ANCHORS_LATENT],
             Output.INV_LATENTS: attention_output[AttentionOutput.OUTPUT],
             Output.SIMILARITIES: attention_output[AttentionOutput.SIMILARITIES],
+            Output.NON_QUANTIZED_SIMILARITIES: attention_output[AttentionOutput.NON_QUANTIZED_SIMILARITIES],
         }
 
     def encode(
