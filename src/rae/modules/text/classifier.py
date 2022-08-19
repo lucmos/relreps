@@ -53,17 +53,21 @@ class TextClassifier(nn.Module):
             set(batch_post_reduce) if batch_post_reduce is not None and len(batch_post_reduce) > 0 else {}
         )
 
-        self.anchor_batch = {
-            key: [sample[key] for sample in metadata.anchor_samples] for key in metadata.anchor_samples[0].keys()
-        }
-        anchor_encodings = self.text_encoder.collate_fn(batch=self.anchor_batch)
+        anchors = self.text_encoder.collate_fn(batch=metadata.anchor_samples)
+
+        if not self.text_encoder.trainable:
+            self.register_buffer("anchor_encodings", anchors["encodings"])
+            self.register_buffer("anchor_words_per_text", anchors["sections"]["words_per_text"])
+            self.register_buffer("anchor_words_per_sentence", anchors["sections"]["words_per_sentence"])
+            self.register_buffer("anchor_sentences_per_text", anchors["sections"]["sentences_per_text"])
+
         n_anchors = (
-            len(anchor_encodings["sections"]["words_per_text"])
+            len(anchors["sections"]["words_per_text"])
             if EncodingLevel.TEXT in self.anchors_reduce
             else (
-                len(anchor_encodings["sections"]["words_per_sentence"])
+                len(anchors["sections"]["words_per_sentence"])
                 if EncodingLevel.SENTENCE in self.anchors_reduce
-                else anchor_encodings["sections"]["words_per_sentence"].sum()
+                else anchors["sections"]["words_per_sentence"].sum()
             )
         )
         self.relative_projection = instantiate(relative_projection, n_anchors=n_anchors, n_classes=n_classes)
@@ -83,8 +87,22 @@ class TextClassifier(nn.Module):
                 in_features=self.relative_projection.output_dim,
                 out_features=n_classes,
             ),
-            nn.Tanh(),
+            nn.ReLU(),
         )
+        # self.sequential = nn.Sequential(
+        #     # TODO: reactivate DeepProjection
+        #     DeepProjection(
+        #         in_features=300,
+        #         out_features=n_classes,
+        #         dropout=0,
+        #         activation=nn.ReLU(),
+        #     ),
+        #     # nn.Linear(
+        #     #     in_features=300,
+        #     #     out_features=n_classes,
+        #     # ),
+        #     # nn.ReLU(),
+        # )
 
     def set_finetune_mode(self):
         pass
@@ -98,7 +116,9 @@ class TextClassifier(nn.Module):
         Returns:
             predictions with size [batch, n_classes]
         """
-        batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
+        if "encodings" not in batch:
+            assert False
+            batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
         x = batch["encodings"]
 
         x, reduced_to_sentence = EncodingLevel.reduce(
@@ -106,11 +126,25 @@ class TextClassifier(nn.Module):
         )
 
         with torch.no_grad():
-            anchor_batch = to_device(self.text_encoder.collate_fn(batch=self.anchor_batch), device=device)
+            anchor_encodings, sections = (
+                (
+                    self.anchor_encodings,
+                    dict(
+                        words_per_text=self.anchor_words_per_text,
+                        words_per_sentence=self.anchor_words_per_sentence,
+                        sentences_per_text=self.anchor_sentences_per_text,
+                    ),
+                )
+                if self.anchor_encodings is not None
+                else (
+                    (x := to_device(self.text_encoder.collate_fn(batch=self.anchor_batch), device=device)),
+                    x["sections"],
+                )
+            )
 
             anchors, _ = EncodingLevel.reduce(
-                encodings=anchor_batch["encodings"],
-                **anchor_batch["sections"],
+                encodings=anchor_encodings,
+                **sections,
                 reduced_to_sentence=False,
                 reduce_transformations=self.anchors_reduce,
             )

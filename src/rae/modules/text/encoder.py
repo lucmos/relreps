@@ -3,6 +3,7 @@ from abc import abstractmethod
 from functools import lru_cache
 from pathlib import Path
 from typing import Set, Sequence, List, Optional, Mapping, Dict, Any
+import rae
 
 import fasttext
 import gensim.downloader
@@ -159,15 +160,18 @@ class GensimEncoder(TextEncoder):
     def _build_vector_models():
         available_models = set(gensim.downloader.info()["models"].keys())
         model_name2bin_mode = {
-            "fasttext-wiki-news-subwords-300": False,
+            "local_fasttext": False,
+            # "fasttext-wiki-news-subwords-300": False,
             # "conceptnet-numberbatch-17-06-300": False,
             "word2vec-google-news-300": True,
             "glove-wiki-gigaword-300": False,
         }
-        assert all(model in available_models for model in model_name2bin_mode.keys())
+        # assert all(model in available_models for model in model_name2bin_mode.keys())
 
         model_name2path: Mapping[str, Path] = {
             model_name: Path(gensim.downloader.load(model_name, return_path=True))
+            if model_name != "local_fasttext"
+            else (PROJECT_ROOT / "data" / "fasttext" / "cc.en.300.vec")
             for model_name in tqdm(model_name2bin_mode.keys(), desc="Downloading models (with cache)")
         }
         restricted_dir: Path = Path(gensim.downloader.BASE_DIR) / "restricted"
@@ -227,7 +231,7 @@ class GensimEncoder(TextEncoder):
         self.language: str = language
         self.lemmatize: bool = lemmatize
 
-        self.model = KeyedVectors.load_word2vec_format(
+        self.model: KeyedVectors = KeyedVectors.load_word2vec_format(
             fname=str((Path(gensim.downloader.BASE_DIR) / "restricted") / f"{model_name}.txt")
         )
         self.pipeline = SpacyManager.instantiate(language)
@@ -316,3 +320,8 @@ class TransformerEncoder(TextEncoder):
         # TODO: support sentence level
 
         return [encoding]
+
+
+if __name__ == "__main__":
+
+    GensimEncoder._build_vector_models()
