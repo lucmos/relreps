@@ -1,23 +1,12 @@
-import itertools
 import logging
 from enum import auto
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import rich
-import torch
 import typer
-from torchmetrics import (
-    ErrorRelativeGlobalDimensionlessSynthesis,
-    MeanSquaredError,
-    MetricCollection,
-    PeakSignalNoiseRatio,
-    StructuralSimilarityIndexMeasure,
-)
 
-from rae.modules.enumerations import Output
-from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
-from rae.pl_modules.pl_stitching_module import StitchingModule
 from rae.utils.evaluation import parse_checkpoint_id, parse_checkpoints_tree
 
 try:
@@ -58,6 +47,21 @@ MODELS = sorted(checkpoints[DATASETS[0]].keys())
 
 
 def compute_predictions(force_predict: bool) -> pd.DataFrame:
+    import itertools
+
+    import torch
+    from torchmetrics import (
+        ErrorRelativeGlobalDimensionlessSynthesis,
+        MeanSquaredError,
+        MetricCollection,
+        PeakSignalNoiseRatio,
+        StructuralSimilarityIndexMeasure,
+    )
+
+    from rae.modules.enumerations import Output
+    from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
+    from rae.pl_modules.pl_stitching_module import StitchingModule
+
     if PREDICTIONS_TSV.exists() and not force_predict:
         return pd.read_csv(PREDICTIONS_TSV, sep="\t", index_col=0)
     rich.print("Computing the predictions")
@@ -203,15 +207,98 @@ def compute_predictions(force_predict: bool) -> pd.DataFrame:
     return predictions_df
 
 
+def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd.DataFrame:
+    if PERFORMANCE_TSV.exists() and not force_measure:
+        return pd.read_csv(PERFORMANCE_TSV, sep="\t", index_col=0)
+    rich.print("Computing the performance")
+
+    performance_df = predictions_df.groupby(
+        [
+            "stitching",
+            "run_id_a",
+            "run_id_b",
+            "model_type",
+            "dataset_name",
+        ]
+    ).agg([np.mean])
+    performance_df = performance_df.droplevel(1, axis=1)
+    performance_df = performance_df.drop(columns=["sample_idx"])
+    performance_df = performance_df.reset_index()
+
+    performance_df.to_csv(PERFORMANCE_TSV, sep="\t")
+    return performance_df
+
+
 class Display(StrEnum):
     DF = auto()
     LATEX = auto()
 
 
+def display_performance(performance_df, display: Display):
+    aggregated_performnace = performance_df.drop(columns=["run_id_a", "run_id_b"])
+    aggregated_perfomance = aggregated_performnace.groupby(
+        [
+            "dataset_name",
+            "model_type",
+            "stitching",
+        ]
+    ).agg([np.mean, np.std, "count"])
+    aggregated_perfomance = aggregated_perfomance.round(6)
+    aggregated_perfomance = (
+        aggregated_perfomance[["mse", "ergas", "psnr", "ssim"]]
+        .reindex([True, False], level="stitching")
+        .reindex(["mnist", "fmnist", "cifar10"], level="dataset_name")
+        .reindex(["mnist", "fmnist", "cifar10"], level="dataset_name")
+    )
+
+    if display == Display.DF:
+        rich.print(aggregated_perfomance)
+
+    elif display == Display.LATEX:
+        COLUMN_ORDER = [
+            "mnist",
+            "fmnist",
+            "cifar10",
+        ]
+        METRIC_CONSIDERED = "mse"
+
+        df = aggregated_perfomance[METRIC_CONSIDERED]
+        reconstruction_str = r"{} & {} & {} & {}\\[1ex]"
+
+        def latex_float(f):
+            float_str = "{0:.2e}".format(f)
+            if "e" in float_str:
+                base, exponent = float_str.split("e")
+                return r"{0} \times 10^{{{1}}}".format(base, int(exponent))
+            else:
+                return float_str
+
+        def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str, stitching: bool) -> str:
+            try:
+                mean_std = df.loc[dataset_name, model_type, stitching]
+                return rf"${latex_float(mean_std['mean'])} \pm {latex_float(mean_std['std'])}$"
+            except (AttributeError, KeyError):
+                return "?"
+
+        for available_model_type, available_model_name in zip(
+            ("ae", "rel_ae", "vae", "rel_vae"), ("AE", "Rel AE", "VAE", "Rel VAE")
+        ):
+            for stitching in [False, True]:
+
+                s = reconstruction_str.format(
+                    available_model_name,
+                    *[
+                        extract_mean_std(df, dataset_name, available_model_type, stitching)
+                        for dataset_name in COLUMN_ORDER
+                    ],
+                )
+                print(stitching, s)
+
+
 def evaluate(force_predict: bool = False, force_measure: bool = False, display: Display = Display.DF):
-    _ = compute_predictions(force_predict=force_predict)
-    # performance_df = measure_predictions(predictions_df, force_measure=force_measure)
-    # display_performance(performance_df, display=display)
+    predictions_df = compute_predictions(force_predict=force_predict)
+    performance_df = measure_predictions(predictions_df, force_measure=force_measure)
+    display_performance(performance_df, display=display)
 
 
 if __name__ == "__main__":
