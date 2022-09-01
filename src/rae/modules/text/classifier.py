@@ -9,6 +9,7 @@ from torch import nn
 from torch.types import Device
 
 from rae.data.text.datamodule import EncodingLevel, MetaData
+from rae.modules.blocks import DeepProjection
 from rae.modules.enumerations import AttentionOutput, Output
 from rae.modules.text.encoder import TextEncoder
 from rae.utils.utils import to_device
@@ -77,25 +78,26 @@ class TextClassifier(nn.Module):
 
         self.sequential = nn.Sequential(
             # TODO: reactivate DeepProjection
-            # DeepProjection(
-            #     in_features=self.relative_projection.output_dim,
-            #     out_features=n_classes,
-            #     dropout=0.2,
-            #     activation=nn.SiLU(),
-            # ),
-            nn.Linear(
+            DeepProjection(
                 in_features=self.relative_projection.output_dim,
                 out_features=n_classes,
+                dropout=0.1,
+                activation=nn.SiLU(),
             ),
-            nn.ReLU(),
+            # nn.Linear(
+            #     in_features=self.relative_projection.output_dim,
+            #     out_features=n_classes,
+            # ),
+            # nn.Dropout(0.1),
+            # nn.ReLU(),
         )
         # self.sequential = nn.Sequential(
         #     # TODO: reactivate DeepProjection
         #     DeepProjection(
         #         in_features=300,
         #         out_features=n_classes,
-        #         dropout=0,
-        #         activation=nn.ReLU(),
+        #         dropout=0.1,
+        #         activation=nn.SiLU(),
         #     ),
         #     # nn.Linear(
         #     #     in_features=300,
@@ -152,6 +154,8 @@ class TextClassifier(nn.Module):
         attention_output = self.relative_projection(x=x, anchors=anchors)
         out = attention_output[AttentionOutput.OUTPUT]
         out = self.sequential(out)
+
+        # out = self.sequential(x)
 
         out, _ = EncodingLevel.reduce(
             encodings=out,

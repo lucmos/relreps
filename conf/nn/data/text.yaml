@@ -1,7 +1,7 @@
 _target_: rae.data.text.datamodule.MyDataModule
 
 anchors_mode: "stratified_subset" # "stratified", "stratified_subset", "fixed", "random_images", "random_latents"
-anchors_num: 500
+anchors_num: 300
 
 val_fixed_sample_idxs: ${nn.data.datasets.val_fixed_sample_idxs}
 

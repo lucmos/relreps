@@ -10,7 +10,7 @@ model:
     _target_: rae.modules.text.encoder.GensimEncoder
     language: en
     lemmatize: false
-    model_name: "fasttext-wiki-news-subwords-300"
+    model_name: "local_fasttext"
 
   #text_encoder:
   #  _target_: rae.data.text.datamodule.TransformerEncoder
