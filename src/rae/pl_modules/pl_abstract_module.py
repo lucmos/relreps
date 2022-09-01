@@ -31,6 +31,22 @@ class AbstractLightningModule(pl.LightningModule):
 
         self.validation_pca: Optional[PCA] = None
 
+    @abc.abstractmethod
+    def encode(self, *args, **kwargs):
+        raise NotImplementedError
+
+    # @property
+    # def encode_output(self) -> Set[str]:
+    #     raise NotImplementedError
+    #
+    # @property
+    # def decode_input(self) -> Set[str]:
+    #     raise NotImplementedError
+
+    @abc.abstractmethod
+    def decode(self, *args, **kwargs):
+        raise NotImplementedError
+
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         checkpoint["validation_pca"] = self.validation_pca
 

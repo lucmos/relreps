@@ -1,4 +1,5 @@
 input_size: 28
+in_channels: 1
 
 anchors:
   _target_: rae.data.vision.fmnist.FashionMNISTDataset

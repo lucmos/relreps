@@ -13,8 +13,6 @@ from nn_core.model_logging import NNLogger
 
 from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
-from rae.modules.vision.ae import AE
-from rae.modules.vision.rae_model import RAE, RaeDecoder
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
 from rae.pl_modules.pl_visualizations import on_fit_end_viz, on_fit_start_viz, validation_epoch_end_viz
 from rae.utils.tensor_ops import detach_tensors
@@ -30,7 +28,7 @@ class LightningAutoencoder(AbstractLightningModule):
         super().__init__(metadata, *args, **kwargs)
 
         self.autoencoder = hydra.utils.instantiate(
-            kwargs["model"] if "model" in kwargs else kwargs["autoencoder"], metadata=metadata
+            kwargs["model"] if "model" in kwargs else kwargs["autoencoder"], metadata=metadata, _recursive_=False
         )
 
         self.reconstruction_quality_metrics = {
@@ -42,7 +40,7 @@ class LightningAutoencoder(AbstractLightningModule):
         self.register_buffer("anchors_latents", self.metadata.anchors_latents)
         self.register_buffer("fixed_images", self.metadata.fixed_images)
 
-        self.loss = hydra.utils.instantiate(self.hparams.loss)
+        self.loss = self.autoencoder.loss_function
 
         self.supported_viz = self.supported_viz()
         pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
@@ -56,16 +54,16 @@ class LightningAutoencoder(AbstractLightningModule):
         if self.anchors_images is not None:
             supported_viz.add(SupportedViz.ANCHORS_SOURCE)
 
-        if isinstance(self.autoencoder, RAE):
-            supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
+        # if isinstance(self.autoencoder, RAE):
+        #     supported_viz.add(SupportedViz.INVARIANT_LATENT_DISTRIBUTION)
 
         # supported_viz.add(SupportedViz.LATENT_EVOLUTION_PLOTLY_ANIMATION)
         supported_viz.add(SupportedViz.ANCHORS_RECONSTRUCTED)
         supported_viz.add(SupportedViz.VALIDATION_IMAGES_RECONSTRUCTED)
-        supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
-        supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
-        supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
-        supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
+        # supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
+        # supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
+        # supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
+        # supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
         supported_viz.add(SupportedViz.LATENT_SPACE)
         supported_viz.add(SupportedViz.LATENT_SPACE_NORMALIZED)
         supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
@@ -80,8 +78,22 @@ class LightningAutoencoder(AbstractLightningModule):
         Returns:
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
-        # example
-        return self.autoencoder(x)
+        encoding = self.encode(x)
+        return self.decode(**encoding)
+
+    def encode(self, *args, **kwargs):
+        return self.autoencoder.encode(*args, **kwargs)
+
+    # @property
+    # def encode_output(self) -> Set[str]:
+    #     raise NotImplementedError
+    #
+    # @property
+    # def decode_input(self) -> Set[str]:
+    #     raise NotImplementedError
+
+    def decode(self, *args, **kwargs):
+        return self.autoencoder.decode(*args, **kwargs)
 
     def step(self, batch, batch_index: int, stage: Stage) -> Mapping[str, Any]:
         image_batch = batch["image"]
@@ -93,21 +105,10 @@ class LightningAutoencoder(AbstractLightningModule):
                 f"{stage}/{metric_name}", metric_value, on_step=False, on_epoch=True, batch_size=image_batch.shape[0]
             )
 
-        if isinstance(self.autoencoder, AE):
-            loss = self.loss(
-                out[Output.RECONSTRUCTION],
-                image_batch,
-            )
-        else:
-            loss = self.loss(
-                out[Output.RECONSTRUCTION],
-                image_batch,
-                out[Output.LATENT_MU],
-                out[Output.LATENT_LOGVAR],
-            )
+        loss_out = self.loss(model_out=out, batch=batch)
 
         self.log_dict(
-            {f"loss/{stage}": loss.cpu().detach()},
+            {f"{loss_name}/{stage}": value.cpu().detach() for loss_name, value in loss_out.items()},
             on_step=stage == Stage.TRAIN_STAGE,
             on_epoch=True,
             prog_bar=True,
@@ -115,7 +116,7 @@ class LightningAutoencoder(AbstractLightningModule):
         )
 
         return {
-            Output.LOSS: loss,
+            Output.LOSS: loss_out["loss"],
             Output.BATCH: batch,
             **{key: detach_tensors(value) for key, value in out.items()},
         }
@@ -159,16 +160,18 @@ class LightningAutoencoder(AbstractLightningModule):
             anchors_reconstructed = anchors_out.get(Output.RECONSTRUCTION, None)
 
         else:
-            assert self.anchors_latents is not None
-            anchors_num = self.anchors_latents.shape[0]
-            # TODO: these latents should be normalized if the normalization is enabled..
-            anchors_latents = self.anchors_latents
-            if isinstance(self.autoencoder.decoder, RaeDecoder):
-                anchors_reconstructed, _ = self.autoencoder.decoder(
-                    self.anchors_latents, anchors_latents=self.anchors_latents
-                )
-            else:
-                anchors_reconstructed = self.autoencoder.decoder(self.anchors_latents)
+            pass
+            # TODO: Decommenta
+            # assert self.anchors_latents is not None
+            # anchors_num = self.anchors_latents.shape[0]
+            # # TODO: these latents should be normalized if the normalization is enabled..
+            # anchors_latents = self.anchors_latents
+            # if isinstance(self.autoencoder.decoder, RaeDecoder):
+            #     anchors_reconstructed, _ = self.autoencoder.decoder(
+            #         self.anchors_latents, anchors_latents=self.anchors_latents
+            #     )
+            # else:
+            #     anchors_reconstructed = self.autoencoder.decoder(self.anchors_latents)
 
         non_elements = ["none"] * anchors_num
         aggregate(
@@ -199,7 +202,7 @@ class LightningAutoencoder(AbstractLightningModule):
         )
 
 
-@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")
+@hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default", version_base="1.1")
 def main(cfg: omegaconf.DictConfig) -> None:
     """Debug main to quickly develop the Lightning Module.
 

@@ -1,92 +1,15 @@
 #!/bin/bash
+# Reconstruction
 
- # Relative
-
-python src/rae/run.py \
-  core.tags='[complete-bootstrap, memory, continual, relative]' \
+python src/rae/run.py -m \
+  core.tags='[classification, absolute, fig:ae-rotations, small_cnn]' \
+  'nn/data/datasets=vision/mnist' \
+  'train.seed_index=0,1,2,3,4,5' \
+  nn/module=classifier \
+  nn/module/model=cnn \
+  train=classification \
+  nn.module.model.latent_dim=2 \
   nn.data.anchors_num=500 \
-  nn/data/datasets=continual/cifar10 \
-  nn/module=continual_classifier \
-  nn/module/model=rcnn \
-  nn.module.model.hidden_features=512 \
-  nn.module.model.values_mode=self_attention \
-  nn.module.model.values_self_attention_nhead=8 \
-#  nn.module.model.dropout_p=0.5 \
-  nn.module.replay.max_size=0 \
-  nn.module.memory.limit_target_representation=True \
-  nn.module.memory.start_epoch=9 \
-  nn.module.memory.loss_weight=1e3
-
-python src/rae/run.py \
-  core.tags='[complete-bootstrap, memory, continual, relative]' \
-  nn.data.anchors_num=500 \
-  nn/data/datasets=continual/cifar10 \
-  nn/module=continual_classifier \
-  nn/module/model=rcnn \
-  nn.module.model.hidden_features=512 \
-  nn.module.model.values_mode=self_attention \
-  nn.module.model.values_self_attention_nhead=8 \
-#  nn.module.model.dropout_p=0.5 \
-  nn.module.replay.max_size=0 \
-  nn.module.memory.limit_target_representation=False \
-  nn.module.memory.start_epoch=9 \
-  nn.module.memory.loss_weight=1e3
-
-#python src/rae/run.py \
-#  core.tags='[complete-bootstrap, continual, relative]' \
-#  nn.data.anchors_num=500 \
-#  nn/data/datasets=continual/cifar10 \
-#  nn/module=continual_classifier \
-#  nn/module/model=rcnn \
-#  nn.module.model.hidden_features=512 \
-#  nn.module.model.dropout_p=0.5 \
-#  nn.module.replay.max_size=100
-#
-#python src/rae/run.py \
-#  core.tags='[complete-bootstrap, continual, relative]' \
-#  nn.data.anchors_num=500 \
-#  nn/data/datasets=continual/cifar10 \
-#  nn/module=continual_classifier \
-#  nn/module/model=rcnn \
-#  nn.module.model.similarities_quantization_mode=differentiable_round \
-#  nn.module.model.similarities_bin_size=0.5 \
-#  nn.module.model.hidden_features=512 \
-#  nn.module.model.dropout_p=0.5 \
-#  nn.module.replay.max_size=0
-#
-#python src/rae/run.py \
-#  core.tags='[complete-bootstrap, continual, relative]' \
-#  nn.data.anchors_num=500 \
-#  nn/data/datasets=continual/cifar10 \
-#  nn/module=continual_classifier \
-#  nn/module/model=rcnn \
-#  nn.module.model.similarities_quantization_mode=differentiable_round \
-#  nn.module.model.similarities_bin_size=0.5 \
-#  nn.module.model.hidden_features=512 \
-#  nn.module.model.dropout_p=0.5 \
-#  nn.module.replay.max_size=100
-
-# Absolute
-
-#python src/rae/run.py \
-#  core.tags='[complete-bootstrap,  memory, continual, absolute]' \
-#  nn.data.anchors_num=500 \
-#  nn/data/datasets=continual/cifar10 \
-#  nn/module=continual_classifier \
-#  nn/module/model=cnn \
-#  nn.module.model.hidden_features=512 \
-#  nn.module.model.dropout_p=0.5 \
-#  nn.module.replay.max_size=0 \
-#  nn.module.memory.limit_target_representation=False \
-#  nn.module.memory.start_epoch=9 \
-#  nn.module.memory.loss_weight=1e6
-
-#python src/rae/run.py \
-#  core.tags='[complete-bootstrap, continual, absolute]' \
-#  nn.data.anchors_num=500 \
-#  nn/data/datasets=continual/cifar10 \
-#  nn/module=continual_classifier \
-#  nn/module/model=cnn \
-#  nn.module.model.hidden_features=512 \
-#  nn.module.model.dropout_p=0.5 \
-#  nn.module.replay.max_size=100
+  "nn.module.model.hidden_dims=[2, 3, 4, 8]" \
+  "nn.module.optimizer.lr=5e-4" \
+  train.trainer.max_epochs=40

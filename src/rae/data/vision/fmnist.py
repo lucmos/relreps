@@ -24,12 +24,7 @@ class FashionMNISTDataset(Dataset):
             kwargs["path"],
             train=split == "train",
             download=True,
-            transform=transforms.Compose(
-                [
-                    transforms.Grayscale(num_output_channels=3),
-                    kwargs["transform"],
-                ]
-            ),
+            transform=kwargs["transform"],
         )
 
     @property

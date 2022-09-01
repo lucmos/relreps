@@ -1,0 +1,31 @@
+input_size: 32
+in_channels: 3
+
+transforms:
+  _target_: torchvision.transforms.Compose
+  transforms:
+    - _target_: rae.data.data_transforms.ChannelAdapt
+      in_channels: ${nn.data.datasets.in_channels}
+      out_channels: ${nn.module.model.in_channels}
+
+    - _target_: torchvision.transforms.Resize
+      size: ${nn.module.model.input_size}
+
+    - _target_: torchvision.transforms.ToTensor
+#
+#    - _target_: torchvision.transforms.Normalize
+#      mean: [0.485, 0.456, 0.406]
+#      std: [0.229, 0.224, 0.225]
+
+
+anchors:
+  _target_: rae.data.vision.cifar10.CIFAR10Dataset
+
+train:
+  _target_: rae.data.vision.cifar10.CIFAR10Dataset
+
+val:
+  - _target_: rae.data.vision.cifar10.CIFAR10Dataset
+
+#    test:
+#      - _target_: rae.data.cifar10.CIFAR10Dataset

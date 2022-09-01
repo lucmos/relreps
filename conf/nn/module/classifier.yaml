@@ -3,9 +3,6 @@ _target_: rae.pl_modules.vision.pl_gclassifier.LightningClassifier
 loss:
   _target_: torch.nn.modules.loss.CrossEntropyLoss
 
-model:
-  input_size: ${nn.data.datasets.input_size}
-
 defaults:
   - _self_
   - model: vision/relresnet

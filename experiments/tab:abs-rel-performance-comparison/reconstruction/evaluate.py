@@ -1,14 +1,23 @@
 import logging
-from collections import defaultdict
 from enum import auto
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
 import rich
 import torch
 import typer
+from torchmetrics import (
+    ErrorRelativeGlobalDimensionlessSynthesis,
+    MeanSquaredError,
+    MetricCollection,
+    PeakSignalNoiseRatio,
+    StructuralSimilarityIndexMeasure,
+)
+
+from rae.modules.enumerations import Output
+from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
+from rae.utils.evaluation import parse_checkpoint_id, parse_checkpoints_tree
 
 try:
     # be ready for 3.10 when it drops
@@ -19,7 +28,7 @@ except ImportError:
 logging.getLogger().setLevel(logging.ERROR)
 
 
-BATCH_SIZE = 32
+BATCH_SIZE = 256
 
 
 EXPERIMENT_ROOT = Path(__file__).parent
@@ -34,34 +43,16 @@ DATASET_SANITY = {
     "cifar100": ("rae.data.vision.cifar100.CIFAR100Dataset", "test"),
 }
 MODEL_SANITY = {
-    "abs": "rae.modules.vision.resnet.ResNet",
-    "rel": "rae.modules.vision.relresnet.RelResNet",
+    "vae": "rae.modules.vae.VanillaVAE",
+    "ae": "rae.modules.ae.VanillaAE",
+    "rel_vae": "rae.modules.rel_vae.VanillaRelVAE",
+    "rel_ae": "rae.modules.rel_ae.VanillaRelAE",
 }
 
 
-def parse_checkpoint_id(ckpt: Path) -> str:
-    return ckpt.with_suffix("").with_suffix("").name
-
-
-# Parse checkpoints tree
-checkpoints = defaultdict(dict)
-RUNS = defaultdict(dict)
-for dataset_abbrv in EXPERIMENT_CHECKPOINTS.iterdir():
-    checkpoints[dataset_abbrv.name] = defaultdict(list)
-    RUNS[dataset_abbrv.name] = defaultdict(list)
-    for model_abbrv in dataset_abbrv.iterdir():
-        for ckpt in model_abbrv.iterdir():
-            checkpoints[dataset_abbrv.name][model_abbrv.name].append(ckpt)
-            RUNS[dataset_abbrv.name][model_abbrv.name].append(parse_checkpoint_id(ckpt))
-
+checkpoints, RUNS = parse_checkpoints_tree(EXPERIMENT_CHECKPOINTS)
 
 DATASETS = sorted(checkpoints.keys())
-DATASET_NUM_CLASSES = {
-    "mnist": 10,
-    "fmnist": 10,
-    "cifar10": 10,
-    "cifar100": 100,
-}
 MODELS = sorted(checkpoints[DATASETS[0]].keys())
 
 
@@ -72,39 +63,31 @@ def compute_predictions(force_predict: bool) -> pd.DataFrame:
     PREDICTIONS_TSV.unlink(missing_ok=True)
 
     import hydra
-    from omegaconf import DictConfig, OmegaConf
-    from torch import nn
     from torch.utils.data import DataLoader
     from tqdm import tqdm
 
-    from nn_core.serialization import NNCheckpointIO
-
     from rae.data.vision.datamodule import MyDataModule
-    from rae.modules.enumerations import Output
-    from rae.pl_modules.vision.pl_gclassifier import LightningClassifier
+    from rae.utils.evaluation import parse_checkpoint
 
     DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def parse_checkpoint(
-        module_class: Type[nn.Module],
-        checkpoint_path: Path,
-        map_location: Optional[Union[Dict[str, str], str, torch.device, int, Callable]] = None,
-    ) -> Tuple[nn.Module, DictConfig]:
-        if checkpoint_path.name.endswith(".ckpt.zip"):
-            checkpoint = NNCheckpointIO.load(path=checkpoint_path, map_location=map_location)
-            model = module_class._load_model_state(checkpoint=checkpoint, metadata=checkpoint.get("metadata", None))
-            model.eval()
-            return (
-                model,
-                OmegaConf.create(checkpoint["cfg"]),
-            )
-        raise ValueError(f"Wrong checkpoint: {checkpoint_path}")
+    CONSIDERED_METRICS = MetricCollection(
+        {
+            "mse": MeanSquaredError(),
+            "ergas": ErrorRelativeGlobalDimensionlessSynthesis(),
+            "psnr": PeakSignalNoiseRatio(),
+            "ssim": StructuralSimilarityIndexMeasure(),
+        }
+    )
 
-    predictions = {x: [] for x in ("run_id", "model_type", "dataset_name", "sample_idx", "pred", "target")}
+    predictions = {
+        **{x: [] for x in ("run_id", "model_type", "dataset_name", "sample_idx")},
+        **{k: [] for k in CONSIDERED_METRICS.keys()},
+    }
     for dataset_name in (dataset_tqdm := tqdm(DATASETS, leave=True)):
         dataset_tqdm.set_description(f"Dataset ({dataset_name})")
         _, data_cfg = parse_checkpoint(
-            module_class=LightningClassifier,
+            module_class=LightningAutoencoder,
             checkpoint_path=checkpoints[dataset_name][MODELS[0]][0],
             map_location="cpu",
         )
@@ -132,25 +115,29 @@ def compute_predictions(force_predict: bool) -> pd.DataFrame:
                 ckpt_tqdm.set_description(f"Run id ({run_id})")
 
                 model, cfg = parse_checkpoint(
-                    module_class=LightningClassifier,
+                    module_class=LightningAutoencoder,
                     checkpoint_path=ckpt,
                     map_location="cpu",
                 )
                 assert (
-                    f"{model.model.__module__}.{model.model.__class__.__name__}" == MODEL_SANITY[model_type]
-                ), f"{model.model.__module__}.{model.model.__class__.__name__}!={MODEL_SANITY[model_type]}"
+                    f"{model.autoencoder.__module__}.{model.autoencoder.__class__.__name__}" == MODEL_SANITY[model_type]
+                ), f"{model.autoencoder.__module__}.{model.autoencoder.__class__.__name__}!={MODEL_SANITY[model_type]}"
                 model = model.to(DEVICE)
                 for batch in tqdm(val_dataloder, desc="Batch", leave=False):
                     model_out = model(batch["image"].to(DEVICE))
-                    pred = model_out[Output.LOGITS].argmax(-1).cpu()
+
+                    # COMPUTE ERRORS FOR EACH SAMPLE
+                    for idx in range(batch["image"].shape[0]):
+                        metrics = CONSIDERED_METRICS.clone()
+                        metrics.update(model_out[Output.RECONSTRUCTION][[idx]].cpu(), batch["image"][[idx]].cpu())
+                        for metric_name, metric_value in metrics.compute().items():
+                            predictions[metric_name].append(metric_value.item())
 
                     batch_size = len(batch["index"].cpu().tolist())
                     predictions["run_id"].extend([run_id] * batch_size)
                     predictions["model_type"].extend([model_type] * batch_size)
                     predictions["dataset_name"].extend([dataset_name] * batch_size)
                     predictions["sample_idx"].extend(batch["index"].cpu().tolist())
-                    predictions["pred"].extend(pred.cpu().tolist())
-                    predictions["target"].extend(batch["target"].cpu().tolist())
                     del model_out
                     del batch
                 model.cpu()
@@ -166,45 +153,11 @@ def measure_predictions(predictions_df: pd.DataFrame, force_measure: bool) -> pd
         return pd.read_csv(PERFORMANCE_TSV, sep="\t", index_col=0)
     rich.print("Computing the performance")
 
-    from torchmetrics import Accuracy, F1Score, MetricCollection
+    performance_df: pd.DataFrame = predictions_df.groupby(["run_id", "model_type", "dataset_name"]).agg([np.mean])
+    performance_df = performance_df.droplevel(1, axis=1)
+    performance_df = performance_df.drop(columns=["sample_idx"])
+    performance_df = performance_df.reset_index()
 
-    CONSIDERED_METRICS = {
-        "acc/weighted": lambda num_classes: Accuracy(average="weighted", num_classes=num_classes),
-        "acc/micro": lambda num_classes: Accuracy(average="macro", num_classes=num_classes),
-        "acc/macro": lambda num_classes: Accuracy(average="micro", num_classes=num_classes),
-        "f1/macro": lambda num_classes: F1Score(average="macro", num_classes=num_classes),
-        "f1/micro": lambda num_classes: F1Score(average="micro", num_classes=num_classes),
-    }
-
-    PERFORMANCE_TSV.unlink(missing_ok=True)
-
-    performance = {
-        **{x: [] for x in ("run_id", "model_type", "dataset_name")},
-        **{k: [] for k in CONSIDERED_METRICS.keys()},
-    }
-
-    for dataset_name, dataset_pred in RUNS.items():
-        for model_type, run_ids in dataset_pred.items():
-            for run_id in run_ids:
-                metrics = MetricCollection(
-                    {
-                        key: metric(num_classes=DATASET_NUM_CLASSES[dataset_name])
-                        for key, metric in CONSIDERED_METRICS.items()
-                    }
-                )
-                run_df = predictions_df[predictions_df["run_id"] == run_id]
-                run_predictions = torch.as_tensor(run_df["pred"].values)
-                run_targets = torch.as_tensor(run_df["target"].values)
-
-                metrics.update(run_predictions, run_targets)
-
-                performance["run_id"].append(run_id)
-                performance["dataset_name"].append(dataset_name)
-                performance["model_type"].append(model_type)
-                for metric_name, metric_value in metrics.compute().items():
-                    performance[metric_name].append(metric_value.item())
-
-    performance_df = pd.DataFrame(performance)
     performance_df.to_csv(PERFORMANCE_TSV, sep="\t")
     return performance_df
 
@@ -215,42 +168,53 @@ class Display(StrEnum):
 
 
 def display_performance(performance_df, display: Display):
-    aggregated_performnace = performance_df.drop(columns=["run_id"])
+    aggregated_performnace = performance_df.reset_index().drop(columns=["run_id"])
     aggregated_perfomance = aggregated_performnace.groupby(
         [
             "dataset_name",
             "model_type",
         ]
     ).agg([np.mean, np.std])
-    aggregated_perfomance = (aggregated_perfomance * 100).round(2)
+    aggregated_perfomance = aggregated_perfomance.round(6)
+    aggregated_perfomance = (
+        aggregated_perfomance[["mse", "ergas", "psnr", "ssim"]]
+        .reindex(["ae", "rel_ae", "vae", "rel_vae"], level="model_type")
+        .reindex(["mnist", "fmnist", "cifar10", "cifar100"], level="dataset_name")
+    )
 
     if display == Display.DF:
         rich.print(aggregated_perfomance)
 
     elif display == Display.LATEX:
         COLUMN_ORDER = ["mnist", "cmnist", "fmnist", "cifar10", "cifar100", "shapenet", "faust", "coma", "amz"]
-        METRIC_CONSIDERED = "f1/macro"
+        METRIC_CONSIDERED = "mse"
 
         df = aggregated_perfomance[METRIC_CONSIDERED]
-        classification_rel = r"Relative & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
-        classification_abs = r"Absolute & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
+        reconstruction_str = r"{} & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
+
+        def latex_float(f):
+            float_str = "{0:.2e}".format(f)
+            if "e" in float_str:
+                base, exponent = float_str.split("e")
+                return r"{0} \times 10^{{{1}}}".format(base, int(exponent))
+            else:
+                return float_str
 
         def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str) -> str:
             try:
                 mean_std = df.loc[dataset_name, model_type]
-                return rf"${mean_std['mean']:.2f} \pm {mean_std['std']:.2f}$"
+                return rf"${latex_float(mean_std['mean'])} \pm {latex_float(mean_std['std'])}$"
             except (AttributeError, KeyError):
                 return "?"
 
-        classification_rel = classification_rel.format(
-            *[extract_mean_std(df, dataset_name, "rel") for dataset_name in COLUMN_ORDER]
-        )
-        classification_abs = classification_abs.format(
-            *[extract_mean_std(df, dataset_name, "abs") for dataset_name in COLUMN_ORDER]
-        )
-
-        print(classification_rel)
-        print(classification_abs)
+        for available_model_type, available_model_name in zip(
+            ("ae", "rel_ae", "vae", "rel_vae"), ("AE", "Relative AE", "VAE", "Relative VAE")
+        ):
+            s = reconstruction_str.format(
+                available_model_name,
+                *[extract_mean_std(df, dataset_name, available_model_type) for dataset_name in COLUMN_ORDER],
+            )
+            print(s)
 
 
 def evaluate(force_predict: bool = False, force_measure: bool = False, display: Display = Display.DF):
