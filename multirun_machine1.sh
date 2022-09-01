@@ -74,5 +74,4 @@ python src/rae/run.py -m \
   nn.data.anchors_num=500 \
   "nn.module.model.hidden_dims=null" \
   "nn.module.optimizer.lr=5e-4" \
-  train.trainer.max_epochs=75 \
-  nn.module.model.remove_encoder_last_activation=True
+  train.trainer.max_epochs=75

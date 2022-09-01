@@ -1,7 +1,6 @@
 import math
 from typing import Dict, List
 
-import hydra
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
@@ -17,8 +16,6 @@ class VanillaVAE(nn.Module):
         input_size,
         latent_dim: int,
         hidden_dims: List = None,
-        activation: str = "torch.nn.GELU",
-        remove_encoder_last_activation: bool = False,
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -40,8 +37,6 @@ class VanillaVAE(nn.Module):
             height=metadata.height,
             n_channels=metadata.n_channels,
             hidden_dims=hidden_dims,
-            activation=activation,
-            remove_encoder_last_activation=remove_encoder_last_activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
@@ -53,7 +48,7 @@ class VanillaVAE(nn.Module):
                 self.latent_dim,
                 encoder_out_numel,
             ),
-            hydra.utils.instantiate({"_target_": activation}),
+            nn.GELU(),
         )
 
     def encode(self, input: Tensor) -> Dict[str, Tensor]:
