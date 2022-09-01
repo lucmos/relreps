@@ -7,7 +7,7 @@ in_channels: 3
 use_pretrained: True
 finetune: False
 
-hidden_features: 512
+hidden_features: 500
 
 # Relative params
 relative_attention:
@@ -15,9 +15,10 @@ relative_attention:
   similarity_mode: inner
   values_mode: similarities
   normalization_mode: l2
-  in_features: null
+  in_features: ${nn.module.model.latent_dim}
   hidden_features: null
   transform_elements: null
+  self_attention_hidden_dim: null
   values_self_attention_nhead: null
   similarities_quantization_mode: null
   similarities_bin_size: null
@@ -25,4 +26,4 @@ relative_attention:
   similarities_aggregation_n_groups: null
   anchors_sampling_mode: null
   n_anchors_sampling_per_class: null
-  output_normalization_mode: batchnorm
+  output_normalization_mode: layernorm
