@@ -1,3 +1,5 @@
 _target_: rae.modules.vae.VanillaVAE
 latent_dim: 500
 hidden_dims: null
+activation: torch.nn.GELU
+remove_encoder_last_activation: True

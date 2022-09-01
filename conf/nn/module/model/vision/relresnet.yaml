@@ -15,7 +15,7 @@ relative_attention:
   similarity_mode: inner
   values_mode: similarities
   normalization_mode: l2
-  in_features: ${nn.module.model.latent_dim}
+  in_features: null
   hidden_features: null
   transform_elements: null
   self_attention_hidden_dim: null

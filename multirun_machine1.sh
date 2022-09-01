@@ -6,7 +6,7 @@
 python src/rae/run.py -m \
   core.tags='[classification, relative, definitive]' \
   nn/module/model=vision/relresnet \
-  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100,vision/cifar10' \
   'train.seed_index=0,1,2,3,4,5' \
   nn/module=classifier \
   train=classification \
@@ -17,18 +17,18 @@ python src/rae/run.py -m \
   nn.module.model.hidden_features=500 \
   nn.data.anchors_num=500 \
   "nn.module.optimizer.lr=5e-4" \
-  nn.module.model.relative_attention.output_normalization_mode=layernorm \
-  train.trainer.max_epochs=100 \
-  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
-  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
-  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null'
+  train.trainer.max_epochs=50 \
+  'nn.module.model.relative_attention._target_=rae.modules.attention.RelativeAttention' \
+  'nn.module.model.relative_attention.normalization_mode=l2' \
+  'nn.module.model.relative_attention.values_mode=similarities'  \
+  'nn.module.model.relative_attention.values_self_attention_nhead=null'
 
 
 # Absolute
 python src/rae/run.py -m \
   core.tags='[classification, absolute, definitive]' \
   nn/module/model=vision/resnet \
-  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100,vision/cifar10' \
   'train.seed_index=0,1,2,3,4,5' \
   nn/module=classifier \
   train=classification \
@@ -38,8 +38,7 @@ python src/rae/run.py -m \
   nn.module.model.finetune=False \
   nn.module.model.hidden_features=500 \
   "nn.module.optimizer.lr=5e-4" \
-  train.trainer.max_epochs=75 \
-  nn.module.model.remove_encoder_last_activation=True
+  train.trainer.max_epochs=35
 
 
 # Reconstruction
@@ -57,9 +56,10 @@ python src/rae/run.py -m \
   "nn.module.model.hidden_dims=null" \
   "nn.module.optimizer.lr=5e-4" \
   train.trainer.max_epochs=100 \
-  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
-  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
-  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
+  'nn.module.model.relative_attention._target_=rae.modules.attention.RelativeAttention' \
+  'nn.module.model.relative_attention.normalization_mode=l2' \
+  'nn.module.model.relative_attention.values_mode=similarities'  \
+  'nn.module.model.relative_attention.values_self_attention_nhead=null' \
   nn.module.model.remove_encoder_last_activation=True
 
 # Absolute
