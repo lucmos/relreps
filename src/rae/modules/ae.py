@@ -17,7 +17,8 @@ class VanillaAE(nn.Module):
         input_size,
         latent_dim: int,
         hidden_dims: List = None,
-        latent_activation: str = "torch.nn.GELU",
+        activation: str = "torch.nn.GELU",
+        remove_encoder_last_activation: bool = False,
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -35,15 +36,18 @@ class VanillaAE(nn.Module):
         self.latent_dim = latent_dim
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
-            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
+            width=metadata.width,
+            height=metadata.height,
+            n_channels=metadata.n_channels,
+            hidden_dims=hidden_dims,
+            activation=activation,
+            remove_encoder_last_activation=remove_encoder_last_activation,
         )
         encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
         self.encoder_out = nn.Sequential(
             nn.Linear(encoder_out_numel, latent_dim),
-            hydra.utils.instantiate({"_target_": latent_activation})
-            if latent_activation is not None
-            else nn.Identity(),
+            nn.Identity() if remove_encoder_last_activation else hydra.utils.instantiate({"_target_": activation}),
         )
 
         self.decoder_in = nn.Sequential(
@@ -51,9 +55,7 @@ class VanillaAE(nn.Module):
                 self.latent_dim,
                 encoder_out_numel,
             ),
-            hydra.utils.instantiate({"_target_": latent_activation})
-            if latent_activation is not None
-            else nn.Identity(),
+            hydra.utils.instantiate({"_target_": activation}),
         )
 
     def encode(self, input: Tensor) -> Dict[str, Tensor]:
