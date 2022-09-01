@@ -6,10 +6,11 @@ import omegaconf
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-from nn_core.common import PROJECT_ROOT
-from nn_core.model_logging import NNLogger
 from torch import nn
 from torchmetrics import Accuracy, F1Score, Precision, Recall
+
+from nn_core.common import PROJECT_ROOT
+from nn_core.model_logging import NNLogger
 
 from rae.data.text.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage

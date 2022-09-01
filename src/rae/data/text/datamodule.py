@@ -2,7 +2,7 @@ import logging
 from enum import auto
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union, Mapping, Set, Collection
+from typing import Any, Collection, Dict, List, Mapping, Optional, Sequence, Set, Union
 
 import hydra
 import numpy as np
@@ -11,12 +11,13 @@ import pytorch_lightning as pl
 import spacy
 import spacy.cli as spacy_down
 import torch
-from nn_core.common import PROJECT_ROOT
 from omegaconf import DictConfig
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from spacy import Language
 from torch.utils.data import DataLoader, Dataset
+
+from nn_core.common import PROJECT_ROOT
 
 from rae.utils.tensor_ops import contiguous_mean
 

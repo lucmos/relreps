@@ -10,10 +10,11 @@ import omegaconf
 import torch
 from datasets import Dataset as HFDataset
 from datasets import load_dataset
-from nn_core.common import PROJECT_ROOT
-from nn_core.nn_types import Split
 from torch.utils.data import Dataset
 from tqdm import tqdm
+
+from nn_core.common import PROJECT_ROOT
+from nn_core.nn_types import Split
 
 import rae  # noqa
 

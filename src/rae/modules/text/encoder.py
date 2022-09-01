@@ -2,19 +2,20 @@ import logging
 from abc import abstractmethod
 from functools import lru_cache
 from pathlib import Path
-from typing import Set, Sequence, List, Optional, Mapping, Dict, Any
-import rae
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
 
 import fasttext
 import gensim.downloader
 import torch
 from gensim.models import KeyedVectors
-from nn_core.common import PROJECT_ROOT
-from spacy.tokens import Span, Token, Doc
+from spacy.tokens import Doc, Span, Token
 from torch import nn
 from tqdm import tqdm
-from transformers import BatchEncoding, PreTrainedTokenizer, PreTrainedModel, AutoTokenizer, AutoModel
+from transformers import AutoModel, AutoTokenizer, BatchEncoding, PreTrainedModel, PreTrainedTokenizer
 
+from nn_core.common import PROJECT_ROOT
+
+import rae  # noqa
 from rae.data.text.datamodule import SpacyManager
 
 pylogger = logging.getLogger(__name__)
@@ -158,7 +159,7 @@ class FastTextEncoder(TextEncoder):
 class GensimEncoder(TextEncoder):
     @staticmethod
     def _build_vector_models():
-        available_models = set(gensim.downloader.info()["models"].keys())
+        # available_models = set(gensim.downloader.info()["models"].keys())
         model_name2bin_mode = {
             "local_fasttext": False,
             # "fasttext-wiki-news-subwords-300": False,
@@ -179,7 +180,7 @@ class GensimEncoder(TextEncoder):
 
         key2occ = {}
         model_name2vectors: Dict[str, KeyedVectors] = {}
-        pylogger.debug(f"Loading original vectors...")
+        pylogger.debug("Loading original vectors...")
         for model_name, model_path in model_name2path.items():
             pylogger.debug(f"Loading {model_name}")
             weights = KeyedVectors.load_word2vec_format(
@@ -194,8 +195,6 @@ class GensimEncoder(TextEncoder):
         pylogger.debug(f"Keeping only {len(valid_keys)} words/vectors")
         for model_name, weights in tqdm(model_name2vectors.items(), desc="Writing restricted vectors"):
             out_path: Path = restricted_dir / f"{model_name}.txt"
-            if out_path.exists():
-                continue
 
             pylogger.debug(f"Restricting {model_name}")
             restricted_vectors = KeyedVectors(vector_size=weights.vector_size)

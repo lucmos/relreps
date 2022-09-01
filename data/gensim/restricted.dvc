@@ -1,0 +1,5 @@
+outs:
+- md5: 37534b6a922d43f9c011584a18dc2530.dir
+  size: 871505120
+  nfiles: 3
+  path: restricted

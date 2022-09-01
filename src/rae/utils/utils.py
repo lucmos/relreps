@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterable, Sequence, Union, MutableMapping, Mapping
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Sequence, Union
 
 import torch
 import torch.nn.functional as F

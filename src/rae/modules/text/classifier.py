@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import Dict, Any, Set, Collection
+from typing import Any, Collection, Dict, Set
 
 import torch
 from hydra.utils import instantiate
@@ -8,7 +8,7 @@ from omegaconf import DictConfig
 from torch import nn
 from torch.types import Device
 
-from rae.data.text.datamodule import MetaData, EncodingLevel
+from rae.data.text.datamodule import EncodingLevel, MetaData
 from rae.modules.enumerations import AttentionOutput, Output
 from rae.modules.text.encoder import TextEncoder
 from rae.utils.utils import to_device
