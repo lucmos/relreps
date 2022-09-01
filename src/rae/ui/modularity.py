@@ -8,7 +8,7 @@ from torch.nn.functional import mse_loss
 from nn_core.ui import select_checkpoint
 
 from rae.modules.enumerations import Output
-from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
+from rae.pl_modules.vision.pl_gautoencoder import LightningAutoencoder
 from rae.ui.ui_utils import (
     check_wandb_login,
     compute_weights_difference,

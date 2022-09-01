@@ -1,3 +1,8 @@
-*
-
-!.gitignore
+/synset_info.tsv
+/MNIST
+/FashionMNIST
+/cifar-10-python.tar.gz
+/cifar-100-python.tar.gz
+/cifar-10-batches-py
+/cifar-100-python
+/fasttext

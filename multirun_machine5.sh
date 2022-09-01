@@ -1,333 +1,103 @@
 #!/bin/bash
+# Reconstruction
 
-# Variational RAE
+# Relative
+python src/rae/run.py -m \
+  core.tags='[reconstruction, relative, no-activation-after-encoder]' \
+  nn/module/model=rel_ae,rel_vae \
+  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+  'train.seed_index=0,1,2,3,4,5' \
+  nn/module=autoencoder \
+  train=reconstruction \
+  nn.module.model.latent_dim=500 \
+  nn.data.anchors_num=500 \
+  "nn.module.model.hidden_dims=null" \
+  "nn.module.optimizer.lr=5e-4" \
+  train.trainer.max_epochs=100 \
+  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
+  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
+  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
+  nn.module.model.remove_encoder_last_activation=True
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=2 \
-    nn.module.autoencoder.latent_dim=2 \
+## Absolute
+#python src/rae/run.py -m \
+#  core.tags='[reconstruction, absolute, tab1-definitive]' \
+#  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  nn/module=autoencoder \
+#  nn/module/model=ae,vae \
+#  train=reconstruction \
+#  nn.module.model.latent_dim=500 \
+#  nn.data.anchors_num=500 \
+#  "nn.module.model.hidden_dims=null" \
+#  "nn.module.optimizer.lr=5e-4" \
+#  train.trainer.max_epochs=100
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=3 \
-    nn.module.autoencoder.latent_dim=3 \
+## Relative
+#python src/rae/run.py -m \
+#  core.tags='[reconstruction, relative, tab1-definitive]' \
+#  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  nn/module=autoencoder \
+#  nn/module/model=rel_vae,rel_ae \
+#  train=reconstruction \
+#  nn.module.model.latent_dim=500 \
+#  nn.data.anchors_num=500 \
+#  "nn.module.model.hidden_dims=null" \
+#  "nn.module.optimizer.lr=5e-4" \
+#  train.trainer.max_epochs=100 \
+#  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
+#  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
+#  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null'
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=4 \
-    nn.module.autoencoder.latent_dim=4 \
+## Relative Quantization
+#python src/rae/run.py -m \
+#  core.tags='[reconstruction, relative, tab1-definitive, quantized]' \
+#  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  nn/module=autoencoder \
+#  nn/module/model=rel_vae,rel_ae \
+#  train=reconstruction \
+#  nn.module.model.latent_dim=500 \
+#  nn.data.anchors_num=500 \
+#  "nn.module.model.hidden_dims=null" \
+#  "nn.module.optimizer.lr=5e-4" \
+#  train.trainer.max_epochs=100 \
+#  'nn.module.model.relative_attention.relative_attentions.0.normalization_mode=l2' \
+#  'nn.module.model.relative_attention.relative_attentions.0.values_mode=similarities'  \
+#  'nn.module.model.relative_attention.relative_attentions.0.values_self_attention_nhead=null' \
+#  'nn.module.model.relative_attention.relative_attentions.0.similarities_quantization_mode=differentiable_round'  \
+#  'nn.module.model.relative_attention.relative_attentions.0.similarities_bin_size=0.1,0.2,0.3,0.5'
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=5 \
-    nn.module.autoencoder.latent_dim=5 \
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=6 \
-    nn.module.autoencoder.latent_dim=6 \
+# Classifcation
+## Relative
+#python src/rae/run.py -m \
+#  core.tags='[classification, relative, tab1]' \
+#  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
+#  nn/module=classifier \
+#  nn/module/model=vision/relresnet \
+#  nn.module.model.resnet_size=18 \
+#  nn.module.model.input_size=224 \
+#  nn.module.model.use_pretrained=True \
+#  nn.module.model.finetune=False \
+#  nn.module.model.hidden_features=512 \
+#  nn.module.model.relative_attention.output_normalization_mode=layernorm \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  train.trainer.max_epochs=10
+#
+## Absolute
+#python src/rae/run.py -m \
+#  core.tags='[classification, absolute, tab1]' \
+#  'nn/data/datasets=vision/fmnist,vision/cifar100,vision/mnist,vision/cifar10' \
+#  nn/module=classifier \
+#  nn/module/model=vision/resnet \
+#  nn.module.model.resnet_size=18 \
+#  nn.module.model.input_size=224 \
+#  nn.module.model.use_pretrained=True \
+#  nn.module.model.finetune=False \
+#  nn.module.model.hidden_features=512 \
+#  'train.seed_index=0,1,2,3,4,5' \
+#  train.trainer.max_epochs=10
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=7 \
-    nn.module.autoencoder.latent_dim=7 \
 
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=8 \
-    nn.module.autoencoder.latent_dim=8 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=9 \
-    nn.module.autoencoder.latent_dim=9 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=10 \
-    nn.module.autoencoder.latent_dim=10 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=15 \
-    nn.module.autoencoder.latent_dim=15 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=20 \
-    nn.module.autoencoder.latent_dim=20 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=30 \
-    nn.module.autoencoder.latent_dim=30 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=35 \
-    nn.module.autoencoder.latent_dim=35 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=40 \
-    nn.module.autoencoder.latent_dim=40 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=50 \
-    nn.module.autoencoder.latent_dim=50 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=60 \
-    nn.module.autoencoder.latent_dim=60 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=75 \
-    nn.module.autoencoder.latent_dim=75 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=90 \
-    nn.module.autoencoder.latent_dim=90 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=110 \
-    nn.module.autoencoder.latent_dim=110 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=130 \
-    nn.module.autoencoder.latent_dim=130 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=150 \
-    nn.module.autoencoder.latent_dim=150 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=200 \
-    nn.module.autoencoder.latent_dim=200 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=250 \
-    nn.module.autoencoder.latent_dim=250 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=300 \
-    nn.module.autoencoder.latent_dim=300 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=350 \
-    nn.module.autoencoder.latent_dim=350 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=400 \
-    nn.module.autoencoder.latent_dim=400 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=450 \
-    nn.module.autoencoder.latent_dim=450 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=500 \
-    nn.module.autoencoder.latent_dim=500 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=750 \
-    nn.module.autoencoder.latent_dim=750 \
-
-python src/rae/run.py \
-    nn.module._target_=rae.pl_modules.pl_variational.LightningVariational \
-    nn.module.autoencoder._target_=rae.modules.rae.RAE \
-    +nn.module.autoencoder.normalize_latents=False \
-    nn.data.anchors_mode=stratified \
-    core.tags='[rae, latent-as-anchors, no-lr-scheduler]' \
-    train.seed_index=1 \
-    nn.data.anchors_idxs=null \
-    nn.data.anchors_num=1000 \
-    nn.module.autoencoder.latent_dim=1000 \

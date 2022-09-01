@@ -1,0 +1,10 @@
+_target_: rae.modules.vision.resnet.ResNet
+resnet_size: 18
+
+input_size: 224
+in_channels: 3
+
+use_pretrained: True
+finetune: False
+
+hidden_features: 500

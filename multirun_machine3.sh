@@ -1,16 +1,15 @@
 #!/bin/bash
 
-python src/rae/run.py \
-  core.tags='[complete-bootstrap,  memory, continual, absolute]' \
+# Absolute
+python src/rae/run.py -m \
+  core.tags='[reconstruction, absolute, tab1-definitive]' \
+  'nn/data/datasets=vision/mnist,vision/fmnist,vision/cifar100_nonorm,vision/cifar10_nonorm' \
+  'train.seed_index=0,1,2,3,4,5' \
+  nn/module=autoencoder \
+  nn/module/model=vae,ae \
+  train=reconstruction \
+  nn.module.model.latent_dim=500 \
   nn.data.anchors_num=500 \
-  nn/data/datasets=continual/cifar10 \
-  nn/module=continual_classifier \
-  nn/module/model=cnn \
-  nn.data.datasets.tasks_epochs="[10, 10, 10, 10, 10, 10, 10, 10, 10, 10]" \
-  nn.data.datasets.tasks_progression="[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9],  [0, 1],  [1, 2],  [2, 3],  [3, 4],  [4, 5],  [5, 6],  [6, 7],  [7, 8],  [8, 9]]" \
-  nn.module.model.hidden_features=512 \
-  nn.module.model.dropout_p=0.5 \
-  nn.module.replay.max_size=0 \
-  nn.module.memory.limit_target_representation=False \
-  nn.module.memory.start_epoch=9 \
-  nn.module.memory.loss_weight=1e6
+  "nn.module.model.hidden_dims=null" \
+  "nn.module.optimizer.lr=5e-4" \
+  train.trainer.max_epochs=100

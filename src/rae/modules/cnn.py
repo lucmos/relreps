@@ -1,82 +1,75 @@
-import logging
-from typing import Dict
+import math
+from typing import Dict, List
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 
-from rae.modules.blocks import LearningBlock, ResidualBlock
+from rae.modules.blocks import build_dynamic_encoder_decoder
 from rae.modules.enumerations import Output
-from rae.utils.tensor_ops import infer_dimension
-
-pylogger = logging.getLogger(__name__)
 
 
-class CNN(nn.Module):
+class VanillaCNN(nn.Module):
     def __init__(
         self,
         metadata,
-        hidden_features: int,
-        dropout_p: float,
+        input_size,
+        latent_dim: int,
+        hidden_dims: List = None,
         **kwargs,
     ) -> None:
-        """Simple model that uses convolutions.
+        """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
 
         Args:
-            metadata: the metadata object
-            input_channels: number of color channels in the image
-            hidden_features: size of the hidden dimensions to use
-            dropout_p: the dropout probability
+            in_channels:
+            latent_dim:
+            hidden_dims:
+            **kwargs:
         """
         super().__init__()
-        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
-        self.hidden_features = hidden_features
 
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels=metadata.n_channels, out_channels=64, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=64, momentum=0.9),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=128, momentum=0.9),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            ResidualBlock(in_channels=128, out_channels=128, kernel_size=3, stride=1, padding=1),
-            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=256, momentum=0.9),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1, bias=False),
-            nn.BatchNorm2d(num_features=256, momentum=0.9),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            ResidualBlock(in_channels=256, out_channels=256, kernel_size=3, stride=1, padding=1),
-            nn.MaxPool2d(kernel_size=2, stride=2),
+        self.metadata = metadata
+        self.input_size = input_size
+        self.latent_dim = latent_dim
+
+        self.encoder, self.encoder_out_shape, _ = build_dynamic_encoder_decoder(
+            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
         )
-        fake_out = infer_dimension(metadata.width, metadata.height, metadata.n_channels, model=self.conv)
-        out_dimension = fake_out[0].nelement()
-        self.conv_fc = nn.Linear(out_dimension, hidden_features)
+        encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
-        self.block = LearningBlock(num_features=hidden_features, dropout_p=dropout_p)
-        self.block_fc = nn.Linear(hidden_features, len(metadata.class_to_idx))
+        self.encoder_out = nn.Sequential(
+            nn.Linear(encoder_out_numel, latent_dim),
+        )
 
-    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """Forward pass.
+        self.projection = nn.Sequential(
+            nn.Linear(self.latent_dim, encoder_out_numel),
+            nn.Tanh(),
+            nn.Linear(
+                encoder_out_numel,
+                len(metadata.class_to_idx),
+            ),
+            nn.ReLU(),
+        )
 
-        Args:
-            x: batch of images with size [batch, 1, w, h]
-
-        Returns:
-            predictions with size [batch, n_classes]
+    def encode(self, input: Tensor) -> Tensor:
         """
-        x = self.conv(x)
-        x = x.view(x.shape[0], -1)
-        x = latents = self.conv_fc(x)
-        x = self.block(x)
-        x = self.block_fc(x)
+        Encodes the input by passing through the encoder network
+        and returns the latent codes.
+        :param input: (Tensor) Input tensor to encoder [N x C x H x W]
+        :return: (Tensor) List of latent codes
+        """
+        result = self.encoder(input)
+        result = torch.flatten(result, start_dim=1)
+        result = self.encoder_out(result)
+        return result
+
+    def forward(self, x: Tensor, **kwargs) -> Dict[Output, Tensor]:
+        latent = self.encode(x)
+        logits = self.projection(latent)
         return {
-            Output.LOGITS: x,
-            Output.DEFAULT_LATENT: latents,
-            Output.BATCH_LATENT: latents,
+            Output.LOGITS: logits,
+            Output.DEFAULT_LATENT: latent,
+            Output.BATCH_LATENT: latent,
         }
 
-    def set_finetune_mode(self):
+    def set_finetune_mode(self) -> None:
         pass

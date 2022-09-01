@@ -10,7 +10,7 @@ from torch.optim import Optimizer
 
 from nn_core.model_logging import NNLogger
 
-from rae.data.datamodule import MetaData
+from rae.data.vision.datamodule import MetaData
 from rae.modules.enumerations import SupportedViz
 
 pylogger = logging.getLogger(__name__)
@@ -30,6 +30,22 @@ class AbstractLightningModule(pl.LightningModule):
         self.metadata = metadata
 
         self.validation_pca: Optional[PCA] = None
+
+    @abc.abstractmethod
+    def encode(self, *args, **kwargs):
+        raise NotImplementedError
+
+    # @property
+    # def encode_output(self) -> Set[str]:
+    #     raise NotImplementedError
+    #
+    # @property
+    # def decode_input(self) -> Set[str]:
+    #     raise NotImplementedError
+
+    @abc.abstractmethod
+    def decode(self, *args, **kwargs):
+        raise NotImplementedError
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
         checkpoint["validation_pca"] = self.validation_pca

@@ -6,7 +6,7 @@ import wandb
 from nn_core.serialization import load_model
 from nn_core.ui import select_checkpoint
 
-from rae.pl_modules.pl_gautoencoder import LightningAutoencoder
+from rae.pl_modules.vision.pl_gautoencoder import LightningAutoencoder
 
 
 @st.cache(allow_output_mutation=True)

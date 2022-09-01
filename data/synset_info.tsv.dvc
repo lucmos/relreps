@@ -1,0 +1,4 @@
+outs:
+- md5: 605f19b56bb509411b589f3e904f105b
+  size: 1978699
+  path: synset_info.tsv

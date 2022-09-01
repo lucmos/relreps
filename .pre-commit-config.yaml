@@ -26,7 +26,7 @@ repos:
 #      - id: detect-aws-credentials  # detects *your* aws credentials from the aws cli credentials file.
       - id: detect-private-key  # detects the presence of private keys.
 #      - id: double-quote-string-fixer  # replaces double quoted strings with single quoted strings.
-      - id: end-of-file-fixer  # ensures that a file is either empty, or ends with one newline.
+#      - id: end-of-file-fixer  # ensures that a file is either empty, or ends with one newline.
 #      - id: file-contents-sorter  # sorts the lines in specified files (defaults to alphabetical). you must provide list of target files as input in your .pre-commit-config.yaml file.
 #      - id: fix-byte-order-marker  # removes utf-8 byte order marker.
 #      - id: fix-encoding-pragma  # adds  # -*- coding: utf-8 -*- to the top of python files.
@@ -62,15 +62,15 @@ repos:
         additional_dependencies:
           - flake8-docstrings==1.6.0
 
-  - repo: https://github.com/pycqa/pydocstyle.git
-    rev: '6.1.1'
-    hooks:
-    -   id: pydocstyle
-        additional_dependencies:
-          - toml
+#  - repo: https://github.com/pycqa/pydocstyle.git
+#    rev: '6.1.1'
+#    hooks:
+#    -   id: pydocstyle
+#        additional_dependencies:
+#          - toml
 
   - repo: https://github.com/kynan/nbstripout.git
-    rev: '0.5.0'
+    rev: '0.6.0'
     hooks:
     -   id: nbstripout
 

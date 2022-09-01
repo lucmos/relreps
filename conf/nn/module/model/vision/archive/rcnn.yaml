@@ -1,0 +1,18 @@
+_target_: rae.modules.relative_classifier.RCNN
+
+# Relative params
+hidden_features: 64
+transform_elements: null
+dropout_p: 0.1
+normalization_mode: l2
+similarity_mode: inner
+num_subspaces: 4
+values_mode: similarities
+values_self_attention_nhead: 8
+similarities_quantization_mode: null
+similarities_bin_size: null
+similarities_aggregation_mode: null
+similarities_aggregation_n_groups: null
+anchors_sampling_mode: null
+n_anchors_sampling_per_class: null
+repr_pooling: null

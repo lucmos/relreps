@@ -1,109 +1,132 @@
-import logging
+import math
+from typing import Dict, List
 
+import hydra.utils
 import torch
-import torch.nn.functional as F
-from torch import nn
+from torch import Tensor, nn
+from torch.nn import functional as F
 
-from rae.data.datamodule import MetaData
+from rae.modules.blocks import build_dynamic_encoder_decoder
 from rae.modules.enumerations import Output
-from rae.utils.tensor_ops import infer_dimension
-
-pylogger = logging.getLogger(__name__)
 
 
-class Encoder(nn.Module):
-    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int) -> None:
-        super().__init__()
-        self.sequential = nn.Sequential(
-            nn.Conv2d(in_channels=metadata.n_channels, out_channels=hidden_channels, kernel_size=3),
-            nn.ReLU(),
-            nn.Conv2d(hidden_channels, hidden_channels, kernel_size=3),
-            nn.ReLU(),
-        )
-
-        fake_out = infer_dimension(metadata.width, metadata.height, metadata.n_channels, model=self.sequential)
-        out_dimension = fake_out[0].nelement()
-
-        self.fc = nn.Linear(in_features=out_dimension, out_features=latent_dim)
-
-    def forward(self, x: torch.Tensor) -> (torch.Tensor, torch.Tensor):
-        x = self.sequential(x)
-        x = x.view(x.shape[0], -1)
-        out = self.fc(x)
-        return out
-
-
-class Decoder(nn.Module):
-    def __init__(self, metadata: MetaData, hidden_channels: int, latent_dim: int) -> None:
-        super().__init__()
-        self.hidden_channels = hidden_channels
-
-        self.fc = nn.Linear(in_features=latent_dim, out_features=hidden_channels * 2 * 7 * 7)
-
-        self.conv2 = nn.ConvTranspose2d(
-            in_channels=hidden_channels * 2, out_channels=hidden_channels, kernel_size=4, stride=2, padding=1
-        )
-        fake_out = infer_dimension(7, 7, self.hidden_channels * 2, model=self.conv2)
-
-        stride = (2, 2)
-        padding = (1, 1)
-        output_padding = (0, 0)
-        dilation = (1, 1)
-        # kernel_w = (metadata.width - (fake_out.width −1)×stride[0] + 2×padding[0] - output_padding[0]  - 1)/dilation[0] + 1
-        # kernel_h = (metadata.height - (fake_out.height −1)×stride[1] + 2×padding[1] - output_padding[1]  - 1)/dilation[1] + 1
-        kernel_w = (
-            metadata.width - (fake_out.size(2) - 1) * stride[0] + 2 * padding[0] - output_padding[0] - 1
-        ) / dilation[0] + 1
-        kernel_h = (
-            metadata.height - (fake_out.size(3) - 1) * stride[1] + 2 * padding[0] - output_padding[1] - 1
-        ) / dilation[1] + 1
-
-        self.conv1 = nn.ConvTranspose2d(
-            in_channels=fake_out.shape[1],
-            out_channels=metadata.n_channels,
-            kernel_size=(int(kernel_w), int(kernel_h)),
-            stride=stride,
-            padding=padding,
-        )
-
-        assert ((out := self.conv1(fake_out)).shape[2], out.shape[3]) == (metadata.width, metadata.height), (
-            out.shape[2],
-            out.shape[3],
-            metadata.width,
-            metadata.height,
-        )
-
-        self.activation = nn.ReLU()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.fc(x)
-        x = x.view(x.size(0), self.hidden_channels * 2, 7, 7)
-        x = self.activation(self.conv2(x))
-        x = self.conv1(x)
-        return x
-
-
-class AE(nn.Module):
+class VanillaAE(nn.Module):
     def __init__(
-        self, metadata: MetaData, hidden_channels: int, latent_dim: int, normalize_latents: bool = False, **kwargs
-    ):
+        self,
+        metadata,
+        input_size,
+        latent_dim: int,
+        hidden_dims: List = None,
+        latent_activation: str = "torch.nn.GELU",
+        **kwargs,
+    ) -> None:
+        """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
+
+        Args:
+            in_channels:
+            latent_dim:
+            hidden_dims:
+            **kwargs:
+        """
         super().__init__()
-        pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
         self.metadata = metadata
-        self.encoder = Encoder(metadata=metadata, hidden_channels=hidden_channels, latent_dim=latent_dim)
-        self.decoder = Decoder(metadata=metadata, hidden_channels=hidden_channels, latent_dim=latent_dim)
-        self.normalize_latents = normalize_latents
+        self.input_size = input_size
+        self.latent_dim = latent_dim
 
-    def forward(self, x):
-        latent = self.encoder(x)
+        self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
+            width=metadata.width, height=metadata.height, n_channels=metadata.n_channels, hidden_dims=hidden_dims
+        )
+        encoder_out_numel = math.prod(self.encoder_out_shape[1:])
 
-        if self.normalize_latents:
-            latent = F.normalize(latent, p=2, dim=-1)
+        self.encoder_out = nn.Sequential(
+            nn.Linear(encoder_out_numel, latent_dim),
+            hydra.utils.instantiate({"_target_": latent_activation})
+            if latent_activation is not None
+            else nn.Identity(),
+        )
 
-        x_recon = self.decoder(latent)
+        self.decoder_in = nn.Sequential(
+            nn.Linear(
+                self.latent_dim,
+                encoder_out_numel,
+            ),
+            hydra.utils.instantiate({"_target_": latent_activation})
+            if latent_activation is not None
+            else nn.Identity(),
+        )
+
+    def encode(self, input: Tensor) -> Dict[str, Tensor]:
+        """
+        Encodes the input by passing through the encoder network
+        and returns the latent codes.
+        :param input: (Tensor) Input tensor to encoder [N x C x H x W]
+        :return: (Tensor) List of latent codes
+        """
+        result = self.encoder(input)
+        result = torch.flatten(result, start_dim=1)
+        result = self.encoder_out(result)
         return {
-            Output.RECONSTRUCTION: x_recon,
-            Output.DEFAULT_LATENT: latent,
-            Output.BATCH_LATENT: latent,
+            Output.BATCH_LATENT: result,
         }
+
+    def decode(self, batch_latent: Tensor) -> Dict[Output, Tensor]:
+        """
+        Maps the given latent codes
+        onto the image space.
+        :param z: (Tensor) [B x D]
+        :return: (Tensor) [B x C x H x W]
+        """
+        result = self.decoder_in(batch_latent)
+        result = result.view(-1, *self.encoder_out_shape[1:])
+        result = self.decoder(result)
+        return {
+            Output.RECONSTRUCTION: result,
+            Output.DEFAULT_LATENT: batch_latent,
+            Output.BATCH_LATENT: batch_latent,
+        }
+
+    def loss_function(self, model_out, batch, *args, **kwargs) -> dict:
+        """https://stackoverflow.com/questions/64909658/what-could-cause-a-vaevariational-autoencoder-to-output-random-noise-even-afte
+
+        Computes the VAE loss function.
+        KL(N(mu, sigma), N(0, 1)) = log frac{1}{sigma} + frac{sigma^2 + mu^2}{2} - frac{1}{2}
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        predictions = model_out[Output.RECONSTRUCTION]
+        targets = batch["image"]
+        mse = F.mse_loss(predictions, targets, reduction="mean")
+        log_sigma_opt = 0.5 * mse.log()
+        r_loss = 0.5 * torch.pow((targets - predictions) / log_sigma_opt.exp(), 2) + log_sigma_opt
+        r_loss = r_loss.sum()
+        loss = r_loss
+        return {
+            "loss": loss,
+            "reconstruction": r_loss.detach() / targets.shape[0],
+        }
+
+    def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
+        """
+        Samples from the latent space and return the corresponding
+        image space map.
+        :param num_samples: (Int) Number of samples
+        :param current_device: (Int) Device to run the model
+        :return: (Tensor)
+        """
+        z = torch.randn(num_samples, self.latent_dim)
+
+        z = z.to(current_device)
+
+        samples = self.decode(z)
+        return samples
+
+    def generate(self, x: Tensor, **kwargs) -> Tensor:
+        """
+        Given an input image x, returns the reconstructed image
+        :param x: (Tensor) [B x C x H x W]
+        :return: (Tensor) [B x C x H x W]
+        """
+
+        return self.forward(x)[0]

@@ -1,11 +1,14 @@
+input_size: 28
+in_channels: 1
+
 anchors:
-  _target_: rae.data.mnist.MNISTDataset
+  _target_: rae.data.vision.mnist.MNISTDataset
 
 train:
-  _target_: rae.data.mnist.MNISTDataset
+  _target_: rae.data.vision.mnist.MNISTDataset
 
 val:
-  - _target_: rae.data.mnist.MNISTDataset
+  - _target_: rae.data.vision.mnist.MNISTDataset
 
 #    test:
 #      - _target_: rae.data.mnist.MNISTDataset

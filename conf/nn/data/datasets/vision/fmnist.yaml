@@ -1,0 +1,14 @@
+input_size: 28
+in_channels: 1
+
+anchors:
+  _target_: rae.data.vision.fmnist.FashionMNISTDataset
+
+train:
+  _target_: rae.data.vision.fmnist.FashionMNISTDataset
+
+val:
+  - _target_: rae.data.vision.fmnist.FashionMNISTDataset
+
+#    test:
+#      - _target_: rae.data.fmnist.FashionMNISTDataset

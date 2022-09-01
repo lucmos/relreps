@@ -1,0 +1,3 @@
+_target_: rae.modules.cnn.CNN
+hidden_features: 64
+dropout_p: 0.5

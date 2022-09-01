@@ -1,0 +1,5 @@
+_target_: rae.pl_modules.pl_gautoencoder.LightningAutoencoder
+
+defaults:
+  - _self_
+  - model: rel_vae

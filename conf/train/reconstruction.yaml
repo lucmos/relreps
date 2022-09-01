@@ -1,0 +1,64 @@
+# reproducibility
+seed_index: 0
+deterministic: False
+
+# PyTorch Lightning Trainer https://pytorch-lightning.readthedocs.io/en/stable/common/trainer.html
+trainer:
+  fast_dev_run: False # Enable this for debug purposes
+  gpus: 1
+  precision: 32
+  max_epochs: 100
+  max_steps: 1000000
+  accumulate_grad_batches: 1
+  num_sanity_val_steps: 2
+  gradient_clip_val: 10.0
+  check_val_every_n_epoch: 1
+  reload_dataloaders_every_n_epochs: ${ifthenelse:1, ${oc.select:nn.data.datasets.tasks_progression, False}, 0}
+  deterministic: ${train.deterministic}
+
+restore:
+  ckpt_or_run_path: null
+  mode: null # null, finetune, hotstart, continue
+
+monitor:
+  metric: 'val_stage/mse'
+  mode: 'min'
+
+callbacks:
+  - _target_: pytorch_lightning.callbacks.EarlyStopping
+    patience: 200
+    verbose: False
+    monitor: ${train.monitor.metric}
+    mode: ${train.monitor.mode}
+
+  - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    save_top_k: 1
+    verbose: False
+    monitor: ${train.monitor.metric}
+    mode: ${train.monitor.mode}
+
+  - _target_: pytorch_lightning.callbacks.LearningRateMonitor
+    logging_interval: "step"
+    log_momentum: False
+
+  - _target_: pytorch_lightning.callbacks.progress.tqdm_progress.TQDMProgressBar
+    refresh_rate: 20
+
+logging:
+  upload:
+    run_files: true
+    source: true
+
+  logger:
+    _target_: pytorch_lightning.loggers.WandbLogger
+
+    name: ${core.name}
+    project: ${core.project_name}
+    entity: gladia
+    log_model: ${..upload.run_files}
+    mode: 'online'
+    tags: ${core.tags}
+
+  wandb_watch:
+    log: 'all'
+    log_freq: 100
