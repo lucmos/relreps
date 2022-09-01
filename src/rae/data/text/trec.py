@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import operator
 import shutil
 from collections import Counter
 from pathlib import Path
@@ -25,7 +26,7 @@ pylogger = logging.getLogger(__name__)
 class Resources:
     split2label_type2class_dist: Mapping[Split, Mapping[str, Mapping[str, int]]]
     split2label_type2classes: Mapping[Split, Mapping[str, Sequence[str]]]
-    # split2lang2cat2texts: Mapping[Split, Mapping[str, Mapping[str, ty.Counter[str]]]]
+    label_type2target2class: Mapping[str, Mapping[int, str]]
 
 
 class TREC(Dataset):
@@ -34,7 +35,7 @@ class TREC(Dataset):
         # TODO: calculate stopwords (maybe with IDF)
         target_dir: Path = PROJECT_ROOT / "data" / "trec"
 
-        file_names = ("split2label_type2class_dist", "split2label_type2classes")
+        file_names = ("split2label_type2class_dist", "split2label_type2classes", "label_type2target2class")
 
         if target_dir.exists() and use_cached and len(list(target_dir.iterdir())) == len(file_names):
             kwargs = {file_name: torch.load(target_dir / file_name) for file_name in file_names}
@@ -47,9 +48,9 @@ class TREC(Dataset):
         label_type2target2class = {
             label_type: {
                 target: sample_class
-                for target, sample_class in enumerate(full_dataset["train"].features[label_type].names)
+                for target, sample_class in enumerate(full_dataset["train"].features[f"label-{label_type}"].names)
             }
-            for label_type in ("label-coarse", "label-fine")
+            for label_type in ("coarse", "fine")
         }
         split2label_type2classes = {}
         for split, dataset in full_dataset.items():
@@ -58,13 +59,16 @@ class TREC(Dataset):
             for sample in tqdm(dataset, desc=f"Iterating {split} data"):
                 for label_type in ("fine", "coarse"):
                     label_type2classes[label_type].append(
-                        label_type2target2class[f"label-{label_type}"][sample[f"label-{label_type}"]]
+                        label_type2target2class[label_type][sample[f"label-{label_type}"]]
                     )
 
             split2label_type2classes[split] = label_type2classes
 
         split2label_type2class_dist = {
-            split: {label_type: Counter(classes) for label_type, classes in label_type2classes.items()}
+            split: {
+                label_type: dict(sorted(Counter(classes).items(), key=operator.itemgetter(0)))
+                for label_type, classes in label_type2classes.items()
+            }
             for split, label_type2classes in split2label_type2classes.items()
         }
 
@@ -116,12 +120,12 @@ class TREC(Dataset):
 
         torch.save(split2label_type2class_dist, target_dir / "split2label_type2class_dist")
         torch.save(split2label_type2classes, target_dir / "split2label_type2classes")
-        # torch.save(split2lang2cat2texts, target_dir / "split2lang2cat2texts")
+        torch.save(label_type2target2class, target_dir / "label_type2target2class")
 
         return Resources(
             split2label_type2class_dist=split2label_type2class_dist,
             split2label_type2classes=split2label_type2classes,
-            # split2lang2cat2texts=split2lang2cat2texts,
+            label_type2target2class=label_type2target2class,
         )
 
     def __init__(self, split: Split, label_type: str, **kwargs):
@@ -135,8 +139,7 @@ class TREC(Dataset):
 
         self.data = load_dataset("trec", split=split)
         self.class_to_idx: Mapping[str, int] = {
-            clazz: idx
-            for idx, clazz in enumerate(sorted(resources.split2label_type2class_dist[split][label_type].keys()))
+            clazz: idx for idx, clazz in resources.label_type2target2class[label_type].items()
         }
         self.idx2class: Mapping[int, str] = {idx: clazz for clazz, idx in self.class_to_idx.items()}
         # print(f"[{split}] Class distribution: {resources.split2lang2classes[split][language]}")
@@ -199,5 +202,6 @@ def main(cfg: omegaconf.DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    for x in TREC(split="train", label_type="coarse"):
-        print(x)
+    for x in TREC(split="validation", label_type="coarse"):
+        if x["class"] == "ENTY":
+            print(x)
