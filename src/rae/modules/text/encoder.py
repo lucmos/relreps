@@ -1,5 +1,6 @@
 import logging
 from abc import abstractmethod
+from collections import Counter
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
@@ -61,11 +62,10 @@ class TextEncoder(nn.Module):
             A batch generated from the given samples
         """
         text_encodings: Sequence[Sequence[torch.Tensor]] = [self.encode(text=sample["data"]) for sample in batch]
-        start_len: int = len(batch)
+        skipped_batch = [sample for sample, text_encoding in zip(batch, text_encodings) if text_encoding is None]
         batch = [sample for sample, text_encoding in zip(batch, text_encodings) if text_encoding is not None]
-        end_len: int = len(batch)
-        if start_len != end_len:
-            print(f"Skipping {start_len - end_len} samples")
+        if len(skipped_batch) != 0:
+            print(f"Skipping {len(skipped_batch)} samples: {Counter(sample['class'] for sample in skipped_batch)}")
         text_encodings = [text_encoding for text_encoding in text_encodings if text_encoding is not None]
 
         batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}

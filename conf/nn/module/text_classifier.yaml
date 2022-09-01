@@ -33,6 +33,7 @@ model:
     similarities_aggregation_n_groups: null
     anchors_sampling_mode: null
     n_anchors_sampling_per_class: null
+    output_normalization_mode: layernorm
 
   batch_pre_reduce: [ sentence, text ]
   anchors_reduce: [ sentence, text ]

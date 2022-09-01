@@ -9,8 +9,9 @@ from torch import nn
 from torch.types import Device
 
 from rae.data.text.datamodule import EncodingLevel, MetaData
+from rae.modules.attention import AttentionOutput
 from rae.modules.blocks import DeepProjection
-from rae.modules.enumerations import AttentionOutput, Output
+from rae.modules.enumerations import Output
 from rae.modules.text.encoder import TextEncoder
 from rae.utils.utils import to_device
 
