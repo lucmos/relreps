@@ -33,10 +33,15 @@ class LearningBlock(nn.Module):
 
 class DeepProjection(nn.Module):
     def __init__(
-        self, in_features: int, out_features: int, dropout: float, activation: torch.nn.modules.activation = None
+        self,
+        in_features: int,
+        out_features: int,
+        dropout: float,
+        num_layers: int = 5,
+        activation: torch.nn.modules.activation = None,
     ):
         super().__init__()
-        projection_inputs = [int(in_features // (2**in_dim)) for in_dim in range(0, 5)]
+        projection_inputs = [int(in_features // (2**in_dim)) for in_dim in range(0, num_layers)]
         projection_outputs = projection_inputs[1:] + [out_features]
 
         self.dropout = torch.nn.Dropout(p=dropout)
