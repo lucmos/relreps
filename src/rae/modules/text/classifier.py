@@ -1,6 +1,6 @@
 import itertools
 import logging
-from typing import Any, Collection, Dict, Set
+from typing import Collection, Set
 
 import torch
 from hydra.utils import instantiate
@@ -94,15 +94,7 @@ class TextClassifier(nn.Module):
     def set_finetune_mode(self):
         pass
 
-    def forward(self, batch: Dict[str, Any], device: Device) -> Dict[str, torch.Tensor]:
-        """Forward pass.
-
-        Args:
-            x: batch of images with size [batch, 1, w, h]
-
-        Returns:
-            predictions with size [batch, n_classes]
-        """
+    def encode(self, batch, device: Device):
         if "encodings" not in batch:
             assert False
             batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
@@ -136,13 +128,24 @@ class TextClassifier(nn.Module):
                 reduce_transformations=self.anchors_reduce,
             )
         #
-        attention_output = self.relative_projection(x=x, anchors=anchors)
-        out = self.sequential(attention_output[AttentionOutput.OUTPUT])
+        attention_output = self.relative_projection.encode(x=x, anchors=anchors)
+
+        return {
+            **attention_output,
+            "sections": batch["sections"],
+            Output.ANCHORS_LATENT: anchors,
+            Output.BATCH_LATENT: x,
+            "reduced_to_sentence": reduced_to_sentence,
+        }
+
+    def decode(self, **encoding):
+        x = self.relative_projection.decode(**encoding)
+        out = self.sequential(x[AttentionOutput.OUTPUT])
 
         out, _ = EncodingLevel.reduce(
             encodings=out,
-            **batch["sections"],
-            reduced_to_sentence=reduced_to_sentence,
+            **encoding["sections"],
+            reduced_to_sentence=encoding["reduced_to_sentence"],
             reduce_transformations=self.post_reduce,
         )
 
@@ -150,13 +153,13 @@ class TextClassifier(nn.Module):
             Output.LOGITS: out,
             Output.DEFAULT_LATENT: EncodingLevel.reduce(
                 encodings=x,
-                **batch["sections"],
-                reduced_to_sentence=reduced_to_sentence,
+                **encoding["sections"],
+                reduced_to_sentence=encoding["reduced_to_sentence"],
                 reduce_transformations=self.post_reduce,
             )[0],
-            Output.BATCH_LATENT: x,
-            Output.ANCHORS_LATENT: anchors,
-            Output.INV_LATENTS: attention_output[AttentionOutput.SIMILARITIES],
+            Output.BATCH_LATENT: encoding[Output.BATCH_LATENT],
+            Output.ANCHORS_LATENT: encoding[Output.ANCHORS_LATENT],
+            Output.INV_LATENTS: x[AttentionOutput.SIMILARITIES],
             Output.INT_PREDICTIONS: torch.argmax(out, dim=-1),
         }
 
@@ -223,15 +226,7 @@ class AbsoluteTextClassifier(nn.Module):
     def set_finetune_mode(self):
         pass
 
-    def forward(self, batch: Dict[str, Any], device: Device) -> Dict[str, torch.Tensor]:
-        """Forward pass.
-
-        Args:
-            x: batch of images with size [batch, 1, w, h]
-
-        Returns:
-            predictions with size [batch, n_classes]
-        """
+    def encode(self, batch, device: Device):
         if "encodings" not in batch:
             assert False
             batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
@@ -241,23 +236,26 @@ class AbsoluteTextClassifier(nn.Module):
             encodings=x, **batch["sections"], reduced_to_sentence=False, reduce_transformations=self.pre_reduce
         )
 
-        out = self.sequential(x)
+        return {"x": x, "reduced_to_sentence": reduced_to_sentence, "sections": batch["sections"]}
+
+    def decode(self, **encoding):
+        out = self.sequential(encoding["x"])
 
         out, _ = EncodingLevel.reduce(
             encodings=out,
-            **batch["sections"],
-            reduced_to_sentence=reduced_to_sentence,
+            **encoding["sections"],
+            reduced_to_sentence=encoding["reduced_to_sentence"],
             reduce_transformations=self.post_reduce,
         )
 
         return {
             Output.LOGITS: out,
             Output.DEFAULT_LATENT: EncodingLevel.reduce(
-                encodings=x,
-                **batch["sections"],
-                reduced_to_sentence=reduced_to_sentence,
+                encodings=encoding["x"],
+                **encoding["sections"],
+                reduced_to_sentence=encoding["reduced_to_sentence"],
                 reduce_transformations=self.post_reduce,
             )[0],
-            Output.BATCH_LATENT: x,
+            Output.BATCH_LATENT: encoding["x"],
             Output.INT_PREDICTIONS: torch.argmax(out, dim=-1),
         }

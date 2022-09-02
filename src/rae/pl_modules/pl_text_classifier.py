@@ -95,6 +95,12 @@ class LightningTextClassifier(AbstractLightningModule):
     #     supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
     #     return supported_viz
 
+    def encode(self, *args, **kwargs):
+        return self.model.encode(*args, **kwargs)
+
+    def decode(self, *args, **kwargs):
+        return self.model.decode(*args, **kwargs)
+
     def forward(self, batch: Mapping[str, Any], *args, **kwargs) -> torch.Tensor:
         """Method for the forward pass.
 
@@ -104,7 +110,8 @@ class LightningTextClassifier(AbstractLightningModule):
         Returns:
             output_dict: forward output containing the predictions (output logits ecc...) and the loss if any.
         """
-        return self.model(batch, device=self.device, *args, **kwargs)
+        encoding = self.encode(batch, *args, device=self.device, **kwargs)
+        return self.decode(**encoding)
 
     def step(self, batch, batch_index: int, stage: Stage) -> Mapping[str, Any]:
         out = self(batch)
