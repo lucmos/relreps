@@ -6,8 +6,9 @@ val_fixed_sample_idxs: [ 83, 309, 194, 281, 14, 408, 126, 499, 255, 455, 107, 28
                          105, 488, 48, 56, 154, 404 ]
 
 anchors:
-  _target_: rae.data.text.TREC
-  label_type: ${nn.data.datasets.label_type}
+  _target_: rae.data.text.embedding_anchor.EmbeddingAnchorDataset
+  method: most_frequent
+  num_anchors: ${nn.data.anchors_num}
 
 train:
   _target_: rae.data.text.TREC

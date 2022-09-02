@@ -83,7 +83,9 @@ class TextEncoder(nn.Module):
         sentences_per_text = torch.tensor([len(text) for text in text_encodings])
 
         classes = batch["class"]
-        targets = torch.as_tensor(batch["target"])
+
+        classes = None if any(x is None for x in classes) else classes
+        targets = None if any(x is None for x in batch["target"]) else torch.as_tensor(batch["target"])
 
         sections = dict(
             words_per_sentence=words_per_sentence, words_per_text=words_per_text, sentences_per_text=sentences_per_text
