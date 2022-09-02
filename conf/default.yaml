@@ -6,6 +6,7 @@ core:
   tags:
     - develop
     - semantic_horizon
+    - word_anchors
   name: null
 
 defaults:

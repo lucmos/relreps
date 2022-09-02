@@ -5,9 +5,14 @@ from pathlib import Path
 from typing import Mapping, Sequence, Set
 
 import hydra
+import numpy as np
 import omegaconf
 import torch
 import torch.nn.functional as F
+from pytorch_lightning import seed_everything
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import normalize
+from sklearn.utils import shuffle
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
@@ -23,7 +28,9 @@ pylogger = logging.getLogger(__name__)
 
 class AnchorSamplingMethod(StrEnum):
     TF_IDF = auto()
-    K_MEANS = auto()
+    K_MEANS_RANDOM = auto()
+    K_MEANS_MOST_FREQUENT = auto()
+    K_MEANS_CENTROID = auto()
     ALL_SIMILAR = auto()
     RANDOM = auto()
     MOST_FREQUENT = auto()
@@ -49,18 +56,65 @@ def get_best_aligned_indices(A, B, chunk_size=500, p=2):
 class EmbeddingAnchorDataset(Dataset):
     @classmethod
     def build_anchors(cls, method: AnchorSamplingMethod, text_encoders: Sequence[GensimEncoder]) -> Sequence[str]:
+        seed_everything(42)
         assert len({frozenset(encoder.model.key_to_index.keys()) for encoder in text_encoders}) == 1
 
         target_dir: Path = PROJECT_ROOT / "data" / "anchor_dataset"
         target_dir.mkdir(exist_ok=True, parents=True)
 
-        stopwords = text_encoders[0].stopwords
+        target_encoder = [encoder for encoder in text_encoders if encoder.model_name == "local_fasttext"]
+        if len(target_encoder) == 0:
+            target_encoder = text_encoders[0]
+        else:
+            target_encoder = target_encoder[0]
+
+        stopwords = target_encoder.stopwords
 
         if method == AnchorSamplingMethod.MOST_FREQUENT:
-            anchors = list(text_encoders[0].model.key_to_index.keys())
+            anchors = list(target_encoder.model.key_to_index.keys())
         elif method == AnchorSamplingMethod.RANDOM:
-            anchors = list(text_encoders[0].model.key_to_index.keys())
+            anchors = list(target_encoder.model.key_to_index.keys())
             random.shuffle(anchors)
+        elif method == AnchorSamplingMethod.K_MEANS_RANDOM:
+            vectors = normalize(target_encoder.model.vectors, norm="l2")
+            clustered = KMeans(n_clusters=42).fit_predict(vectors)
+
+            shuffled_idxs, shuffled_targets = shuffle(
+                np.asarray(list(range(len(target_encoder.model.vectors)))),
+                np.asarray(clustered),
+                random_state=0,
+            )
+            all_targets = sorted(set(shuffled_targets))
+            class2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
+
+            anchor_indices = []
+            i = 0
+            while len(anchor_indices) < len(clustered):
+                for target, target_idxs in class2idxs.items():
+                    if len(target_idxs) <= i:
+                        continue
+                    anchor_indices.append(target_idxs[i])
+                i += 1
+
+            anchors = [target_encoder.model.index_to_key[index] for index in anchor_indices]
+        elif method == AnchorSamplingMethod.K_MEANS_MOST_FREQUENT:
+            vectors = normalize(target_encoder.model.vectors, norm="l2")
+            clustered = KMeans(n_clusters=42).fit_predict(vectors)
+
+            idxs = np.asarray(list(range(len(target_encoder.model.vectors))))
+            all_targets = sorted(set(clustered))
+            class2idxs = {target: idxs[clustered == target] for target in all_targets}
+
+            anchor_indices = []
+            i = 0
+            while len(anchor_indices) < len(clustered):
+                for target, target_idxs in class2idxs.items():
+                    if len(target_idxs) <= i:
+                        continue
+                    anchor_indices.append(target_idxs[i])
+                i += 1
+
+            anchors = [target_encoder.model.index_to_key[index] for index in anchor_indices]
         else:
             raise NotImplementedError
 
@@ -145,5 +199,10 @@ if __name__ == "__main__":
         )
     ]
 
-    for method in (AnchorSamplingMethod.RANDOM, AnchorSamplingMethod.MOST_FREQUENT):
+    for method in (
+        AnchorSamplingMethod.K_MEANS_MOST_FREQUENT,
+        AnchorSamplingMethod.K_MEANS_RANDOM,
+        AnchorSamplingMethod.RANDOM,
+        AnchorSamplingMethod.MOST_FREQUENT,
+    ):
         EmbeddingAnchorDataset.build_anchors(method=method, text_encoders=ENCODERS)

@@ -233,6 +233,7 @@ class GensimEncoder(TextEncoder):
         super().__init__(trainable=False)
         self.language: str = language
         self.lemmatize: bool = lemmatize
+        self.model_name: str = model_name
 
         self.model: KeyedVectors = KeyedVectors.load_word2vec_format(
             fname=str((Path(gensim.downloader.BASE_DIR) / "restricted") / f"{model_name}.txt")
