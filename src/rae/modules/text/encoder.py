@@ -65,7 +65,9 @@ class TextEncoder(nn.Module):
         skipped_batch = [sample for sample, text_encoding in zip(batch, text_encodings) if text_encoding is None]
         batch = [sample for sample, text_encoding in zip(batch, text_encodings) if text_encoding is not None]
         if len(skipped_batch) != 0:
-            print(f"Skipping {len(skipped_batch)} samples: {Counter(sample['class'] for sample in skipped_batch)}")
+            pylogger.warning(
+                f"Skipping {len(skipped_batch)} samples: {Counter(sample['class'] for sample in skipped_batch)}"
+            )
         text_encodings = [text_encoding for text_encoding in text_encodings if text_encoding is not None]
 
         batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}

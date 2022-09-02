@@ -96,7 +96,6 @@ class TextClassifier(nn.Module):
 
     def encode(self, batch, device: Device):
         if "encodings" not in batch:
-            assert False
             batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
         x = batch["encodings"]
 
@@ -228,7 +227,6 @@ class AbsoluteTextClassifier(nn.Module):
 
     def encode(self, batch, device: Device):
         if "encodings" not in batch:
-            assert False
             batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
         x = batch["encodings"]
 
