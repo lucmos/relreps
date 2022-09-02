@@ -20,12 +20,7 @@ from torch.utils.data import DataLoader, Dataset
 from nn_core.common import PROJECT_ROOT
 
 from rae.utils.tensor_ops import contiguous_mean
-
-try:
-    # be ready for 3.10 when it drops
-    from enum import StrEnum
-except ImportError:
-    from backports.strenum import StrEnum
+from rae.utils.utils import StrEnum
 
 pylogger = logging.getLogger(__name__)
 
@@ -38,6 +33,7 @@ class AnchorsMode(StrEnum):
     FIXED = auto()
     RANDOM_SAMPLES = auto()
     RANDOM_LATENTS = auto()
+    DATASET = auto()
 
 
 class SpacyManager:
@@ -250,6 +246,15 @@ class MyDataModule(pl.LightningDataModule):
 
     def get_anchors(self) -> Dict[str, Any]:
         dataset_to_consider = self.anchors_dataset
+
+        if self.anchors_mode == AnchorsMode.DATASET:
+            return {
+                "anchor_idxs": list(range(len(dataset_to_consider))),
+                "anchor_samples": list(dataset_to_consider),
+                "anchor_targets": dataset_to_consider.targets,
+                "anchor_classes": dataset_to_consider.classes,
+                "anchor_latents": None,
+            }
 
         if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
             shuffled_idxs, shuffled_targets = shuffle(

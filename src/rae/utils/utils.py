@@ -5,6 +5,12 @@ import torch.nn.functional as F
 from sklearn.decomposition import PCA
 from torch.types import Device
 
+try:
+    # be ready for 3.10 when it drops
+    from enum import StrEnum  # noqa
+except ImportError:
+    from backports.strenum import StrEnum  # noqa
+
 
 def check_all_equal_size(elements: Iterable[Any]) -> bool:
     """Check if all elements have the same size.
