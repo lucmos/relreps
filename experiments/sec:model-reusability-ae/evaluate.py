@@ -247,8 +247,8 @@ def display_performance(performance_df, display: Display):
     aggregated_perfomance = (
         aggregated_perfomance[["mse", "ergas", "psnr", "ssim"]]
         .reindex([True, False], level="stitching")
-        .reindex(["mnist", "fmnist", "cifar10"], level="dataset_name")
-        .reindex(["mnist", "fmnist", "cifar10"], level="dataset_name")
+        .reindex(["mnist", "fmnist", "cifar10", "cifar100"], level="dataset_name")
+        .reindex(["mnist", "fmnist", "cifar10", "cifar100"], level="dataset_name")
     )
 
     if display == Display.DF:
@@ -259,11 +259,12 @@ def display_performance(performance_df, display: Display):
             "mnist",
             "fmnist",
             "cifar10",
+            "cifar100",
         ]
         METRIC_CONSIDERED = "mse"
 
         df = aggregated_perfomance[METRIC_CONSIDERED]
-        reconstruction_str = r"{} & {} & {} & {}\\[1ex]"
+        reconstruction_str = r"{} & {} & {}  & {} \\[1ex]"
 
         def latex_float(f):
             float_str = "{0:.2f}".format(f)
@@ -286,13 +287,13 @@ def display_performance(performance_df, display: Display):
             for stitching in [False, True]:
 
                 s = reconstruction_str.format(
-                    available_model_name,
                     *[
                         extract_mean_std(df, dataset_name, available_model_type, stitching)
                         for dataset_name in COLUMN_ORDER
                     ],
                 )
-                print(stitching, s)
+                print(stitching, available_model_name)
+                print(s)
 
 
 def evaluate(force_predict: bool = False, force_measure: bool = False, display: Display = Display.DF):
