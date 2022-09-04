@@ -10,6 +10,7 @@ import omegaconf
 import torch
 import torch.nn.functional as F
 from pytorch_lightning import seed_everything
+from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import normalize
 from sklearn.utils import shuffle
@@ -85,12 +86,12 @@ class EmbeddingAnchorDataset(Dataset):
                 random_state=0,
             )
             all_targets = sorted(set(shuffled_targets))
-            class2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
+            cluster2idxs = {target: shuffled_idxs[shuffled_targets == target] for target in all_targets}
 
             anchor_indices = []
             i = 0
             while len(anchor_indices) < len(clustered):
-                for target, target_idxs in class2idxs.items():
+                for target, target_idxs in cluster2idxs.items():
                     if len(target_idxs) <= i:
                         continue
                     anchor_indices.append(target_idxs[i])
@@ -103,12 +104,37 @@ class EmbeddingAnchorDataset(Dataset):
 
             idxs = np.asarray(list(range(len(target_encoder.model.vectors))))
             all_targets = sorted(set(clustered))
-            class2idxs = {target: idxs[clustered == target] for target in all_targets}
+            cluster2idxs = {target: idxs[clustered == target] for target in all_targets}
 
             anchor_indices = []
             i = 0
             while len(anchor_indices) < len(clustered):
-                for target, target_idxs in class2idxs.items():
+                for target, target_idxs in cluster2idxs.items():
+                    if len(target_idxs) <= i:
+                        continue
+                    anchor_indices.append(target_idxs[i])
+                i += 1
+
+            anchors = [target_encoder.model.index_to_key[index] for index in anchor_indices]
+        elif method == AnchorSamplingMethod.K_MEANS_CENTROID:
+            vectors = normalize(target_encoder.model.vectors, norm="l2")
+            clustered = KMeans(n_clusters=42).fit_predict(vectors)
+
+            idxs = np.asarray(list(range(len(target_encoder.model.vectors))))
+            all_targets = sorted(set(clustered))
+            cluster2idxs = {target: idxs[clustered == target] for target in all_targets}
+
+            for cluster_id, idxs in cluster2idxs.items():
+                cluster_vectors = vectors[idxs]
+                cluster_centroid: np.ndarray = np.average(cluster_vectors, axis=0)
+                distances = cdist(cluster_centroid[None, :], cluster_vectors)[0]
+                sorted_idxs = np.argsort(distances)
+                cluster2idxs[cluster_id] = sorted_idxs
+
+            anchor_indices = []
+            i = 0
+            while len(anchor_indices) < len(clustered):
+                for target, target_idxs in cluster2idxs.items():
                     if len(target_idxs) <= i:
                         continue
                     anchor_indices.append(target_idxs[i])
@@ -202,6 +228,7 @@ if __name__ == "__main__":
     for method in (
         AnchorSamplingMethod.K_MEANS_MOST_FREQUENT,
         AnchorSamplingMethod.K_MEANS_RANDOM,
+        AnchorSamplingMethod.K_MEANS_CENTROID,
         AnchorSamplingMethod.RANDOM,
         AnchorSamplingMethod.MOST_FREQUENT,
     ):

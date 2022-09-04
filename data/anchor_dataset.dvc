@@ -1,5 +1,5 @@
 outs:
-- md5: 6bf20836469afd381cad162b863fdc57.dir
-  size: 3630912
-  nfiles: 4
+- md5: 9365791c2ec8cf6dcffb66831f78ab19.dir
+  size: 4289536
+  nfiles: 5
   path: anchor_dataset
