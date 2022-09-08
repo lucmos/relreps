@@ -171,6 +171,11 @@ class LightningTextClassifier(AbstractLightningModule):
         for metric_name, metric in self.train_stage_metrics.items():
             metric.reset()
 
+    def state_dict(self, *args, **kwargs):
+        result = super(LightningTextClassifier, self).state_dict(*args, **kwargs)
+        result = {k: v for k, v in result.items() if not k.startswith("model.transformer")}
+        return result
+
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
         for metric_name, metric in self.val_stage_metrics.items():
             metric.reset()
