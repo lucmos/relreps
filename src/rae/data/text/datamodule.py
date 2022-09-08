@@ -255,8 +255,7 @@ class MyDataModule(pl.LightningDataModule):
                 "anchor_classes": dataset_to_consider.classes,
                 "anchor_latents": None,
             }
-
-        if self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
+        elif self.anchors_mode == AnchorsMode.STRATIFIED_SUBSET:
             shuffled_idxs, shuffled_targets = shuffle(
                 np.asarray(list(range(len(dataset_to_consider)))),
                 np.asarray(dataset_to_consider.targets),
@@ -269,7 +268,8 @@ class MyDataModule(pl.LightningDataModule):
             i = 0
             while len(anchor_indices) < self.anchors_num:
                 for target, target_idxs in class2idxs.items():
-                    anchor_indices.append(target_idxs[i])
+                    if i < len(target_idxs):
+                        anchor_indices.append(target_idxs[i])
                     if len(anchor_indices) == self.anchors_num:
                         break
                 i += 1
@@ -387,7 +387,7 @@ class MyDataModule(pl.LightningDataModule):
             num_workers=self.num_workers.train,
             pin_memory=False,
             persistent_workers=True,
-            collate_fn=self.trainer.model.model.text_encoder.collate_fn,
+            collate_fn=self.trainer.model.model.collate_fn,
         )
 
     def val_dataloader(self) -> Sequence[DataLoader]:
@@ -399,7 +399,7 @@ class MyDataModule(pl.LightningDataModule):
                 num_workers=self.num_workers.val,
                 pin_memory=False,
                 persistent_workers=True,
-                collate_fn=self.trainer.model.model.text_encoder.collate_fn,
+                collate_fn=self.trainer.model.model.collate_fn,
             )
             for dataset in self.val_datasets
         ]
