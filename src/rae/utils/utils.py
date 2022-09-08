@@ -85,3 +85,16 @@ def to_device(mapping: MutableMapping, device: Device):
         for key, value in mapping.items()
     }
     return mapped
+
+
+def chunk_iterable(iterable: Iterable, chunk_size: int):
+    chunk: list = []
+
+    for e in iterable:
+        chunk.append(e)
+        if len(chunk) == chunk_size:
+            yield list(chunk)
+            chunk = []
+
+    if len(chunk) != 0:
+        yield list(chunk)
