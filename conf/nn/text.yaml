@@ -34,8 +34,8 @@ data:
     test: 16
 
   batch_size:
-    train: 128
-    val: 128
+    train: 32
+    val: 32
     test: 16
 
 module:
@@ -63,4 +63,4 @@ module:
 defaults:
   - _self_
   - data: text # pick one of the yamls in nn/data/
-  - module: text_classifier # ae_variational # classifier #  ae_deterministic #
+  - module: hf_text_classifier # ae_variational # classifier #  ae_deterministic #

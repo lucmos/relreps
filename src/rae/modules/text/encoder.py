@@ -3,7 +3,7 @@ from abc import abstractmethod
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Set, Union
 
 import fasttext
 import gensim.downloader
@@ -12,7 +12,7 @@ from gensim.models import KeyedVectors
 from spacy.tokens import Doc, Span, Token
 from torch import nn
 from tqdm import tqdm
-from transformers import AutoModel, AutoTokenizer, BatchEncoding, PreTrainedModel, PreTrainedTokenizer
+from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizer
 
 from nn_core.common import PROJECT_ROOT
 
@@ -103,6 +103,37 @@ class TextEncoder(nn.Module):
             }
         }
         return dict(encodings=encodings, classes=classes, targets=targets, sections=sections, **other_params)
+
+    def collate_hf_fn(self, batch: Sequence[Mapping[str, Any]]):
+        """Custom collate function for dataloaders with access to split and metadata.
+
+        Args:
+            samples: A list of samples coming from the Dataset to be merged into a batch
+            device: The Device to transfer the batch to
+
+        Returns:
+            A batch generated from the given samples
+        """
+        encodings = self.encode(text=[sample["data"] for sample in batch])
+        batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}
+
+        # encodings ~ (sample_index, sentence_index, word_index)
+
+        classes = batch["class"]
+
+        classes = None if any(x is None for x in classes) else classes
+        targets = None if any(x is None for x in batch["target"]) else torch.as_tensor(batch["target"])
+
+        other_params = {
+            k: v
+            for k, v in batch.items()
+            if k
+            not in {
+                "class",
+                "target",
+            }
+        }
+        return dict(encodings=encodings, classes=classes, targets=targets, **other_params)
 
 
 class FastTextEncoder(TextEncoder):
@@ -305,29 +336,127 @@ class TransformerEncoder(TextEncoder):
             dst_path,
         )
 
-    def __init__(self, transformer_name: str, trainable: bool):
-        super().__init__(trainable=trainable)
+    def __init__(self, transformer_name: str):
+        super().__init__(trainable=False)
         self.transformer_name: str = transformer_name
 
         self.tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(transformer_name, use_fast=True)
-        self.transformer: PreTrainedModel = AutoModel.from_pretrained(
-            transformer_name, output_hidden_states=True, return_dict=True
-        ).eval()
 
     @torch.no_grad()
-    def encode(self, text: str) -> Optional[Sequence[torch.Tensor]]:
-        encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt", truncation=True)
-        encoding: torch.Tensor = self.transformer(**encoding)["hidden_states"][-1]
+    def encode(self, text: Union[str, List[str]]) -> Optional[Sequence[torch.Tensor]]:
+        encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True)
         # encoding ~ (text, bpe, hidden)
-        # TODO: remove special tokens here?
-        encoding: torch.Tensor = encoding.squeeze(dim=0)[1:-1, :]
-        # encoding ~ (bpe, hidden)
-
         # TODO: support sentence level
 
-        return [encoding]
+        return encoding
+
+
+# class SelfEncoder(TextEncoder):
+#     def __init__(
+#         self,
+#         metadata: MetaData,
+#         relative_projection: DictConfig,
+#         text_encoder: DictConfig,
+#         batch_pre_reduce: Collection[EncodingLevel] = None,
+#         anchors_reduce: Collection[EncodingLevel] = None,
+#         **kwargs,
+#     ) -> None:
+#         super().__init__(trainable=False)
+#         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
+#
+#         self.metadata = metadata
+#         self.text_encoder: TextEncoder = instantiate(text_encoder, _recursive_=False)
+#         self.text_encoder.add_stopwords(stopwords=metadata.stopwords)
+#
+#         n_classes: int = len(self.metadata.class_to_idx)
+#
+#         self.pre_reduce: Set[EncodingLevel] = (
+#             set(batch_pre_reduce) if batch_pre_reduce is not None and len(batch_pre_reduce) > 0 else {}
+#         )
+#         self.anchors_reduce: Set[EncodingLevel] = (
+#             set(anchors_reduce) if anchors_reduce is not None and len(anchors_reduce) > 0 else {}
+#         )
+#
+#         anchors = self.text_encoder.collate_fn(batch=metadata.anchor_samples)
+#
+#         if not self.text_encoder.trainable:
+#             self.register_buffer("anchor_encodings", anchors["encodings"])
+#             self.register_buffer("anchor_words_per_text", anchors["sections"]["words_per_text"])
+#             self.register_buffer("anchor_words_per_sentence", anchors["sections"]["words_per_sentence"])
+#             self.register_buffer("anchor_sentences_per_text", anchors["sections"]["sentences_per_text"])
+#
+#         n_anchors = (
+#             len(anchors["sections"]["words_per_text"])
+#             if EncodingLevel.TEXT in self.anchors_reduce
+#             else (
+#                 len(anchors["sections"]["words_per_sentence"])
+#                 if EncodingLevel.SENTENCE in self.anchors_reduce
+#                 else anchors["sections"]["words_per_sentence"].sum()
+#             )
+#         )
+#         self.relative_projection: RelativeAttention = instantiate(
+#             relative_projection, n_anchors=n_anchors, n_classes=n_classes
+#         )
+#
+#     def add_stopwords(self, stopwords: Set[str]):
+#         self.text_encoder.add_stopwords(stopwords=stopwords)
+#
+#     def encoding_dim(self) -> int:
+#         return self.relative_projection.output_dim
+#
+#     def decode(self, **encoding):
+#         return self.relative_projection.decode(**encoding)
+#
+#     def encode(self, text: str) -> Optional[Sequence[torch.Tensor]]:
+#         return self.text_encoder.encode(text=text)
+#
+#     def save(self, dst_dir: Path):
+#         self.text_encoder.save(dst_dir=dst_dir)
+#
+#     def forward(self, batch, device: Device):
+#         if "encodings" not in batch:
+#             batch = to_device(self.text_encoder.collate_fn(batch=batch), device=device)
+#         x = batch["encodings"]
+#
+#         x, reduced_to_sentence = EncodingLevel.reduce(
+#             encodings=x, **batch["sections"], reduced_to_sentence=False, reduce_transformations=self.pre_reduce
+#         )
+#
+#         with torch.no_grad():
+#             anchor_encodings, sections = (
+#                 (
+#                     self.anchor_encodings,
+#                     dict(
+#                         words_per_text=self.anchor_words_per_text,
+#                         words_per_sentence=self.anchor_words_per_sentence,
+#                         sentences_per_text=self.anchor_sentences_per_text,
+#                     ),
+#                 )
+#                 if self.anchor_encodings is not None
+#                 else (
+#                     (x := to_device(self.text_encoder.collate_fn(batch=self.anchor_batch), device=device)),
+#                     x["sections"],
+#                 )
+#             )
+#
+#             anchors, _ = EncodingLevel.reduce(
+#                 encodings=anchor_encodings,
+#                 **sections,
+#                 reduced_to_sentence=False,
+#                 reduce_transformations=self.anchors_reduce,
+#             )
+#
+#         #
+#         attention_output = self.relative_projection.encode(x=x, anchors=anchors)
+#
+#         return {
+#             **attention_output,
+#             "sections": batch["sections"],
+#             Output.ANCHORS_LATENT: anchors,
+#             Output.BATCH_LATENT: x,
+#             "reduced_to_sentence": reduced_to_sentence,
+#         }
 
 
 if __name__ == "__main__":
-
     GensimEncoder._build_vector_models()
