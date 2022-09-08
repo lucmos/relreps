@@ -104,37 +104,6 @@ class TextEncoder(nn.Module):
         }
         return dict(encodings=encodings, classes=classes, targets=targets, sections=sections, **other_params)
 
-    def collate_hf_fn(self, batch: Sequence[Mapping[str, Any]]):
-        """Custom collate function for dataloaders with access to split and metadata.
-
-        Args:
-            samples: A list of samples coming from the Dataset to be merged into a batch
-            device: The Device to transfer the batch to
-
-        Returns:
-            A batch generated from the given samples
-        """
-        encodings = self.encode(text=[sample["data"] for sample in batch])
-        batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}
-
-        # encodings ~ (sample_index, sentence_index, word_index)
-
-        classes = batch["class"]
-
-        classes = None if any(x is None for x in classes) else classes
-        targets = None if any(x is None for x in batch["target"]) else torch.as_tensor(batch["target"])
-
-        other_params = {
-            k: v
-            for k, v in batch.items()
-            if k
-            not in {
-                "class",
-                "target",
-            }
-        }
-        return dict(encodings=encodings, classes=classes, targets=targets, **other_params)
-
 
 class FastTextEncoder(TextEncoder):
     def add_stopwords(self, stopwords: Set[str]):
@@ -315,6 +284,37 @@ class GensimEncoder(TextEncoder):
 
 
 class TransformerEncoder(TextEncoder):
+    def collate_fn(self, batch: Sequence[Mapping[str, Any]]):
+        """Custom collate function for dataloaders with access to split and metadata.
+
+        Args:
+            samples: A list of samples coming from the Dataset to be merged into a batch
+            device: The Device to transfer the batch to
+
+        Returns:
+            A batch generated from the given samples
+        """
+        encodings = self.encode(text=[sample["data"] for sample in batch])
+        batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}
+
+        # encodings ~ (sample_index, sentence_index, word_index)
+
+        classes = batch["class"]
+
+        classes = None if any(x is None for x in classes) else classes
+        targets = None if any(x is None for x in batch["target"]) else torch.as_tensor(batch["target"])
+
+        other_params = {
+            k: v
+            for k, v in batch.items()
+            if k
+            not in {
+                "class",
+                "target",
+            }
+        }
+        return dict(encodings=encodings, classes=classes, targets=targets, **other_params)
+
     def add_stopwords(self, stopwords: Set[str]):
         pass
 

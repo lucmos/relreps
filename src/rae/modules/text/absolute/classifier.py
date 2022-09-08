@@ -20,7 +20,7 @@ pylogger = logging.getLogger(__name__)
 
 class HFTextClassifier(nn.Module):
     def collate_fn(self, batch: Sequence[Any]):
-        return self.text_encoder.collate_hf_fn(batch=batch)
+        return self.text_encoder.collate_fn(batch=batch)
 
     def __init__(
         self,

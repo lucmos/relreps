@@ -4,7 +4,7 @@ loss:
   _target_: torch.nn.modules.loss.CrossEntropyLoss
 
 model:
-  _target_: rae.modules.text.classifier.TextClassifier
+  _target_: rae.modules.text.relative.classifier.TextClassifier
 
   text_encoder:
     _target_: rae.modules.text.encoder.GensimEncoder

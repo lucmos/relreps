@@ -4,7 +4,7 @@ loss:
   _target_: torch.nn.modules.loss.CrossEntropyLoss
 
 model:
-  _target_: rae.modules.text.classifier.HFTextClassifier
+  _target_: rae.modules.text.relative.classifier.HFTextClassifier
 
   transformer_name: bert-base-cased
 

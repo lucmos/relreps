@@ -173,7 +173,7 @@ class LightningTextClassifier(AbstractLightningModule):
 
     def state_dict(self, *args, **kwargs):
         result = super(LightningTextClassifier, self).state_dict(*args, **kwargs)
-        result = {k: v for k, v in result.items() if not k.startswith("model.transformer")}
+        result = {k: v for k, v in result.items() if "transformer" not in k}
         return result
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
