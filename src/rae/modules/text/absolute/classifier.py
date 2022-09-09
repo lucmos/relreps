@@ -68,6 +68,7 @@ class HFTextClassifier(nn.Module):
         transformer_encoding_dim = transformer_config["hidden_size" if "hidden_size" in transformer_config else "dim"]
 
         self.sequential = nn.Sequential(
+            nn.LayerNorm(normalized_shape=transformer_encoding_dim),
             nn.Linear(in_features=transformer_encoding_dim, out_features=transformer_encoding_dim),
             DeepProjection(
                 in_features=transformer_encoding_dim,
