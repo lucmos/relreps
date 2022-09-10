@@ -4,6 +4,7 @@ import logging
 from typing import Any, Collection, Sequence, Set
 
 import torch
+import torch.nn.functional as F
 from hydra.utils import instantiate
 from torch import nn
 from torch.types import Device
@@ -103,6 +104,7 @@ class HFTextClassifier(nn.Module):
 
         with torch.no_grad():
             x = self.call_transformer(encodings=batch["encodings"], sample_ids=batch["index"])
+        x = F.normalize(x, p=2, dim=-1)
 
         return {
             Output.BATCH_LATENT: x,
@@ -222,3 +224,20 @@ class WETextClassifier(nn.Module):
             Output.BATCH_LATENT: encoding["x"],
             Output.INT_PREDICTIONS: torch.argmax(out, dim=-1),
         }
+
+
+if __name__ == "__main__":
+    for transformer_name in (
+        "bert-base-cased",
+        "bert-base-uncased",
+        "google/electra-base-discriminator",
+        "roberta-base",
+        "albert-base-v2",
+        "distilbert-base-uncased",
+        "distilbert-base-cased",
+        "xlm-roberta-base",
+    ):
+        transformer_config = AutoModel.from_pretrained(transformer_name).config.to_dict()
+        # TODO: DistilBert doesn't have the "hidden_size" parameter :@
+        transformer_encoding_dim = transformer_config["hidden_size" if "hidden_size" in transformer_config else "dim"]
+        print(transformer_name, transformer_encoding_dim)
