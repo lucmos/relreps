@@ -30,7 +30,7 @@ class HFTextClassifier(nn.Module):
         transformer_name: str,
         batch_pre_reduce: Collection[EncodingLevel] = None,
         batch_post_reduce: Collection[EncodingLevel] = None,
-        finetuning: bool = False,
+        finetune: bool = False,
         **kwargs,
     ) -> None:
         """Simple model that uses convolutions.
@@ -52,6 +52,12 @@ class HFTextClassifier(nn.Module):
         self.transformer: PreTrainedModel = AutoModel.from_pretrained(
             transformer_name, output_hidden_states=True, return_dict=True
         ).eval()
+
+        if not finetune:
+            self.transformer.requires_grad_(False)
+            self.transformer.eval()
+
+        self.finetune: bool = finetune
 
         self.pre_reduce: Set[EncodingLevel] = (
             set(batch_pre_reduce) if batch_pre_reduce is not None and len(batch_pre_reduce) > 0 else {}
@@ -82,7 +88,9 @@ class HFTextClassifier(nn.Module):
         )
 
     def set_finetune_mode(self):
-        self.transformer.eval()
+        if not self.finetune:
+            self.transformer.requires_grad_(False)
+            self.transformer.eval()
 
     def call_transformer(self, encodings, sample_ids):
         sample_encodings = self.transformer(**encodings)["hidden_states"][-1]
@@ -104,6 +112,7 @@ class HFTextClassifier(nn.Module):
 
         with torch.no_grad():
             x = self.call_transformer(encodings=batch["encodings"], sample_ids=batch["index"])
+
         x = F.normalize(x, p=2, dim=-1)
 
         return {
