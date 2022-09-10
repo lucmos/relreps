@@ -292,6 +292,7 @@ class HFTextClassifier(nn.Module):
             # "sections": batch["sections"],
             Output.ANCHORS_LATENT: anchors,
             Output.BATCH_LATENT: x,
+            Output.DEFAULT_LATENT: attention_output[AttentionOutput.SIMILARITIES],
             # "reduced_to_sentence": reduced_to_sentence,
         }
 
@@ -308,7 +309,6 @@ class HFTextClassifier(nn.Module):
 
         return {
             Output.LOGITS: out,
-            Output.DEFAULT_LATENT: encoding[Output.BATCH_LATENT],
             Output.BATCH_LATENT: encoding[Output.BATCH_LATENT],
             Output.ANCHORS_LATENT: encoding[Output.ANCHORS_LATENT],
             Output.INV_LATENTS: x[AttentionOutput.SIMILARITIES],

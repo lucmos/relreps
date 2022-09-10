@@ -110,8 +110,8 @@ class MetaData:
         anchor_targets: Optional[torch.Tensor],
         anchor_classes: Optional[Sequence[str]],
         anchor_latents: Optional[torch.Tensor],
-        fixed_sample_idxs: Sequence[Mapping[str, Any]],
-        fixed_samples: torch.Tensor,
+        fixed_sample_idxs: Optional[List[int]],
+        fixed_samples: Optional[Sequence[Mapping[str, Any]]],
         fixed_sample_targets: torch.Tensor,
         fixed_sample_classes: Sequence[str],
         class_to_idx: Dict[str, int],
@@ -241,7 +241,7 @@ class MyDataModule(pl.LightningDataModule):
 
         self.latent_dim = latent_dim
 
-        self.val_fixed_sample_idxs: List[int] = val_fixed_sample_idxs
+        self.val_fixed_sample_idxs: List[int] = list(val_fixed_sample_idxs)
         self.anchors: Dict[str, Any] = None
 
     def get_anchors(self) -> Dict[str, Any]:

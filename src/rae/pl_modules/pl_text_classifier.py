@@ -1,11 +1,13 @@
 import logging
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Set
 
 import hydra
 import omegaconf
 import pandas as pd
+import plotly.express as px
 import pytorch_lightning as pl
 import torch
+from sklearn.decomposition import PCA
 from torch import nn
 from torchmetrics import Accuracy, F1Score, Precision, Recall
 
@@ -13,8 +15,9 @@ from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
 
 from rae.data.text.datamodule import MetaData
-from rae.modules.enumerations import Output, Stage
+from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
+from rae.utils.utils import chunk_iterable, to_device
 
 pylogger = logging.getLogger(__name__)
 
@@ -80,20 +83,12 @@ class LightningTextClassifier(AbstractLightningModule):
         # self.supported_viz = self.supported_viz()
         # pylogger.info(f"Enabled visualizations: {str(sorted(x.value for x in self.supported_viz))}")
 
-    # def supported_viz(self) -> Set[SupportedViz]:
-    #     supported_viz = set()
-    #
-    #     if self.fixed_images is not None:
-    #         supported_viz.add(SupportedViz.VALIDATION_IMAGES_SOURCE)
-    #
-    #     if self.anchors_images is not None:
-    #         supported_viz.add(SupportedViz.ANCHORS_SOURCE)
-    #
-    #     supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT)
-    #     supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT)
-    #     supported_viz.add(SupportedViz.ANCHORS_SELF_INNER_PRODUCT_NORMALIZED)
-    #     supported_viz.add(SupportedViz.ANCHORS_VALIDATION_IMAGES_INNER_PRODUCT_NORMALIZED)
-    #     return supported_viz
+    def supported_viz(self) -> Set[SupportedViz]:
+        supported_viz = set()
+
+        supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
+
+        return supported_viz
 
     def encode(self, *args, **kwargs):
         return self.model.encode(*args, **kwargs)
@@ -183,65 +178,65 @@ class LightningTextClassifier(AbstractLightningModule):
         if self.trainer.sanity_checking:
             return
 
-        # validation_aggregation = {}
-        # for output in outputs:
-        #     aggregate(
-        #         validation_aggregation,
-        #         sample_index=output["batch"]["index"].cpu().tolist(),
-        #         class_name=output["batch"]["classes"],
-        #         target=output["batch"]["targets"].cpu(),
-        #         latents=output[Output.DEFAULT_LATENT].cpu(),
-        #         epoch=[self.current_epoch] * len(output["batch"]["index"]),
-        #         is_anchor=[False] * len(output["batch"]["index"]),
-        #         anchor_index=[None] * len(output["batch"]["index"]),
-        #     )
-        #
-        # if self.anchor_samples is not None:
-        #     anchors_num = len(self.metadata.anchor_idxs)
-        #     anchors_out = self(
-        #         dict(
-        #             encodings=self.anchor_samples,
-        #             sections=dict(
-        #                 words_per_sentence=self.model.anchors_words_per_sentence,
-        #                 words_per_text=self.model.anchors_words_per_text,
-        #                 sentences_per_text=self.model.anchors_sentences_per_text,
-        #             ),
-        #         )
-        #     )
-        #     if Output.ANCHORS_LATENT in anchors_out:
-        #         anchors_latents = anchors_out[Output.ANCHORS_LATENT]
-        #     else:
-        #         anchors_latents = anchors_out[Output.DEFAULT_LATENT]
-        # else:
-        #     raise NotImplementedError()
-        #
-        # non_elements = ["none"] * anchors_num
-        # aggregate(
-        #     validation_aggregation,
-        #     sample_index=self.metadata.anchor_idxs
-        #     if self.metadata.anchor_idxs is not None
-        #     else list(range(anchors_num)),
-        #     class_name=self.metadata.anchor_classes if self.metadata.anchor_classes is not None else non_elements,
-        #     target=self.metadata.anchor_targets.cpu() if self.metadata.anchor_targets is not None else non_elements,
-        #     latents=anchors_latents.cpu(),
-        #     epoch=[self.current_epoch] * anchors_num,
-        #     is_anchor=[True] * anchors_num,
-        #     anchor_index=list(range(anchors_num)),
-        # )
-        #
-        # latents = validation_aggregation["latents"]
-        # self.fit_pca(latents)
-        # add_2D_latents(validation_aggregation, latents=latents, pca=self.validation_pca)
-        # del validation_aggregation["latents"]
+        data = {
+            "is_anchor": [],
+            "image_index": [],
+            "anchor_index": [],
+            "class_name": [],
+            "latent_dim_0": [],
+            "latent_dim_1": [],
+        }
+        latents: List = []
 
-        # validation_epoch_end_viz(
-        #     lightning_module=self,
-        #     outputs=outputs,
-        #     validation_stats_df=pd.DataFrame(validation_aggregation),
-        #     anchors_reconstructed=None,
-        #     anchors_latents=anchors_latents,
-        #     fixed_samples_out=self(self.fixed_samples),
-        # )
+        data["class_name"] = self.metadata.anchor_classes + self.metadata.fixed_sample_classes
+        data["image_index"] = self.metadata.anchor_idxs + self.metadata.fixed_sample_idxs
+        data["anchor_index"] = self.metadata.anchor_idxs + len(self.metadata.fixed_sample_idxs) * [None]
+        data["is_anchor"] = len(self.metadata.anchor_idxs) * [True] + len(self.metadata.fixed_sample_idxs) * [False]
+
+        for batch in chunk_iterable(self.metadata.anchor_samples + self.metadata.fixed_samples, 128):
+            batch = to_device(self.model.text_encoder.collate_fn(batch=batch), device=self.device)
+            batch_encoding = self.encode(batch=batch, device=self.device)
+            latents.append(batch_encoding[Output.DEFAULT_LATENT])
+
+        latents: torch.Tensor = torch.cat(latents, dim=0)
+        pca_latents = PCA(n_components=2).fit_transform(X=latents.detach().cpu().numpy())
+        data["latent_dim_0"] = pca_latents[:, 0]
+        data["latent_dim_1"] = pca_latents[:, 1]
+
+        latent_val_fig = plot_latent_space(
+            metadata=self.metadata,
+            validation_stats_df=pd.DataFrame(data),
+            x_data="latent_dim_0",
+            y_data="latent_dim_1",
+        )
+        self.logger.experiment.log({"sPaCe1!1": latent_val_fig}, step=self.global_step)
+
+
+def plot_latent_space(metadata, validation_stats_df, x_data: str, y_data: str):
+    color_discrete_map = {
+        class_name: color
+        for class_name, color in zip(metadata.class_to_idx, px.colors.qualitative.Plotly[: len(metadata.class_to_idx)])
+    }
+
+    latent_val_fig = px.scatter(
+        validation_stats_df,
+        x=x_data,
+        y=y_data,
+        category_orders={"class_name": metadata.class_to_idx.keys()},
+        #             # size='std_0',  # TODO: fixme, plotly crashes with any column name to set the anchor size
+        color="class_name",
+        hover_name="image_index",
+        hover_data=["image_index", "anchor_index"],
+        facet_col="is_anchor",
+        color_discrete_map=color_discrete_map,
+        # symbol="is_anchor",
+        # symbol_map={False: "circle", True: "star"},
+        size_max=40,
+        range_x=[-5, 5],
+        color_continuous_scale=None,
+        range_y=[-5, 5],
+    )
+    return latent_val_fig
 
 
 @hydra.main(config_path=str(PROJECT_ROOT / "conf"), config_name="default")

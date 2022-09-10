@@ -4,7 +4,6 @@ import logging
 from typing import Any, Collection, Sequence, Set
 
 import torch
-import torch.nn.functional as F
 from hydra.utils import instantiate
 from torch import nn
 from torch.types import Device
@@ -113,10 +112,9 @@ class HFTextClassifier(nn.Module):
         with torch.no_grad():
             x = self.call_transformer(encodings=batch["encodings"], sample_ids=batch["index"])
 
-        x = F.normalize(x, p=2, dim=-1)
-
         return {
             Output.BATCH_LATENT: x,
+            Output.DEFAULT_LATENT: x,
         }
 
     def decode(self, **encoding):
@@ -131,7 +129,6 @@ class HFTextClassifier(nn.Module):
 
         return {
             Output.LOGITS: out,
-            Output.DEFAULT_LATENT: encoding[Output.BATCH_LATENT],
             Output.BATCH_LATENT: encoding[Output.BATCH_LATENT],
             Output.INT_PREDICTIONS: torch.argmax(out, dim=-1),
         }
