@@ -1,5 +1,5 @@
 /checkpoints
 /predictions.tsv
-/nlp_stitching.csv
 /nlp_stitching-amazon_reviews_multi_en.csv
 /nlp_stitching-dbpedia_14.csv
+/nlp_stitching-trec.csv
