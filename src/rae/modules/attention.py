@@ -7,6 +7,7 @@ from typing import Dict, Iterable, Optional, Sequence, Set, Union
 import hydra.utils
 import torch
 import torch.nn.functional as F
+from sklearn.cluster import KMeans
 from torch import nn
 from torch.nn import ModuleList
 
@@ -59,11 +60,13 @@ class SimilaritiesQuantizationMode(StrEnum):
     NONE = auto()
     DIFFERENTIABLE_ROUND = auto()
     SMOOTH_STEPS = auto()
+    KMEANS = auto()
 
 
 class AbsoluteQuantizationMode(StrEnum):
     NONE = auto()
     DIFFERENTIABLE_ROUND = auto()
+    KMEANS = auto()
     # SMOOTH_STEPS = auto()
 
 
@@ -202,8 +205,10 @@ class RelativeAttention(AbstractRelativeAttention):
         self_attention_hidden_dim: Optional[int] = None,
         values_self_attention_nhead: Optional[int] = None,
         absolute_quantization_mode: Optional[AbsoluteQuantizationMode] = None,
+        absolute_num_clusters: Optional[int] = None,
         absolute_bin_size: Optional[float] = None,
         similarities_quantization_mode: Optional[SimilaritiesQuantizationMode] = None,
+        similarities_num_clusters: Optional[int] = None,
         similarities_bin_size: Optional[float] = None,
         similarities_aggregation_mode: Optional[SimilaritiesAggregationMode] = None,
         similarities_aggregation_n_groups: Optional[int] = None,
@@ -236,6 +241,8 @@ class RelativeAttention(AbstractRelativeAttention):
         super().__init__()
         pylogger.info(f"Instantiating <{self.__class__.__qualname__}>")
 
+        self.absolute_num_clusters = absolute_num_clusters
+        self.similarities_num_clusters = similarities_num_clusters
         self.in_features = in_features
         self.hidden_features = hidden_features
         self.n_anchors = n_anchors
@@ -452,6 +459,14 @@ class RelativeAttention(AbstractRelativeAttention):
 
             x = torch.round(x / self.absolute_bin_size) * self.absolute_bin_size
             x = x + (x - x).detach()
+        elif self.absolute_quantization_mode == AbsoluteQuantizationMode.KMEANS:
+
+            kmeans = KMeans(n_clusters=self.absolute_num_clusters, random_state=0).fit(
+                torch.cat([x, anchors]).detach().cpu().numpy()
+            )
+
+            x = torch.as_tensor(kmeans.cluster_centers_[kmeans.predict(x.detach().cpu().numpy())])
+            anchors = torch.as_tensor(kmeans.cluster_centers_[kmeans.predict(anchors.detach().cpu().numpy())])
         elif self.absolute_quantization_mode == AbsoluteQuantizationMode.SMOOTH_STEPS:
             raise NotImplementedError()
 
@@ -491,6 +506,13 @@ class RelativeAttention(AbstractRelativeAttention):
             )
         elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.CUSTOM_ROUND:
             quantized_similarities = cround(quantized_similarities, self.similarities_bin_size)
+        elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.KMEANS:
+            kmeans = KMeans(n_clusters=self.similarities_num_clusters, random_state=0).fit(
+                quantized_similarities.detach().cpu().numpy()
+            )
+            quantized_similarities = torch.as_tensor(
+                kmeans.cluster_centers_[kmeans.predict(quantized_similarities.detach().cpu().numpy())]
+            )
         else:
             raise NotImplementedError()
 
