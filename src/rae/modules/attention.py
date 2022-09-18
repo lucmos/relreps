@@ -7,7 +7,7 @@ from typing import Dict, Iterable, Optional, Sequence, Set, Union
 import hydra.utils
 import torch
 import torch.nn.functional as F
-from sklearn.cluster import KMeans
+from sklearn.cluster import AgglomerativeClustering
 from torch import nn
 from torch.nn import ModuleList
 
@@ -60,13 +60,13 @@ class SimilaritiesQuantizationMode(StrEnum):
     NONE = auto()
     DIFFERENTIABLE_ROUND = auto()
     SMOOTH_STEPS = auto()
-    KMEANS = auto()
+    CLUSTER = auto()
 
 
 class AbsoluteQuantizationMode(StrEnum):
     NONE = auto()
     DIFFERENTIABLE_ROUND = auto()
-    KMEANS = auto()
+    CLUSTER = auto()
     # SMOOTH_STEPS = auto()
 
 
@@ -459,14 +459,26 @@ class RelativeAttention(AbstractRelativeAttention):
 
             x = torch.round(x / self.absolute_bin_size) * self.absolute_bin_size
             x = x + (x - x).detach()
-        elif self.absolute_quantization_mode == AbsoluteQuantizationMode.KMEANS:
+        elif self.absolute_quantization_mode == AbsoluteQuantizationMode.CLUSTER:
 
-            kmeans = KMeans(n_clusters=self.absolute_num_clusters, random_state=0).fit(
-                torch.cat([x, anchors]).detach().cpu().numpy()
-            )
+            # kmeans = KMeans(n_clusters=self.absolute_num_clusters, random_state=0).fit(
+            #     torch.cat([x, anchors]).detach().cpu().numpy()
+            # )
+            #
+            # x = torch.as_tensor(kmeans.cluster_centers_[kmeans.predict(x.detach().cpu().numpy())])
+            # anchors = torch.as_tensor(kmeans.cluster_centers_[kmeans.predict(anchors.detach().cpu().numpy())])
+            union = torch.cat([x, anchors])
+            labels = AgglomerativeClustering(
+                n_clusters=None, distance_threshold=self.absolute_num_clusters
+            ).fit_predict(union.detach().cpu().numpy())
+            cluster_centers = torch.zeros((labels.max() + 1, x.shape[1]))
 
-            x = torch.as_tensor(kmeans.cluster_centers_[kmeans.predict(x.detach().cpu().numpy())])
-            anchors = torch.as_tensor(kmeans.cluster_centers_[kmeans.predict(anchors.detach().cpu().numpy())])
+            for i in range(labels.max() + 1):
+                cluster_centers[i] = union[labels == i].mean(0)
+
+            x = torch.as_tensor(cluster_centers[labels[: x.shape[0]]])
+            anchors = torch.as_tensor(cluster_centers[labels[x.shape[0] :]])
+
         elif self.absolute_quantization_mode == AbsoluteQuantizationMode.SMOOTH_STEPS:
             raise NotImplementedError()
 
@@ -506,13 +518,23 @@ class RelativeAttention(AbstractRelativeAttention):
             )
         elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.CUSTOM_ROUND:
             quantized_similarities = cround(quantized_similarities, self.similarities_bin_size)
-        elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.KMEANS:
-            kmeans = KMeans(n_clusters=self.similarities_num_clusters, random_state=0).fit(
-                quantized_similarities.detach().cpu().numpy()
-            )
-            quantized_similarities = torch.as_tensor(
-                kmeans.cluster_centers_[kmeans.predict(quantized_similarities.detach().cpu().numpy())]
-            )
+        elif self.similarities_quantization_mode == SimilaritiesQuantizationMode.CLUSTER:
+            # kmeans = KMeans(n_clusters=self.similarities_num_clusters, random_state=0).fit(
+            #     quantized_similarities.detach().cpu().numpy()
+            # )
+            # quantized_similarities = torch.as_tensor(
+            #     kmeans.cluster_centers_[kmeans.predict(quantized_similarities.detach().cpu().numpy())]
+            # )
+
+            labels = AgglomerativeClustering(
+                n_clusters=None, distance_threshold=self.similarities_num_clusters
+            ).fit_predict(quantized_similarities.detach().cpu().numpy())
+            cluster_centers = torch.zeros((labels.max() + 1, x.shape[1]))
+
+            for i in range(labels.max() + 1):
+                cluster_centers[i] = quantized_similarities[labels == i].mean(0)
+
+            quantized_similarities = torch.as_tensor(cluster_centers[labels])
         else:
             raise NotImplementedError()
 
