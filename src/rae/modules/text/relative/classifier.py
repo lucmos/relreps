@@ -236,8 +236,8 @@ class HFTextClassifier(nn.Module):
                 in_features=self.relative_projection.output_dim,
                 out_features=n_classes,
                 dropout=0.1,
-                num_layers=1,
-                activation=nn.Tanh(),
+                num_layers=3,
+                activation=nn.SiLU(),
             ),
             nn.ReLU(),
         )

@@ -56,8 +56,7 @@ class DeepProjection(nn.Module):
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
         for projection_layer, batch_norm in zip(self.projection_layers, self.batch_norms):
-            # TODO: reactivate batch norm with correct transpose
-            # data = batch_norm(data)
+            data = batch_norm(data)
             if self.activation is not None:
                 data = self.activation(data)
             data = self.dropout(data)
