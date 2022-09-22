@@ -110,6 +110,8 @@ class LightningTextClassifier(AbstractLightningModule):
         out = self(batch)
 
         loss = self.loss(out[Output.LOGITS], batch["targets"])
+        self.log("logits/any_NaN", torch.isnan(out[Output.LOGITS]).sum(), on_step=True, on_epoch=True)
+        self.log("int_predictions/any_NaN", torch.isnan(out[Output.INT_PREDICTIONS]).sum(), on_step=True, on_epoch=True)
 
         self.log_dict(
             {f"loss/{stage}": loss.cpu().detach()},
