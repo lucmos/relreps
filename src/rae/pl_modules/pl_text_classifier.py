@@ -7,7 +7,6 @@ import pandas as pd
 import plotly.express as px
 import pytorch_lightning as pl
 import torch
-from sklearn.decomposition import PCA
 from torch import nn
 from torchmetrics import Accuracy, F1Score, Precision, Recall
 
@@ -17,7 +16,6 @@ from nn_core.model_logging import NNLogger
 from rae.data.text.datamodule import MetaData
 from rae.modules.enumerations import Output, Stage, SupportedViz
 from rae.pl_modules.pl_abstract_module import AbstractLightningModule
-from rae.utils.utils import chunk_iterable, to_device
 
 pylogger = logging.getLogger(__name__)
 
@@ -86,7 +84,7 @@ class LightningTextClassifier(AbstractLightningModule):
     def supported_viz(self) -> Set[SupportedViz]:
         supported_viz = set()
 
-        supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
+        # supported_viz.add(SupportedViz.LATENT_SPACE_PCA)
 
         return supported_viz
 
@@ -178,38 +176,38 @@ class LightningTextClassifier(AbstractLightningModule):
         if self.trainer.sanity_checking:
             return
 
-        data = {
-            "is_anchor": [],
-            "image_index": [],
-            "anchor_index": [],
-            "class_name": [],
-            "latent_dim_0": [],
-            "latent_dim_1": [],
-        }
-        latents: List = []
-
-        data["class_name"] = self.metadata.anchor_classes + self.metadata.fixed_sample_classes
-        data["image_index"] = self.metadata.anchor_idxs + self.metadata.fixed_sample_idxs
-        data["anchor_index"] = self.metadata.anchor_idxs + len(self.metadata.fixed_sample_idxs) * [None]
-        data["is_anchor"] = len(self.metadata.anchor_idxs) * [True] + len(self.metadata.fixed_sample_idxs) * [False]
-
-        for batch in chunk_iterable(self.metadata.anchor_samples + self.metadata.fixed_samples, 128):
-            batch = to_device(self.model.text_encoder.collate_fn(batch=batch), device=self.device)
-            batch_encoding = self.encode(batch=batch, device=self.device)
-            latents.append(batch_encoding[Output.DEFAULT_LATENT])
-
-        latents: torch.Tensor = torch.cat(latents, dim=0)
-        pca_latents = PCA(n_components=2).fit_transform(X=latents.detach().cpu().numpy())
-        data["latent_dim_0"] = pca_latents[:, 0]
-        data["latent_dim_1"] = pca_latents[:, 1]
-
-        latent_val_fig = plot_latent_space(
-            metadata=self.metadata,
-            validation_stats_df=pd.DataFrame(data),
-            x_data="latent_dim_0",
-            y_data="latent_dim_1",
-        )
-        self.logger.experiment.log({"sPaCe1!1": latent_val_fig}, step=self.global_step)
+        # data = {
+        #     "is_anchor": [],
+        #     "image_index": [],
+        #     "anchor_index": [],
+        #     "class_name": [],
+        #     "latent_dim_0": [],
+        #     "latent_dim_1": [],
+        # }
+        # latents: List = []
+        #
+        # data["class_name"] = self.metadata.anchor_classes + self.metadata.fixed_sample_classes
+        # data["image_index"] = self.metadata.anchor_idxs + self.metadata.fixed_sample_idxs
+        # data["anchor_index"] = self.metadata.anchor_idxs + len(self.metadata.fixed_sample_idxs) * [None]
+        # data["is_anchor"] = len(self.metadata.anchor_idxs) * [True] + len(self.metadata.fixed_sample_idxs) * [False]
+        #
+        # for batch in chunk_iterable(self.metadata.anchor_samples + self.metadata.fixed_samples, 128):
+        #     batch = to_device(self.model.text_encoder.collate_fn(batch=batch), device=self.device)
+        #     batch_encoding = self.encode(batch=batch, device=self.device)
+        #     latents.append(batch_encoding[Output.DEFAULT_LATENT])
+        #
+        # latents: torch.Tensor = torch.cat(latents, dim=0)
+        # pca_latents = PCA(n_components=2).fit_transform(X=latents.detach().cpu().numpy())
+        # data["latent_dim_0"] = pca_latents[:, 0]
+        # data["latent_dim_1"] = pca_latents[:, 1]
+        #
+        # latent_val_fig = plot_latent_space(
+        #     metadata=self.metadata,
+        #     validation_stats_df=pd.DataFrame(data),
+        #     x_data="latent_dim_0",
+        #     y_data="latent_dim_1",
+        # )
+        # self.logger.experiment.log({"sPaCe1!1": latent_val_fig}, step=self.global_step)
 
 
 def plot_latent_space(metadata, validation_stats_df, x_data: str, y_data: str):

@@ -234,7 +234,7 @@ class MyDataModule(pl.LightningDataModule):
         self.anchor_idxs: List[int] = anchors_idxs
         if anchors_mode not in set(AnchorsMode):
             raise ValueError(f"Invalid anchors selection mode: '{anchors_mode}'")
-        if anchors_mode != AnchorsMode.FIXED and self.anchor_idxs is not None:
+        if anchors_mode not in {AnchorsMode.FIXED, AnchorsMode.DATASET} and self.anchor_idxs is not None:
             raise ValueError(f"The anchors indexes '{anchors_idxs}' are ignored if the anchors mode is not 'fixed'!")
         if anchors_mode == AnchorsMode.FIXED and self.anchors_num is not None:
             raise ValueError(f"The anchor number '{anchors_num}' is ignored if the anchors mode is 'fixed'!")
@@ -249,8 +249,8 @@ class MyDataModule(pl.LightningDataModule):
 
         if self.anchors_mode == AnchorsMode.DATASET:
             return {
-                "anchor_idxs": list(range(len(dataset_to_consider))),
-                "anchor_samples": list(dataset_to_consider),
+                "anchor_idxs": self.anchor_idxs,
+                "anchor_samples": [dataset_to_consider[x] for x in self.anchor_idxs],
                 "anchor_targets": dataset_to_consider.targets,
                 "anchor_classes": dataset_to_consider.classes,
                 "anchor_latents": None,

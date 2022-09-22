@@ -29,14 +29,14 @@ data:
   gpus: ${train.trainer.gpus}
 
   num_workers:
-    train: 16
-    val: 16
-    test: 16
+    train: 8
+    val: 8
+    test: 8
 
   batch_size:
-    train: 32
-    val: 32
-    test: 16
+    train: 64
+    val: 64
+    test: 32
 
 module:
   plot_n_val_samples: 1000

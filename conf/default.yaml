@@ -6,7 +6,8 @@ core:
   tags:
     - develop
     - semantic_horizon
-    - word_anchors
+    - stitching
+    - multilingual
   name: null
 
 defaults:

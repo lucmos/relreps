@@ -228,6 +228,7 @@ class HFTextClassifier(nn.Module):
         assert all(x < y for x, y in itertools.product(self.pre_reduce, self.post_reduce))
 
         self.sequential = nn.Sequential(
+            nn.LayerNorm(self.relative_projection.output_dim),
             nn.Linear(
                 in_features=self.relative_projection.output_dim, out_features=self.relative_projection.output_dim
             ),
