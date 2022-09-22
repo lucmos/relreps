@@ -77,11 +77,11 @@ def add_2D_latents(
     return aggregation
 
 
-def to_device(mapping: MutableMapping, device: Device):
+def to_device(mapping: MutableMapping, device: Device, non_blocking: bool = False):
     mapped = {
-        key: to_device(value, device=device)
+        key: to_device(value, device=device, non_blocking=non_blocking)
         if isinstance(value, Mapping)
-        else (value.to(device) if hasattr(value, "to") else value)
+        else (value.to(device, non_blocking=non_blocking) if hasattr(value, "to") else value)
         for key, value in mapping.items()
     }
     return mapped
