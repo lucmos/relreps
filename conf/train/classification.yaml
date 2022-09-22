@@ -21,7 +21,7 @@ restore:
   mode: null # null, finetune, hotstart, continue
 
 monitor:
-  metric: 'accuracy/val_stage/weighted'
+  metric: 'val_stage/F1Score/weighted'
   mode: 'max'
 
 callbacks:
