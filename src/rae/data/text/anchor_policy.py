@@ -38,6 +38,10 @@ class AnchorSamplingMethod(StrEnum):
     BEST_ALIGN = auto()
 
 
+class AnchorPolicy:
+    pass
+
+
 def get_best_aligned_indices(A, B, chunk_size=500, p=2):
     num_chunks = A.shape[0] // chunk_size
     A = F.normalize(A, p=p, dim=-1)
@@ -55,6 +59,10 @@ def get_best_aligned_indices(A, B, chunk_size=500, p=2):
 
 
 class EmbeddingAnchorDataset(Dataset):
+    @classmethod
+    def build_kmeans(cls, k: Sequence[int]) -> Sequence[str]:
+        pass
+
     @classmethod
     def build_anchors(cls, method: AnchorSamplingMethod, text_encoders: Sequence[GensimEncoder]) -> Sequence[str]:
         seed_everything(42)
@@ -141,6 +149,14 @@ class EmbeddingAnchorDataset(Dataset):
                 i += 1
 
             anchors = [target_encoder.model.index_to_key[index] for index in anchor_indices]
+        elif method in {
+            AnchorSamplingMethod.K_MEANS_10,
+            AnchorSamplingMethod.K_MEANS_100,
+            AnchorSamplingMethod.K_MEANS_500,
+            AnchorSamplingMethod.K_MEANS_1000,
+        }:
+            # k = int(method.name.split("_")[-1])
+            pass
         else:
             raise NotImplementedError
 
@@ -226,10 +242,10 @@ if __name__ == "__main__":
     ]
 
     for method in (
-        AnchorSamplingMethod.K_MEANS_MOST_FREQUENT,
-        AnchorSamplingMethod.K_MEANS_RANDOM,
-        AnchorSamplingMethod.K_MEANS_CENTROID,
-        AnchorSamplingMethod.RANDOM,
-        AnchorSamplingMethod.MOST_FREQUENT,
+        # AnchorSamplingMethod.K_MEANS_MOST_FREQUENT,
+        # AnchorSamplingMethod.K_MEANS_RANDOM,
+        # AnchorSamplingMethod.K_MEANS_CENTROID,
+        # AnchorSamplingMethod.RANDOM,
+        # AnchorSamplingMethod.MOST_FREQUENT,
     ):
         EmbeddingAnchorDataset.build_anchors(method=method, text_encoders=ENCODERS)
