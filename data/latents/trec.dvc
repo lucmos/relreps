@@ -1,0 +1,5 @@
+outs:
+- md5: f5c5a477d9174bb21cc6c2f044b67ea8.dir
+  size: 194649735
+  nfiles: 5
+  path: trec

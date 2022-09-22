@@ -1,10 +1,14 @@
 import logging
+import os
 
 from omegaconf import OmegaConf
 
+from nn_core.common import PROJECT_ROOT
 from nn_core.console_logging import NNRichHandler
 
 from .utils.resolvers import codebase_version
+
+os.environ["GENSIM_DATA_DIR"] = str(PROJECT_ROOT / "data" / "gensim")
 
 # Required workaround because PyTorch Lightning configures the logging on import,
 # thus the logging configuration defined in the __init__.py must be called before

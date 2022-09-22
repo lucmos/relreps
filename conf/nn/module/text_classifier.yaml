@@ -1,0 +1,43 @@
+_target_: rae.pl_modules.pl_text_classifier.LightningTextClassifier
+
+loss:
+  _target_: torch.nn.modules.loss.CrossEntropyLoss
+
+model:
+  _target_: rae.modules.text.relative.classifier.TextClassifier
+
+  text_encoder:
+    _target_: rae.modules.text.encoder.GensimEncoder
+    language: en
+    lemmatize: false
+    model_name: "local_fasttext"
+
+  #text_encoder:
+  #  _target_: rae.data.text.datamodule.TransformerEncoder
+  #  transformer_name: bert-base-cased
+  #  device: cpu
+
+  relative_projection:
+    _target_: rae.modules.attention.RelativeAttention
+    n_anchors: ${nn.data.anchors_num}
+    normalization_mode: l2
+    similarity_mode: inner
+    values_mode: similarities
+    hidden_features: null
+    transform_elements: null
+    in_features: null
+    values_self_attention_nhead: null
+    similarities_quantization_mode: null
+    similarities_bin_size: null
+    similarities_aggregation_mode: null
+    similarities_aggregation_n_groups: null
+    anchors_sampling_mode: null
+    n_anchors_sampling_per_class: null
+    output_normalization_mode: layernorm
+
+  batch_pre_reduce: [ sentence, text ]
+  anchors_reduce: [ sentence, text ]
+  batch_post_reduce: null
+
+defaults:
+  - _self_

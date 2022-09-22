@@ -1,0 +1,34 @@
+program: src/rae/run.py
+
+command:
+  - python3
+  - ${program}
+  - +is_sweep=true
+
+method: grid
+
+project: rae
+entity: gladia
+
+metric:
+  name: f1/val_stage/weighted
+  goal: maximize
+
+parameters:
+
+  train.seed_index:
+    distribution: int_uniform
+    min: 0
+    max: 5
+
+  nn.data.datasets.anchors.method:
+    distribution: categorical
+    values: [k_means_most_frequent, k_means_random, most_frequent, random]
+
+  nn.data.anchors_num:
+    distribution: categorical
+    values: [10, 100, 500, 1000]
+
+  train.trainer.max_epochs:
+    distribution: constant
+    value: 10

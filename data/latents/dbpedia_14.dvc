@@ -1,0 +1,5 @@
+outs:
+- md5: c0b04e923ce520d5bafe04d38cc1422c.dir
+  size: 19365404295
+  nfiles: 5
+  path: dbpedia_14

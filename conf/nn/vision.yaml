@@ -66,5 +66,5 @@ module:
 
 defaults:
   - _self_
-  - data: default # pick one of the yamls in nn/data/
-  - module: autoencoder # ae_variational # classifier #  ae_deterministic #
+  - data: text # pick one of the yamls in nn/data/
+  - module: text_classifier # ae_variational # classifier #  ae_deterministic #

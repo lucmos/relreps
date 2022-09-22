@@ -4,7 +4,7 @@ from typing import List, Optional
 import hydra
 import omegaconf
 import pytorch_lightning as pl
-from omegaconf import DictConfig, ListConfig
+from omegaconf import DictConfig, ListConfig, OmegaConf
 from pytorch_lightning import Callback
 
 from nn_core.callbacks import NNTemplateCore
@@ -50,6 +50,16 @@ def run(cfg: DictConfig) -> str:
     """
     pylogger.info(f"Codebase version: '{cfg.core.version}'")
 
+    template_core: NNTemplateCore = NNTemplateCore(
+        restore_cfg=cfg.train.get("restore", None),
+    )
+
+    logger: NNLogger = NNLogger(logging_cfg=cfg.train.logging, cfg=cfg, resume_id=template_core.resume_id)
+
+    if cfg.get("is_sweep", False):
+        for key, value in logger.experiment.config.items():
+            OmegaConf.update(cfg, key, value)
+
     seed_index_everything(cfg.train)
 
     fast_dev_run: bool = cfg.train.trainer.fast_dev_run
@@ -76,14 +86,9 @@ def run(cfg: DictConfig) -> str:
     model: pl.LightningModule = hydra.utils.instantiate(cfg.nn.module, _recursive_=False, metadata=metadata)
 
     # Instantiate the callbacks
-    template_core: NNTemplateCore = NNTemplateCore(
-        restore_cfg=cfg.train.get("restore", None),
-    )
     callbacks: List[Callback] = build_callbacks(cfg.train.callbacks, template_core)
 
     storage_dir: str = cfg.core.storage_dir
-
-    logger: NNLogger = NNLogger(logging_cfg=cfg.train.logging, cfg=cfg, resume_id=template_core.resume_id)
 
     pylogger.info("Instantiating the <Trainer>")
     trainer = pl.Trainer(

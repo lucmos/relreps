@@ -1,0 +1,5 @@
+outs:
+- md5: c54bbb61408c99762e52690d3c0fbe3e.dir
+  size: 6309404295
+  nfiles: 5
+  path: amazon_reviews_multi_en
