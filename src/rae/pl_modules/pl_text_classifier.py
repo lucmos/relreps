@@ -8,7 +8,7 @@ import plotly.express as px
 import pytorch_lightning as pl
 import torch
 from torch import nn
-from torchmetrics import Accuracy, F1Score, Precision, Recall
+from torchmetrics import Accuracy, F1Score, MetricCollection, Precision, Recall
 
 from nn_core.common import PROJECT_ROOT
 from nn_core.model_logging import NNLogger
@@ -21,26 +21,16 @@ pylogger = logging.getLogger(__name__)
 
 
 def _build_metrics(stage: Stage, num_classes: int) -> nn.ModuleDict:
-    metrics: nn.ModuleDict = nn.ModuleDict(
-        {
-            f"f1/{stage}/{average if average != 'none' else ''}": F1Score(num_classes=num_classes, average=average)
+    metrics = MetricCollection(
+        [
+            MetricCollection(
+                [metric(num_classes=num_classes, average=average) for metric in (F1Score, Precision, Recall, Accuracy)],
+                prefix=f"{stage}/",
+                postfix=f"/{average if average != 'none' else ''}",
+            )
             for average in ("macro", "micro", "weighted", "none")
-        }
+        ]
     )
-    for average in ("macro", "micro", "weighted", "none"):
-        metrics[f"precision/{stage}/{average if average != 'none' else ''}"] = Precision(
-            num_classes=num_classes, average=average
-        )
-
-    for average in ("macro", "micro", "weighted", "none"):
-        metrics[f"recall/{stage}/{average if average != 'none' else ''}"] = Recall(
-            num_classes=num_classes, average=average
-        )
-
-    for average in ("macro", "micro", "weighted", "none"):
-        metrics[f"accuracy/{stage}/{average if average != 'none' else ''}"] = Accuracy(
-            num_classes=num_classes, average=average
-        )
 
     return metrics
 
@@ -110,8 +100,13 @@ class LightningTextClassifier(AbstractLightningModule):
         out = self(batch)
 
         loss = self.loss(out[Output.LOGITS], batch["targets"])
-        self.log("logits/any_NaN", torch.isnan(out[Output.LOGITS]).sum(), on_step=True, on_epoch=True)
-        self.log("int_predictions/any_NaN", torch.isnan(out[Output.INT_PREDICTIONS]).sum(), on_step=True, on_epoch=True)
+        self.log(f"{stage}/logits/any_NaN", torch.isnan(out[Output.LOGITS]).sum(), on_step=True, on_epoch=True)
+        self.log(
+            f"{stage}/int_predictions/any_NaN",
+            torch.isnan(out[Output.INT_PREDICTIONS]).sum(),
+            on_step=True,
+            on_epoch=True,
+        )
 
         self.log_dict(
             {f"loss/{stage}": loss.cpu().detach()},
@@ -122,8 +117,8 @@ class LightningTextClassifier(AbstractLightningModule):
         )
 
         metrics = eval(f"self.{stage.lower()}_metrics")
-        for metric_name, metric in metrics.items():
-            metric_out = metric(out[Output.INT_PREDICTIONS], batch["targets"].flatten())
+        metrics_out = metrics(out[Output.INT_PREDICTIONS], batch["targets"].flatten())
+        for metric_name, metric_out in metrics_out.items():
             # If this metric had no previous aggregation...
             if metric_name.endswith("/"):
                 metric_out = {
