@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
 from omegaconf import DictConfig
-from sklearn.model_selection import ParameterGrid, ParameterSampler
+from sklearn.model_selection import ParameterGrid
 from torch import nn
 from torch_geometric.datasets import Planetoid
 from torch_geometric.nn import GATConv, GCN2Conv, GCNConv, GINConv
@@ -301,7 +301,7 @@ if __name__ == "__main__":
         header: str = "\t".join(keys)
         fw.write(f"{header}\n")
 
-        for experiment in (pbar := tqdm(ParameterSampler(sweep, n_iter=1000, random_state=42), desc="Experiment")):
+        for experiment in (pbar := tqdm(experiments, desc="Experiment")):
             # pprint(experiment)
             temp_log_level = seed_log.getEffectiveLevel()
             seed_log.setLevel(logging.ERROR)
