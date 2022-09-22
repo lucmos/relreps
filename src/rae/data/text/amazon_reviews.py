@@ -167,7 +167,7 @@ class AmazonReviews(Dataset):
         product_category: str = sample[_TARGET_KEY]
         full_text: str = f'{sample["review_title"]}. {sample["review_body"]}'
         return {
-            "index": index,
+            "index": f"{self.split}/{index}",
             "data": full_text,
             "target": self.class_to_idx[product_category],
             "class": product_category,

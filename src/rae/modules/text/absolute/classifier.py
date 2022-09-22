@@ -1,7 +1,7 @@
 import functools
 import itertools
 import logging
-from typing import Any, Collection, Sequence, Set
+from typing import Any, Collection, Dict, Sequence, Set
 
 import torch
 from hydra.utils import instantiate
@@ -86,18 +86,25 @@ class HFTextClassifier(nn.Module):
             nn.ReLU(),
         )
 
+        self._cache: Dict[str, torch.Tensor] = {}
+
     def set_finetune_mode(self):
         if not self.finetune:
             self.transformer.requires_grad_(False)
             self.transformer.eval()
 
-    def call_transformer(self, encodings, sample_ids):
-        sample_encodings = self.transformer(**encodings)["hidden_states"][-1]
-        # TODO: aggregation mode
-        sample_lengths = encodings["attention_mask"].sum(dim=1)
-        result = []
-        for sample_length, sample_encoding in zip(sample_lengths, sample_encodings):
-            result.append(sample_encoding[:sample_length].mean(dim=0))
+    def call_transformer(self, encodings, sample_ids: Sequence[str]):
+        if any(sample_id not in self._cache for sample_id in sample_ids):
+            sample_encodings = self.transformer(**encodings)["hidden_states"][-1]
+            # TODO: aggregation mode
+            sample_lengths = encodings["attention_mask"].sum(dim=1)
+            result = []
+            for sample_length, sample_encoding, sample_id in zip(sample_lengths, sample_encodings, sample_ids):
+                sample_encoding: torch.Tensor = sample_encoding[:sample_length].mean(dim=0)
+                result.append(sample_encoding)
+                self._cache[sample_id] = sample_encoding.cpu()
+        else:
+            result = [self._cache[sample_id] for sample_id in sample_ids]
 
         return torch.stack(result, dim=0)
 
@@ -110,7 +117,7 @@ class HFTextClassifier(nn.Module):
         # )
 
         with torch.no_grad():
-            x = self.call_transformer(encodings=batch["encodings"], sample_ids=batch["index"])
+            x = self.call_transformer(encodings=batch["encodings"], sample_ids=batch["index"]).to(device)
 
         return {
             Output.BATCH_LATENT: x,
