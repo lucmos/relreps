@@ -67,7 +67,11 @@ def build_parallel_corpus(language2threshold: Dict[Language, float], dst_dir: Pa
     # Compute the intersection between English sentences across all languages
     en_sentences = list(set(x) for x in lang2en_sentences.values())
     en_intersection = set.intersection(*en_sentences)
-
+    # en_intersection = {
+    #     sentence
+    #     for sentence in en_intersection
+    #     if len(sentence) > 15 and sentence[0].isalpha() and not sentence[0].isdigit()
+    # }
     # Transform the lang2sentences to easily iterate over couples
     lang2sentences: Dict[Language, Sequence[Tuple[str, str]]] = {
         lang: list(zip(*sentences)) for lang, sentences in lang2sentences.items()
@@ -158,7 +162,7 @@ def extract(language2thresholds: Dict[Language, List[float]]):
 
 
 if __name__ == "__main__":
-    do_extract: bool = True
+    do_extract: bool = False
     if do_extract:
         language2thresholds = {
             Language.FR: [1.05, 1.06],
@@ -172,5 +176,7 @@ if __name__ == "__main__":
         Language.ES: 1.06,
         Language.JA: 1.06,
     }
+    # Sort to get a unique file name as output
+    language2threshold = {k: v for k, v in sorted(language2threshold.items(), key=lambda x: x[0].value)}
     explore_intersections(language2threshold)
     build_parallel_corpus(language2threshold, WIKIMATRIX_DIR / "aligned")
