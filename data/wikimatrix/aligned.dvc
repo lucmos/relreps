@@ -1,0 +1,5 @@
+outs:
+- md5: 21ebc3f59356c965b801690047d6d119.dir
+  size: 3452838
+  nfiles: 5
+  path: aligned
