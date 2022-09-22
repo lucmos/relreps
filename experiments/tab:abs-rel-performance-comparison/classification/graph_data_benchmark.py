@@ -1,7 +1,10 @@
 import functools
 import logging
 import random
+from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import torch
 import torch.nn.functional as F
 import torch_geometric.transforms as T
@@ -219,6 +222,7 @@ def model_test(model, data):
 
 
 if __name__ == "__main__":
+    dst_path: Path = PROJECT_ROOT / "experiments/tab:abs-rel-performance-comparison/classification/graph_benchmark.tsv"
     # df = pd.read_csv((PROJECT_ROOT / "test.tsv"), sep="\t")
     # print(df.groupby(["relative", "dataset"]).agg([np.mean, np.std]))
     # exit()
@@ -256,22 +260,18 @@ if __name__ == "__main__":
     num_anchors: int = 300
 
     sweep = {
-        "seed_index": list(range(5)),
-        # "seed_index": [0],
+        "seed_index": list(range(10)),
         "dataset": ["Cora", "PubMed", "CiteSeer"],
         "num_epochs": [500],
         "in_channels": [num_anchors],
-        # "out_channels": [10, 32, 64],
         "out_channels": [num_anchors],
-        "num_layers": [32],
+        "num_layers": [32, 64],
         "num_anchors": [num_anchors],
         "dropout": [0.5],
-        # "hidden_fn": [torch.relu, torch.tanh, torch.sigmoid],
-        # "conv_fn": [torch.relu, torch.tanh, torch.sigmoid],
         "hidden_fn": [torch.nn.ReLU()],
         "conv_fn": [torch.nn.ReLU()],
         "optimizer": [torch.optim.Adam],
-        "lr": [0.02, 0.01],
+        "lr": [0.02],
         "encoder": [
             (
                 "GCN2Conv",
@@ -295,104 +295,113 @@ if __name__ == "__main__":
     print(f"Total available experiments={len(experiments)}")
 
     # for i, experiment in enumerate(pbar := tqdm(experiments, desc="Experiment")):
-    with (PROJECT_ROOT / "test.tsv").open("w", encoding="utf-8") as fw:
-        keys = list(sweep.keys())
-        keys.append("val_acc")
-        header: str = "\t".join(keys)
-        fw.write(f"{header}\n")
+    if not dst_path.exists():
+        with dst_path.open("w", encoding="utf-8") as fw:
+            keys = list(sweep.keys())
+            keys.append("val_acc")
+            header: str = "\t".join(keys)
+            fw.write(f"{header}\n")
 
-        for experiment in (pbar := tqdm(experiments, desc="Experiment")):
-            # pprint(experiment)
-            temp_log_level = seed_log.getEffectiveLevel()
-            seed_log.setLevel(logging.ERROR)
-            seed_index_everything(DictConfig({"seed_index": experiment["seed_index"]}))
-            seed_log.setLevel(temp_log_level)
+            for experiment in (pbar := tqdm(experiments, desc="Experiment")):
+                # pprint(experiment)
+                temp_log_level = seed_log.getEffectiveLevel()
+                seed_log.setLevel(logging.ERROR)
+                seed_index_everything(DictConfig({"seed_index": experiment["seed_index"]}))
+                seed_log.setLevel(temp_log_level)
 
-            dataset_name = experiment["dataset"]
-            num_anchors: int = experiment["num_anchors"]
+                dataset_name = experiment["dataset"]
+                num_anchors: int = experiment["num_anchors"]
 
-            dataset, data = get_data(dataset_name=dataset_name, num_anchors=num_anchors)
+                dataset, data = get_data(dataset_name=dataset_name, num_anchors=num_anchors)
 
-            encoder_name, encoder_build = experiment["encoder"]
-            if encoder_name == "GCN2Conv":
-                experiment["out_channels"] = num_anchors
-                experiment["in_channels"] = num_anchors
+                encoder_name, encoder_build = experiment["encoder"]
+                if encoder_name == "GCN2Conv":
+                    experiment["out_channels"] = num_anchors
+                    experiment["in_channels"] = num_anchors
 
-            hidden_proj = nn.Linear(dataset.num_features, experiment["in_channels"])
+                hidden_proj = nn.Linear(dataset.num_features, experiment["in_channels"])
 
-            convs = encoder_build(
-                num_layers=experiment["num_layers"],
-                in_channels=experiment["in_channels"],
-                out_channels=experiment["out_channels"],
-            )
-            class_proj = nn.Linear(experiment["out_channels"], dataset.num_classes)
+                convs = encoder_build(
+                    num_layers=experiment["num_layers"],
+                    in_channels=experiment["in_channels"],
+                    out_channels=experiment["out_channels"],
+                )
+                class_proj = nn.Linear(experiment["out_channels"], dataset.num_classes)
 
-            model = Net(
-                hidden_proj=hidden_proj,
-                hidden_fn=experiment["hidden_fn"],
-                relative_proj=RelativeAttention(
-                    n_anchors=num_anchors,
-                    n_classes=dataset.num_classes,
-                    similarity_mode="inner",
-                    values_mode="similarities",
-                    normalization_mode="l2",
-                ),
-                class_proj=class_proj,
-                convs=convs,
-                conv_fn=experiment["conv_fn"],
-                conv_out=experiment["out_channels"],
-                dropout=experiment["dropout"],
-                relative=experiment["relative"],
-            ).to(DEVICE)
-            data = data.to(DEVICE)
-            optimizer = experiment["optimizer"](
-                model.parameters(),
-                lr=experiment["lr"],
-            )
+                model = Net(
+                    hidden_proj=hidden_proj,
+                    hidden_fn=experiment["hidden_fn"],
+                    relative_proj=RelativeAttention(
+                        n_anchors=num_anchors,
+                        n_classes=dataset.num_classes,
+                        similarity_mode="inner",
+                        values_mode="similarities",
+                        normalization_mode="l2",
+                    ),
+                    class_proj=class_proj,
+                    convs=convs,
+                    conv_fn=experiment["conv_fn"],
+                    conv_out=experiment["out_channels"],
+                    dropout=experiment["dropout"],
+                    relative=experiment["relative"],
+                ).to(DEVICE)
+                data = data.to(DEVICE)
+                optimizer = experiment["optimizer"](
+                    model.parameters(),
+                    lr=experiment["lr"],
+                )
 
-            best_val_acc = 0
-            best_epoch = None
-            epochs = []
-            for epoch in range(experiment["num_epochs"]):
-                loss = train_step(model=model, optimizer=optimizer, data=data)
-                model_out, (train_acc, val_acc) = model_test(model=model, data=data)
-                # epochs.append(epoch_out)
-                if val_acc > best_val_acc:
-                    best_val_acc = val_acc
-                    best_epoch = {
-                        "rel_x": model_out[Output.SIMILARITIES].to("cpu", non_blocking=True),
-                        "epoch": epoch,
-                        "loss": loss,
-                        "train_acc": train_acc,
-                        "val_acc": val_acc,
-                    }
-                # print(
-                #     f"Epoch: {epoch:04d}, Loss: {loss:.4f} Train: {train_acc:.4f}, "
-                #     f"Val: {val_acc:.4f}, Test: {tmp_test_acc:.4f}, "
-                #     f"Final Test: {test_acc:.4f}"
-                # )
-            experiment["best_epoch"] = best_epoch
-            # experiment["epochs"] = epochs
-            # best_epoch = epochs[best_epoch]
-            pbar.set_description(
-                f"Epoch: {best_epoch['epoch']:04d}, Loss: {best_epoch['loss']:.4f} Train: {best_epoch['train_acc']:.4f}, "
-                f"Val: {best_epoch['val_acc']:.4f}"
-            )
+                best_val_acc = 0
+                best_epoch = None
+                epochs = []
+                for epoch in range(experiment["num_epochs"]):
+                    loss = train_step(model=model, optimizer=optimizer, data=data)
+                    model_out, (train_acc, val_acc) = model_test(model=model, data=data)
+                    # epochs.append(epoch_out)
+                    if val_acc > best_val_acc:
+                        best_val_acc = val_acc
+                        best_epoch = {
+                            "rel_x": model_out[Output.SIMILARITIES].to("cpu", non_blocking=True),
+                            "epoch": epoch,
+                            "loss": loss,
+                            "train_acc": train_acc,
+                            "val_acc": val_acc,
+                        }
+                    # print(
+                    #     f"Epoch: {epoch:04d}, Loss: {loss:.4f} Train: {train_acc:.4f}, "
+                    #     f"Val: {val_acc:.4f}, Test: {tmp_test_acc:.4f}, "
+                    #     f"Final Test: {test_acc:.4f}"
+                    # )
+                experiment["best_epoch"] = best_epoch
+                # experiment["epochs"] = epochs
+                # best_epoch = epochs[best_epoch]
+                pbar.set_description(
+                    f"Epoch: {best_epoch['epoch']:04d}, Loss: {best_epoch['loss']:.4f} Train: {best_epoch['train_acc']:.4f}, "
+                    f"Val: {best_epoch['val_acc']:.4f}"
+                )
 
-            items = []
-            for key in sweep.keys():
-                run_value = experiment[key]
-                if key == "encoder":
-                    run_value = run_value[0]
-                elif "_fn" in key:
-                    run_value = type(run_value).__name__
-                elif key == "optimizer":
-                    run_value = run_value.__name__
-                items.append(run_value)
-            items.append(best_epoch["val_acc"])
+                items = []
+                for key in sweep.keys():
+                    run_value = experiment[key]
+                    if key == "encoder":
+                        run_value = run_value[0]
+                    elif "_fn" in key:
+                        run_value = type(run_value).__name__
+                    elif key == "optimizer":
+                        run_value = run_value.__name__
+                    items.append(run_value)
+                items.append(best_epoch["val_acc"])
 
-            line: str = "\t".join(map(str, items))
-            fw.write(f"{line}\n")
-            fw.flush()
+                line: str = "\t".join(map(str, items))
+                fw.write(f"{line}\n")
+                fw.flush()
 
-            model.cpu()
+                model.cpu()
+
+    df = pd.read_csv(dst_path, sep="\t")
+    df = (
+        df.drop(columns=[col for col in df.columns if col not in {"val_acc", "dataset", "relative"}])[df.lr == 0.02]
+        .groupby(["relative", "dataset"])
+        .agg([np.mean, np.std])
+    )
+    print(df)
