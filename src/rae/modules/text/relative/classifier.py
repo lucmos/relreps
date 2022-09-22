@@ -249,14 +249,13 @@ class HFTextClassifier(nn.Module):
             self.transformer.requires_grad_(False)
             self.transformer.eval()
 
-    def call_transformer(self, encodings, sample_ids: Sequence[str]):
+    def call_transformer(self, encodings, mask: torch.Tensor, sample_ids: Sequence[str]):
         if any(sample_id not in self._cache for sample_id in sample_ids):
             sample_encodings = self.transformer(**encodings)["hidden_states"][-1]
             # TODO: aggregation mode
-            sample_lengths = encodings["attention_mask"].sum(dim=1)
             result = []
-            for sample_length, sample_encoding, sample_id in zip(sample_lengths, sample_encodings, sample_ids):
-                sample_encoding: torch.Tensor = sample_encoding[:sample_length].mean(dim=0)
+            for sample_encoding, sample_mask, sample_id in zip(sample_encodings, mask, sample_ids):
+                sample_encoding: torch.Tensor = sample_encoding[sample_mask].mean(dim=0)
                 result.append(sample_encoding)
                 self._cache[sample_id] = sample_encoding.cpu()
         else:
@@ -279,7 +278,9 @@ class HFTextClassifier(nn.Module):
                 for anchors_batch in chunk_iterable(self.metadata.anchor_samples, 128):
                     anchors_batch = to_device(self.text_encoder.collate_fn(batch=anchors_batch), device=device)
                     anchor_encodings = self.call_transformer(
-                        encodings=anchors_batch["encodings"], sample_ids=anchors_batch["index"]
+                        encodings=anchors_batch["encodings"],
+                        mask=anchors_batch["mask"],
+                        sample_ids=anchors_batch["index"],
                     )
                     self.anchor_encodings.append(anchor_encodings)
 
@@ -291,7 +292,9 @@ class HFTextClassifier(nn.Module):
             #     reduced_to_sentence=False,
             #     reduce_transformations=self.anchors_reduce,
             # )
-            x = self.call_transformer(encodings=batch["encodings"], sample_ids=batch["index"]).to(device)
+            x = self.call_transformer(encodings=batch["encodings"], mask=batch["mask"], sample_ids=batch["index"]).to(
+                device
+            )
 
         attention_output = self.relative_projection.encode(x=x, anchors=anchors)
 

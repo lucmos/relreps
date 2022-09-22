@@ -295,6 +295,10 @@ class TransformerEncoder(TextEncoder):
             A batch generated from the given samples
         """
         encodings = self.encode(text=[sample["data"] for sample in batch])
+
+        mask = encodings["attention_mask"] * encodings["special_tokens_mask"].bool().logical_not()
+        del encodings["special_tokens_mask"]
+
         batch = {key: [sample[key] for sample in batch] for key in batch[0].keys()}
 
         # encodings ~ (sample_index, sentence_index, word_index)
@@ -313,7 +317,8 @@ class TransformerEncoder(TextEncoder):
                 "target",
             }
         }
-        return dict(encodings=encodings, classes=classes, targets=targets, **other_params)
+
+        return dict(encodings=encodings, mask=mask, classes=classes, targets=targets, **other_params)
 
     def add_stopwords(self, stopwords: Set[str]):
         pass
@@ -344,7 +349,13 @@ class TransformerEncoder(TextEncoder):
 
     @torch.no_grad()
     def encode(self, text: Union[str, List[str]]) -> Optional[Sequence[torch.Tensor]]:
-        encoding: BatchEncoding = self.tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+        encoding: BatchEncoding = self.tokenizer(
+            text,
+            return_tensors="pt",
+            return_special_tokens_mask=True,
+            truncation=True,
+            padding=True,
+        )
         # encoding ~ (text, bpe, hidden)
         # TODO: support sentence level
 
