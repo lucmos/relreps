@@ -159,10 +159,10 @@ class LightningTextClassifier(AbstractLightningModule):
         return result
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
+        self.val_stage_metrics.reset()
+
         if self.trainer.sanity_checking:
             return
-
-        self.val_stage_metrics.reset()
 
         # data = {
         #     "is_anchor": [],
