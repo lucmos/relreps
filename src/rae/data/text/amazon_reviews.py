@@ -48,24 +48,24 @@ class AmazonReviews(Dataset):
 
         split2lang2class_dist = {}
         split2lang2classes = {}
-        split2lang2cat2texts: dict = {}
+        # split2lang2cat2texts: dict = {}
         lang2count = {}
         for split, dataset in full_dataset.items():
             dataset: HFDataset
             lang2classes = {}
-            lang2cat2texts = {}
+            # lang2cat2texts = {}
             for sample in tqdm(dataset, desc=f"Iterating {split} data"):
                 lang2count.setdefault(sample["language"], 0)
                 lang2count[sample["language"]] += 1
 
                 lang2classes.setdefault(sample["language"], []).append(sample[_TARGET_KEY])
-                lang2cat2texts.setdefault(sample["language"], {}).setdefault(sample["product_category"], []).append(
-                    f'{sample["review_title"]}. {sample["review_body"]}'
-                )
+                # lang2cat2texts.setdefault(sample["language"], {}).setdefault(sample["product_category"], []).append(
+                #     f'{sample["review_title"]}. {sample["review_body"]}'
+                # )
 
             split2lang2class_dist[split] = {lang: Counter(classes) for lang, classes in lang2classes.items()}
             split2lang2classes[split] = lang2classes
-            split2lang2cat2texts[split] = lang2cat2texts
+            # split2lang2cat2texts[split] = lang2cat2texts
 
         lang2count = Counter(lang2count)
 
@@ -165,7 +165,14 @@ class AmazonReviews(Dataset):
         index: int = int(index)
         sample = self.data[index]
         product_category: str = sample[_TARGET_KEY]
-        full_text: str = f'{sample["review_title"]}. {sample["review_body"]}'
+        title: str = sample["review_title"].strip('"').strip(".").strip()
+        body: str = sample["review_body"].strip('"').strip(".").strip()
+        if body.startswith("title"):
+            title = ""
+        else:
+            if title[-1].isalpha():
+                title = f"{title}."
+        full_text: str = f"{title} {body}".strip()
         return {
             "index": f"{self.split}/{index}",
             "data": full_text,

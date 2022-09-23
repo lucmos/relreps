@@ -100,13 +100,6 @@ class LightningTextClassifier(AbstractLightningModule):
         out = self(batch)
 
         loss = self.loss(out[Output.LOGITS], batch["targets"])
-        self.log(f"{stage}/logits/any_NaN", torch.isnan(out[Output.LOGITS]).sum(), on_step=True, on_epoch=True)
-        self.log(
-            f"{stage}/int_predictions/any_NaN",
-            torch.isnan(out[Output.INT_PREDICTIONS]).sum(),
-            on_step=True,
-            on_epoch=True,
-        )
 
         self.log_dict(
             {f"loss/{stage}": loss.cpu().detach()},
@@ -158,8 +151,7 @@ class LightningTextClassifier(AbstractLightningModule):
         return self.step(batch, batch_idx, stage=Stage.VAL_STAGE)
 
     def training_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
-        for metric_name, metric in self.train_stage_metrics.items():
-            metric.reset()
+        self.train_stage_metrics.reset()
 
     def state_dict(self, *args, **kwargs):
         result = super(LightningTextClassifier, self).state_dict(*args, **kwargs)
@@ -167,11 +159,10 @@ class LightningTextClassifier(AbstractLightningModule):
         return result
 
     def validation_epoch_end(self, outputs: List[Dict[str, Any]]) -> None:
-        for metric_name, metric in self.val_stage_metrics.items():
-            metric.reset()
-
         if self.trainer.sanity_checking:
             return
+
+        self.val_stage_metrics.reset()
 
         # data = {
         #     "is_anchor": [],

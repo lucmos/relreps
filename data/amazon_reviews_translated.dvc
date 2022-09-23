@@ -1,0 +1,5 @@
+outs:
+- md5: 99914faf0ebb135a6eef99d77967f79d.dir
+  size: 1863085
+  nfiles: 3
+  path: amazon_reviews_translated
