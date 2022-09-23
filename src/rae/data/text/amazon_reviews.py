@@ -167,12 +167,15 @@ class AmazonReviews(Dataset):
         product_category: str = sample[_TARGET_KEY]
         title: str = sample["review_title"].strip('"').strip(".").strip()
         body: str = sample["review_body"].strip('"').strip(".").strip()
-        if body.startswith("title"):
+
+        if body.lower().startswith(title.lower()):
             title = ""
-        else:
-            if title[-1].isalpha():
-                title = f"{title}."
-        full_text: str = f"{title} {body}".strip()
+        # TODO: COMPLETELY BUGGED FOR NO APPARENT REASON
+        # else:
+        #     if title[-1].isalpha():
+        #         title = f"{title}."
+
+        full_text: str = f"{title}. {body}".lstrip(".").strip()
         return {
             "index": f"{self.split}/{index}",
             "data": full_text,
