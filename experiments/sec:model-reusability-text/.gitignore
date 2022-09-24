@@ -3,3 +3,5 @@
 /nlp_stitching-amazon_reviews_multi_en.csv
 /nlp_stitching-dbpedia_14.csv
 /nlp_stitching-trec.csv
+/nlp_multilingual-stitching-amazon-coarse_grained-amazon_translated-0.25.tsv
+/nlp_multilingual-stitching-amazon-fine_grained-amazon_translated-0.25.tsv

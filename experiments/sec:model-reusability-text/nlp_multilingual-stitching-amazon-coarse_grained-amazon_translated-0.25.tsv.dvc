@@ -1,0 +1,4 @@
+outs:
+- md5: 30bcccf6c8b3f43fdbfcfcbd55398492
+  size: 12547
+  path: nlp_multilingual-stitching-amazon-coarse_grained-amazon_translated-0.25.tsv
