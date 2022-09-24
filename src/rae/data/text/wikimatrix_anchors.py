@@ -7,7 +7,7 @@ from nn_core.nn_types import Split
 
 
 class WikiMatrixAnchors(Dataset):
-    def __init__(self, split: Split, datamodule, path: str, language: str, lang2threshold: Mapping[str, float]):
+    def __init__(self, split: Split, path: str, language: str, lang2threshold: Mapping[str, float], **kwargs):
         self.split: Split = split
         self.language: str = language
 
