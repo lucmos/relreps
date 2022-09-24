@@ -1,7 +1,9 @@
 import json
+import random
 from pathlib import Path
 from typing import Mapping, Sequence, Set
 
+from pytorch_lightning import seed_everything
 from torch.utils.data import Dataset
 
 from nn_core.nn_types import Split
@@ -12,7 +14,19 @@ MULTILINGUAL_AMAZON_DIR: Path = PROJECT_ROOT / "data" / "amazon_reviews_translat
 
 
 class MultilingualAmazonAnchors(Dataset):
-    def __init__(self, split: Split, datamodule, path: str, language: str):
+    @classmethod
+    def get_anchor_idxs(cls, num_anchors: int):
+        total_samples: int = len(
+            (MULTILINGUAL_AMAZON_DIR / "translations.tsv").read_text(encoding="utf-8").splitlines()
+        )
+        assert num_anchors <= total_samples
+
+        seed_everything(42)
+        anchor_idxs = list(range(total_samples))
+        random.shuffle(anchor_idxs)
+        return anchor_idxs[:num_anchors]
+
+    def __init__(self, split: Split, language: str, **kwargs):
         self.split: Split = split
         self.language: str = language
 
@@ -56,8 +70,8 @@ class MultilingualAmazonAnchors(Dataset):
         return {
             "index": index,
             "data": sample["lang2text"][self.language],
-            "target": None,
-            "class": None,
+            "target": sample["stars"],
+            "class": str(sample["stars"]),
         }
 
     def __repr__(self) -> str:
