@@ -12,8 +12,8 @@ core:
 
 defaults:
   - hydra: default
-  - nn: text
-  - train: classification
+  - nn: vision
+  - train: reconstruction
   - _self_ # as last argument to allow the override of parameters via this main config
 #    Decomment this parameter to get parallel job running
 #  - hydra/launcher: joblib

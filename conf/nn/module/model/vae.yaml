@@ -1,3 +1,5 @@
 _target_: rae.modules.vae.VanillaVAE
 latent_dim: 500
 hidden_dims: null
+calibrated_loss: False
+kld_weight: 0.025
