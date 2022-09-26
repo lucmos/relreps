@@ -16,6 +16,8 @@ class VanillaVAE(nn.Module):
         input_size,
         latent_dim: int,
         hidden_dims: List = None,
+        calibrated_loss: bool = True,
+        kld_weight: float = 1,
         **kwargs,
     ) -> None:
         """https://github.com/AntixK/PyTorch-VAE/blob/master/models/vanilla_vae.py
@@ -31,6 +33,8 @@ class VanillaVAE(nn.Module):
         self.metadata = metadata
         self.input_size = input_size
         self.latent_dim = latent_dim
+        self.calibrated_loss = calibrated_loss
+        self.kld_weight = kld_weight
 
         self.encoder, self.encoder_out_shape, self.decoder = build_dynamic_encoder_decoder(
             width=metadata.width,
@@ -109,7 +113,7 @@ class VanillaVAE(nn.Module):
     def _compute_kl_loss(self, mean, log_variance):
         return -0.5 * torch.sum(1 + log_variance - mean.pow(2) - log_variance.exp())
 
-    def loss_function(self, model_out, batch, *args, **kwargs) -> dict:
+    def _calibrated_loss_function(self, model_out, batch, *args, **kwargs) -> dict:
         """https://stackoverflow.com/questions/64909658/what-could-cause-a-vaevariational-autoencoder-to-output-random-noise-even-afte
 
         Computes the VAE loss function.
@@ -133,6 +137,46 @@ class VanillaVAE(nn.Module):
             "reconstruction": r_loss.detach() / targets.shape[0],
             "kld": kl_loss.detach() / targets.shape[0],
         }
+
+    def _uncalibrated_loss_function(self, model_out, batch, *args, **kwargs) -> dict:
+        """https://github.com/AntixK/PyTorch-VAE/blob/a6896b944c918dd7030e7d795a8c13e5c6345ec7/experiment.py#L15
+
+        Computes the VAE loss function.
+        KL(N(\mu, \sigma), N(0, 1)) = \log \frac{1}{\sigma} + \frac{\sigma^2 + \mu^2}{2} - \frac{1}{2}
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        predictions = model_out[Output.RECONSTRUCTION]
+        targets = batch["image"]
+        mean = model_out[Output.LATENT_MU]
+        log_variance = model_out[Output.LATENT_LOGVAR]
+
+        kld_weight = self.kld_weight  # Account for the minibatch samples from the dataset
+        recons_loss = F.mse_loss(predictions, targets)
+
+        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_variance - mean**2 - log_variance.exp(), dim=1), dim=0)
+
+        loss = recons_loss + kld_weight * kld_loss
+        return {
+            "loss": loss,
+            "Reconstruction_Loss": recons_loss.detach(),
+            "KLD": -kld_loss.detach(),
+        }
+
+    def loss_function(self, model_out, batch, *args, **kwargs) -> dict:
+        """https://stackoverflow.com/questions/64909658/what-could-cause-a-vaevariational-autoencoder-to-output-random-noise-even-afte
+
+        Computes the VAE loss function.
+        KL(N(mu, sigma), N(0, 1)) = log frac{1}{sigma} + frac{sigma^2 + mu^2}{2} - frac{1}{2}
+        :param args:
+        :param kwargs:
+        :return:
+        """
+        if self.calibrated_loss:
+            return self._calibrated_loss_function(model_out=model_out, batch=batch, *args, **kwargs)
+        else:
+            return self._uncalibrated_loss_function(model_out=model_out, batch=batch, *args, **kwargs)
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
         """
