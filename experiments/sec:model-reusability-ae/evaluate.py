@@ -264,7 +264,7 @@ def display_performance(performance_df, display: Display):
         METRIC_CONSIDERED = "mse"
 
         df = aggregated_perfomance[METRIC_CONSIDERED]
-        reconstruction_str = r"{} & {} & {}  & {} \\[1ex]"
+        reconstruction_str = r"{} & {} & {}  & {} & {} \\[1ex]"
 
         def latex_float(f):
             float_str = "{0:.2f}".format(f)
@@ -277,7 +277,9 @@ def display_performance(performance_df, display: Display):
         def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str, stitching: bool, p=3) -> str:
             try:
                 mean_std = df.loc[dataset_name, model_type, stitching]
-                return rf"${latex_float(mean_std['mean'] * 10**p)} \pm {latex_float(mean_std['std'] * 10**p)} \times 10^{{{-p}}}$"
+                mean = mean_std["mean"] * 10**p
+                std = mean_std["std"] * 10**p
+                return mean, std
             except (AttributeError, KeyError):
                 return "?"
 
@@ -285,13 +287,19 @@ def display_performance(performance_df, display: Display):
             ("ae", "rel_ae", "vae", "rel_vae"), ("AE", "Rel AE", "VAE", "Rel VAE")
         ):
             for stitching in [False, True]:
-
-                s = reconstruction_str.format(
-                    *[
-                        extract_mean_std(df, dataset_name, available_model_type, stitching)
-                        for dataset_name in COLUMN_ORDER
-                    ],
+                str_nums = []
+                all_means = 0
+                all_stds = 0
+                for dataset_name in COLUMN_ORDER:
+                    (mean, std) = extract_mean_std(df, dataset_name, available_model_type, stitching)
+                    all_means += mean
+                    all_stds += std
+                    str_num = rf"${latex_float(mean)} \pm {latex_float(std)}$"
+                    str_nums.append(str_num)
+                str_nums.append(
+                    rf"${latex_float(all_means / len(COLUMN_ORDER))} \pm {latex_float(all_stds / len(COLUMN_ORDER))}$"
                 )
+                s = reconstruction_str.format(*str_nums)
                 print(stitching, available_model_name)
                 print(s)
 
