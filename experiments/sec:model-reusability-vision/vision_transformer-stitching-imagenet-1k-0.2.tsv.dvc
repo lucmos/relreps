@@ -1,0 +1,4 @@
+outs:
+- md5: 8a909db4d12625422aa915413b2604fb
+  size: 8654
+  path: vision_transformer-stitching-imagenet-1k-0.2.tsv
