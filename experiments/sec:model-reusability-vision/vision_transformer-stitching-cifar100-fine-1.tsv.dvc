@@ -1,4 +1,4 @@
 outs:
-- md5: 3f68ab43393c4f9bbba62fcec976c1d5
-  size: 8716
+- md5: 3e95a5226f6fce7de599f454c0dba8b6
+  size: 8621
   path: vision_transformer-stitching-cifar100-fine-1.tsv
