@@ -14,7 +14,7 @@ python src/rae/run.py -m \
   nn.module.model.latent_dim=500 \
   "nn.module.model.hidden_dims=null" \
   "nn.module.model.calibrated_loss=False" \
-  "nn.module.model.kld_weight=0.0025" \
+  "nn.module.model.kld_weight=0.00042" \
   nn.data.anchors_num=500 \
   train.trainer.max_epochs=150
 

@@ -103,7 +103,7 @@ class VanillaVAE(nn.Module):
         :param logvar: (Tensor) Standard deviation of the latent Gaussian [B x D]
         :return: (Tensor) [B x D]
         """
-        if self.training:
+        if self.training or not self.calibrated_loss:
             std = torch.exp(0.5 * logvar)
             eps = torch.randn_like(std)
             return eps * std + mu
