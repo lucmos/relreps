@@ -1,0 +1,4 @@
+outs:
+- md5: de4ef88583b810d929877e8ace81afab
+  size: 4783372
+  path: Cora_data_manifold_stats.tsv
