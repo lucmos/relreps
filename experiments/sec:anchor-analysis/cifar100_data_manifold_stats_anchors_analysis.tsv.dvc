@@ -1,0 +1,4 @@
+outs:
+- md5: b58186207d596bd5bd71184d5714c26c
+  size: 118971
+  path: cifar100_data_manifold_stats_anchors_analysis.tsv
