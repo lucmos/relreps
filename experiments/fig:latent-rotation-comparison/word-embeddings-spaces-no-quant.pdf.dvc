@@ -1,0 +1,4 @@
+outs:
+- md5: 8e3ce691727c5b6685ab46821cc24722
+  size: 559607
+  path: word-embeddings-spaces-no-quant.pdf
