@@ -1,0 +1,4 @@
+outs:
+- md5: f1eed588ea1d5df1fbc6877c25ee43d6
+  size: 560309
+  path: word-embeddings-qualitative-tsne.pdf

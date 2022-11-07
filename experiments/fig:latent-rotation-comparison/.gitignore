@@ -7,4 +7,6 @@
 /rel_ae.pdf
 /word-embeddings-spaces.pdf
 /semantic_horizon.tsv
-/word-embeddings-spaces-no-quant.pdf
+/word-embeddings-qualitative-first_dims.pdf
+/word-embeddings-qualitative-pca.pdf
+/word-embeddings-qualitative-tsne.pdf
