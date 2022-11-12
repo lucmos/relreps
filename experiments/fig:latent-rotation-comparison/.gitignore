@@ -11,3 +11,7 @@
 /word-embeddings-qualitative-pca.pdf
 /word-embeddings-qualitative-tsne.pdf
 /quantitative_analysis.tsv
+/encoded_data
+/anchor_infos.pt
+/anchor_infos_cv.pt
+/quantitative_analysis_cv.tsv

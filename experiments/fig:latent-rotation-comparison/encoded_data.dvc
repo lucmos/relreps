@@ -1,0 +1,5 @@
+outs:
+- md5: 25dcbd5c6e94fc2a2d0219308d43cef6.dir
+  size: 2168045697
+  nfiles: 4
+  path: encoded_data

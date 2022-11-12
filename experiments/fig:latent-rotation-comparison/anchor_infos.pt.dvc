@@ -1,0 +1,4 @@
+outs:
+- md5: 15d1098c359855c1603bf862c55f518e
+  size: 86788129
+  path: anchor_infos.pt
