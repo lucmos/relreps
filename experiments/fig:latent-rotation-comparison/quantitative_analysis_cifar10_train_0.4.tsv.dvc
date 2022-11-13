@@ -1,0 +1,4 @@
+outs:
+- md5: 1c3557e55e487fcc5b06e5b144f496d2
+  size: 26490
+  path: quantitative_analysis_cifar10_train_0.4.tsv
