@@ -15,3 +15,6 @@
 /anchor_infos.pt
 /anchor_infos_cv.pt
 /quantitative_analysis_cv.tsv
+/embeddings-qualitative-cifar10_train_0.4-first_dims.pdf
+/embeddings-qualitative-cifar10_train_0.4-pca.pdf
+/embeddings-qualitative-cifar10_train_0.4-tsne.pdf
