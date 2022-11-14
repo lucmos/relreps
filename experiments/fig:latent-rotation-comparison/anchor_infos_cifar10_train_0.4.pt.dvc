@@ -1,4 +1,4 @@
 outs:
-- md5: 4c92f3f1e600af3dc0639f5dad4ba73c
-  size: 129397713
+- md5: ec2ac1098f9ebc8ec1036caf91991143
+  size: 129397585
   path: anchor_infos_cifar10_train_0.4.pt
