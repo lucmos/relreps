@@ -1,0 +1,4 @@
+outs:
+- md5: 1850c997297955394f80c2a5f14df8ec
+  size: 3251371
+  path: Cora_best_run.pt

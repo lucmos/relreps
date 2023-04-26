@@ -5,11 +5,14 @@ core:
   version: ${version:}
   tags:
     - develop
+    - semantic_horizon
+    - stitching
+    - multilingual
   name: null
 
 defaults:
   - hydra: default
-  - nn: default
+  - nn: vision
   - train: reconstruction
   - _self_ # as last argument to allow the override of parameters via this main config
 #    Decomment this parameter to get parallel job running

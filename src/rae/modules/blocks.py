@@ -31,6 +31,39 @@ class LearningBlock(nn.Module):
         return self.norm2(x_transformed + x_normalized)
 
 
+class DeepProjection(nn.Module):
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        dropout: float,
+        num_layers: int = 5,
+        activation: torch.nn.modules.activation = None,
+    ):
+        super().__init__()
+        projection_inputs = [int(in_features // (2**in_dim)) for in_dim in range(0, num_layers)]
+        projection_outputs = projection_inputs[1:] + [out_features]
+
+        self.dropout = torch.nn.Dropout(p=dropout)
+        self.activation = activation
+        self.projection_layers = torch.nn.ModuleList(
+            [
+                torch.nn.Linear(input_dim, output_dim)
+                for input_dim, output_dim in zip(projection_inputs, projection_outputs)
+            ]
+        )
+        self.batch_norms = torch.nn.ModuleList([torch.nn.BatchNorm1d(input_dim) for input_dim in projection_inputs])
+
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
+        for projection_layer, batch_norm in zip(self.projection_layers, self.batch_norms):
+            data = batch_norm(data)
+            if self.activation is not None:
+                data = self.activation(data)
+            data = self.dropout(data)
+            data = projection_layer(data)
+        return data
+
+
 class ResidualBlock(nn.Module):
     """A residual block as defined by He et al.
 

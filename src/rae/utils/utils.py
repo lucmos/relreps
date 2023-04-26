@@ -1,8 +1,15 @@
-from typing import Any, Dict, Iterable, Sequence, Union
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Sequence, Union
 
 import torch
 import torch.nn.functional as F
 from sklearn.decomposition import PCA
+from torch.types import Device
+
+try:
+    # be ready for 3.10 when it drops
+    from enum import StrEnum  # noqa
+except ImportError:
+    from backports.strenum import StrEnum  # noqa
 
 
 def check_all_equal_size(elements: Iterable[Any]) -> bool:
@@ -68,3 +75,26 @@ def add_2D_latents(
     aggregation["latent_1_pca"] = latents_pca[:, 1]
 
     return aggregation
+
+
+def to_device(mapping: MutableMapping, device: Device, non_blocking: bool = False):
+    mapped = {
+        key: to_device(value, device=device, non_blocking=non_blocking)
+        if isinstance(value, Mapping)
+        else (value.to(device, non_blocking=non_blocking) if hasattr(value, "to") else value)
+        for key, value in mapping.items()
+    }
+    return mapped
+
+
+def chunk_iterable(iterable: Iterable, chunk_size: int):
+    chunk: list = []
+
+    for e in iterable:
+        chunk.append(e)
+        if len(chunk) == chunk_size:
+            yield list(chunk)
+            chunk = []
+
+    if len(chunk) != 0:
+        yield list(chunk)

@@ -1,0 +1,5 @@
+outs:
+- md5: 64cc084997aefa4a2806ab99e3047288.dir
+  size: 4941583456
+  nfiles: 32
+  path: multilingual_amazon

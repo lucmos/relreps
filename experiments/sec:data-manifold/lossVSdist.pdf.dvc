@@ -1,0 +1,4 @@
+outs:
+- md5: dceffbddcb15094f7057edf5ca50587c
+  size: 26669
+  path: lossVSdist.pdf

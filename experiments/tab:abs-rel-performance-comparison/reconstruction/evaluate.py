@@ -186,24 +186,24 @@ def display_performance(performance_df, display: Display):
         rich.print(aggregated_perfomance)
 
     elif display == Display.LATEX:
-        COLUMN_ORDER = ["mnist", "cmnist", "fmnist", "cifar10", "cifar100", "shapenet", "faust", "coma", "amz"]
+        COLUMN_ORDER = ["mnist", "fmnist", "cifar10", "cifar100"]
         METRIC_CONSIDERED = "mse"
 
         df = aggregated_perfomance[METRIC_CONSIDERED]
-        reconstruction_str = r"{} & {} & {} & {} & {} & {} & {} & {} & {} & {} \\[1ex]"
+        reconstruction_str = r"{} & {} & {} & {} & {}  \\[1ex]"
 
         def latex_float(f):
-            float_str = "{0:.2e}".format(f)
+            float_str = "{0:.2f}".format(f)
             if "e" in float_str:
                 base, exponent = float_str.split("e")
                 return r"{0} \times 10^{{{1}}}".format(base, int(exponent))
             else:
                 return float_str
 
-        def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str) -> str:
+        def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str, p=3) -> str:
             try:
                 mean_std = df.loc[dataset_name, model_type]
-                return rf"${latex_float(mean_std['mean'])} \pm {latex_float(mean_std['std'])}$"
+                return rf"${latex_float(mean_std['mean'] * 10**p)} \pm {latex_float(mean_std['std'] *  10**p)} \times 10^{{{-p}}}$"
             except (AttributeError, KeyError):
                 return "?"
 

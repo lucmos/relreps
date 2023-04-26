@@ -6,3 +6,9 @@
 /cifar-10-batches-py
 /cifar-100-python
 /fasttext
+/anchor_dataset
+
+amazon_reviews
+trec
+pyg
+/amazon_reviews_translated

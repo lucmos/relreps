@@ -1,0 +1,4 @@
+outs:
+- md5: d332d350fa564e30010b6132bb1f3cb3
+  size: 590547
+  path: embeddings-qualitative-cifar10_train_0.4-tsne.pdf

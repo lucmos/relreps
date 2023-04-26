@@ -1,0 +1,66 @@
+data:
+  _target_: rae.data.datamodule.MyDataModule
+
+#  anchors_mode: "stratified_subset" # "stratified", "stratified_subset", "fixed", "random_images", "random_latents"
+#  anchors_num: 500
+
+  # Different classes for anchors
+  anchors_idxs: null #[0, 1, 2, 3, 4, 5, 7, 13, 15, 17]
+
+#
+#   ALl anchors from class seven
+#  anchors_idx: [0, 17, 26, 34, 36, 41, 60, 64, 70, 75]
+
+  latent_dim: ${oc.select:nn.module.autoencoder.latent_dim,null}
+
+  val_fixed_sample_idxs: [7371, 3963, 2861, 1701, 3172,
+                          1749, 7023, 1606, 6481, 1377,
+                          6003, 3593, 3410, 3399, 7277,
+                          5337, 968, 8206, 288, 1968,
+                          5677, 9156, 8139, 7660, 7089,
+                          1893, 3845, 2084, 1944, 3375,
+                          4848, 8704, 6038, 2183, 7422,
+                          2682, 6878, 6127, 2941, 5823,
+                          9129, 1798, 6477, 9264, 476,
+                          3007, 4992, 1428, 9901, 5388]
+
+  datasets: ???
+
+  gpus: ${train.trainer.gpus}
+
+  num_workers:
+    train: 8
+    val: 8
+    test: 8
+
+  batch_size:
+    train: 64
+    val: 64
+    test: 32
+
+module:
+  plot_n_val_samples: 1000
+  fit_pca_each_epoch: True
+
+  optimizer:
+    #  Adam-oriented deep learning
+    _target_: torch.optim.Adam
+    #  These are all default parameters for the Adam optimizer
+    lr: 1e-4
+    betas: [ 0.9, 0.999 ]
+    eps: 1e-08
+    weight_decay: 0
+
+#  lr_scheduler:
+#    _target_: torch.optim.lr_scheduler.CosineAnnealingWarmRestarts
+#    T_0: 20
+#    T_mult: 1
+#    eta_min: 0
+#    last_epoch: -1
+#    verbose: False
+
+
+defaults:
+  - _self_
+  - data: text # pick one of the yamls in nn/data/
+  - module: hf_text_classifier # ae_variational # classifier #  ae_deterministic #

@@ -132,9 +132,20 @@ def stratified_mean(
     return torch.mm(sparse_avg_matrix, samples.T).T
 
 
+def contiguous_mean(x: torch.Tensor, sections: torch.Tensor):
+    index: torch.Tensor = torch.arange(sections.shape[0], device=x.device, dtype=torch.long)
+    index = index.unsqueeze(-1).repeat(1, x.shape[1])
+    index = torch.repeat_interleave(index, sections, dim=0)
+
+    to_fill = torch.zeros(sections.size(0), x.size(1), device=x.device, dtype=x.dtype)
+    scattered = to_fill.scatter_add(0, index, x) * (1 / sections.unsqueeze(-1))
+
+    return scattered
+
+
 def detach_tensors(x: Any) -> Any:
     if isinstance(x, torch.Tensor):
-        return x.detach()  # .cpu()
+        return x.detach().cpu()
     else:
         return x
 

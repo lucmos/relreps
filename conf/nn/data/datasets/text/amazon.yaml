@@ -1,0 +1,28 @@
+language: en
+
+val_fixed_sample_idxs: [1003, 1371, 3798, 265, 627, 1072, 2020, 1019, 4723, 2214, 4095, 4522, 3761,
+                        1692, 4086, 2305, 2152, 479, 2716, 4909, 547, 3409, 134, 4968, 1345, 1042, 3283,
+                        4473, 4915, 3500, 1308, 3138, 1599, 316, 3421, 2172, 1651, 344, 3397, 1158, 2838,
+                        4645, 2877, 1493, 1467, 4238, 3466, 839, 3827, 2064]
+
+anchors:
+  _target_: rae.data.text.WikiMatrixAnchors
+  language: ${nn.data.datasets.language}
+  lang2threshold:
+    es: 1.06
+    fr: 1.06
+    ja: 1.06
+
+train:
+  _target_: rae.data.text.AmazonReviews
+  language: ${nn.data.datasets.language}
+
+val:
+  - _target_: rae.data.text.AmazonReviews
+    language: ${nn.data.datasets.language}
+#  - _target_: rae.data.text.AmazonReviews
+#    language: es
+
+#    test:
+#      - _target_: rae.data.text.AmazonReviews
+#       language: ${..language}

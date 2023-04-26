@@ -22,6 +22,8 @@ class Output(StrEnum):
     LOSS = auto()
     BATCH = auto()
     ANCHORS_OUT = auto()
+    INT_PREDICTIONS = auto()
+    STR_PREDICTIONS = auto()
 
 
 class SupportedViz(StrEnum):

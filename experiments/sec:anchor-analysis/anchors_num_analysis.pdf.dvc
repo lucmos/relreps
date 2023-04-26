@@ -1,0 +1,4 @@
+outs:
+- md5: c48eb47f67287b0fe29bd12be38af1ff
+  size: 230824
+  path: anchors_num_analysis.pdf

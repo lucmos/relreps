@@ -1,0 +1,10 @@
+/checkpoints
+/nlp_multilingual-stitching-amazon-coarse_grained-amazon_translated-0.25.tsv
+/nlp_multilingual-stitching-amazon-fine_grained-amazon_translated-0.25.tsv
+/nlp_multilingual-stitching-amazon-coarse_grained-wikimatrix-0.25.tsv
+/nlp_multilingual-stitching-amazon-fine_grained-wikimatrix-0.25.tsv
+/nlp_stitching-amazon_reviews_multi_en_coarse.tsv
+/nlp_stitching-trec.tsv
+/nlp_stitching-amazon_reviews_multi_en_fine_grained.tsv
+/nlp_stitching-dbpedia_14.tsv
+/nlp_multilingual-stitching-amazon-fine_grained-amazon_translated-0.25-xlmr.tsv

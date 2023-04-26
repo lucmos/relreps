@@ -247,8 +247,8 @@ def display_performance(performance_df, display: Display):
     aggregated_perfomance = (
         aggregated_perfomance[["mse", "ergas", "psnr", "ssim"]]
         .reindex([True, False], level="stitching")
-        .reindex(["mnist", "fmnist", "cifar10"], level="dataset_name")
-        .reindex(["mnist", "fmnist", "cifar10"], level="dataset_name")
+        .reindex(["mnist", "fmnist", "cifar10", "cifar100"], level="dataset_name")
+        .reindex(["mnist", "fmnist", "cifar10", "cifar100"], level="dataset_name")
     )
 
     if display == Display.DF:
@@ -259,24 +259,27 @@ def display_performance(performance_df, display: Display):
             "mnist",
             "fmnist",
             "cifar10",
+            "cifar100",
         ]
         METRIC_CONSIDERED = "mse"
 
         df = aggregated_perfomance[METRIC_CONSIDERED]
-        reconstruction_str = r"{} & {} & {} & {}\\[1ex]"
+        reconstruction_str = r"{} & {} & {}  & {} & {} \\[1ex]"
 
         def latex_float(f):
-            float_str = "{0:.2e}".format(f)
+            float_str = "{0:.2f}".format(f)
             if "e" in float_str:
                 base, exponent = float_str.split("e")
                 return r"{0} \times 10^{{{1}}}".format(base, int(exponent))
             else:
                 return float_str
 
-        def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str, stitching: bool) -> str:
+        def extract_mean_std(df: pd.DataFrame, dataset_name: str, model_type: str, stitching: bool, p=3) -> str:
             try:
                 mean_std = df.loc[dataset_name, model_type, stitching]
-                return rf"${latex_float(mean_std['mean'])} \pm {latex_float(mean_std['std'])}$"
+                mean = mean_std["mean"] * 10**p
+                std = mean_std["std"] * 10**p
+                return mean, std
             except (AttributeError, KeyError):
                 return "?"
 
@@ -284,15 +287,21 @@ def display_performance(performance_df, display: Display):
             ("ae", "rel_ae", "vae", "rel_vae"), ("AE", "Rel AE", "VAE", "Rel VAE")
         ):
             for stitching in [False, True]:
-
-                s = reconstruction_str.format(
-                    available_model_name,
-                    *[
-                        extract_mean_std(df, dataset_name, available_model_type, stitching)
-                        for dataset_name in COLUMN_ORDER
-                    ],
+                str_nums = []
+                all_means = 0
+                all_stds = 0
+                for dataset_name in COLUMN_ORDER:
+                    (mean, std) = extract_mean_std(df, dataset_name, available_model_type, stitching)
+                    all_means += mean
+                    all_stds += std
+                    str_num = rf"${latex_float(mean)} \pm {latex_float(std)}$"
+                    str_nums.append(str_num)
+                str_nums.append(
+                    rf"${latex_float(all_means / len(COLUMN_ORDER))} \pm {latex_float(all_stds / len(COLUMN_ORDER))}$"
                 )
-                print(stitching, s)
+                s = reconstruction_str.format(*str_nums)
+                print(stitching, available_model_name)
+                print(s)
 
 
 def evaluate(force_predict: bool = False, force_measure: bool = False, display: Display = Display.DF):

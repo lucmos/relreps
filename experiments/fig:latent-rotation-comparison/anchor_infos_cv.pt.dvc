@@ -1,0 +1,4 @@
+outs:
+- md5: 15a0d580a7c95f99c8226cf70312e753
+  size: 567089697
+  path: anchor_infos_cv.pt
