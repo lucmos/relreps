@@ -1,0 +1,4 @@
+outs:
+- md5: 449c179b5d6682376979dd9d30da4b21
+  size: 589245
+  path: embeddings-qualitative-cifar10_train_0.4-pca.pdf

@@ -8,3 +8,5 @@
 /score_vs_distance.pdf
 /correlation_subfigure.pdf
 /Cora_data_manifold_stats.tsv
+/Cora_data_manifold_stats_hparams.tsv
+/Cora_data_best_run.tsv

@@ -1,0 +1,4 @@
+outs:
+- md5: 902c40e77c56bf13b8c91f4680ff498c
+  size: 568637
+  path: word-embeddings-qualitative-first_dims.pdf

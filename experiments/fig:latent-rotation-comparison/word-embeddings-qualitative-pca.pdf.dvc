@@ -1,0 +1,4 @@
+outs:
+- md5: 022f6fd55ca10702e7e514a51b99ffe1
+  size: 554169
+  path: word-embeddings-qualitative-pca.pdf
