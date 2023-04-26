@@ -1,6 +1,9 @@
 # Relative representations enable zero-shot latent space communication
 
-[OpenReview](https://openreview.net/forum?id=SrC-nwieGJ) | [arXiv](https://arxiv.org/abs/2209.15430) | [BibTeX](#bibtex)
+[Slides](https://lucmos.github.io/relreps-presentation/) |
+[OpenReview](https://openreview.net/forum?id=SrC-nwieGJ) |
+[arXiv](https://arxiv.org/abs/2209.15430) |
+[BibTeX](#bibtex)
 
 <p align="center">
     <img alt="NN Template" src="./data/assets/latent_rotation.svg" width="1200">
