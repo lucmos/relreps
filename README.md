@@ -6,7 +6,7 @@
 [BibTeX](#bibtex)
 
 <p align="center">
-    <img alt="NN Template" src="./data/assets/latent_rotation.svg" width="1200">
+    <img alt="NN Template" src="./data/assets/teaser.gif">
 </p>
 
 [Luca Moschella](https://luca.moschella.dev/)\*,
